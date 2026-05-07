@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
+import InsightsPanel from "../components/InsightsPanel";
 
 export default function ContactDetail() {
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
@@ -46,6 +47,8 @@ export default function ContactDetail() {
       </div>
 
       <StatsStrip accountId={accountId} contactId={cid} />
+
+      <InsightsPanel entries={entries} />
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Activity timeline</h3>
