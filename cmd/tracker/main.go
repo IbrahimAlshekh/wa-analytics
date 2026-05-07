@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -28,36 +29,61 @@ func init() {
 	waStore.DeviceProps.Os = proto.String("Whatsapp web")
 }
 
-func main() {
-	// Early stderr-only logger until we have the data dir.
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})))
+type AuditHandler struct {
+	slog.Handler
+}
 
+func (h *AuditHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	if level >= config.LevelAudit {
+		return true
+	}
+	return h.Handler.Enabled(ctx, level)
+}
+
+func main() {
 	cfg, err := config.Load()
 	if err != nil {
+		// Use a basic logger just for the config error
 		slog.Error("load config", "err", err)
 		os.Exit(1)
 	}
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		slog.Error("create data dir", "path", cfg.DataDir, "err", err)
-		os.Exit(1)
+
+	var logWriter io.Writer = io.Discard
+	baseLevel := slog.LevelError + 10 // Practically disabled
+	if cfg.EnableTerminalLogs || cfg.EnableLogs {
+		if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "create data dir failed: %v\n", err)
+			os.Exit(1)
+		}
+		logPath := filepath.Join(cfg.DataDir, "tracker.log")
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "open log file failed: %v\n", err)
+			os.Exit(1)
+		}
+		defer logFile.Close()
+
+		if cfg.EnableTerminalLogs {
+			logWriter = io.MultiWriter(os.Stderr, logFile)
+		} else {
+			logWriter = logFile
+		}
+		baseLevel = slog.LevelDebug
+	} else {
+		// If logs are disabled, still allow Audit logs to stderr
+		logWriter = os.Stderr
 	}
 
-	// Set up file logging — append to tracker.log in the data dir.
-	logPath := filepath.Join(cfg.DataDir, "tracker.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		slog.Error("open log file", "path", logPath, "err", err)
-		os.Exit(1)
+	h := &AuditHandler{
+		Handler: slog.NewTextHandler(logWriter, &slog.HandlerOptions{
+			Level: baseLevel,
+		}),
 	}
-	defer logFile.Close()
+	slog.SetDefault(slog.New(h))
 
-	w := io.MultiWriter(os.Stderr, logFile)
-	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})))
-	slog.Info("logging to file", "path", logPath)
+	if cfg.EnableLogs || cfg.EnableTerminalLogs {
+		slog.Info("logging initialized", "terminal", cfg.EnableTerminalLogs)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -84,10 +110,10 @@ func main() {
 	// insert it in DB, register with the manager, then start tracking.
 	manager.OnPaired = func(client *wa.Client) {
 		jid := client.OwnJID()
-		slog.Info("main: new account paired", "jid", jid)
+		slog.Log(context.Background(), config.LevelAudit, "main: new account paired", "jid", jid)
 		acc, err := store.InsertAccount(ctx, jid, "")
 		if err != nil {
-			slog.Error("main: insert account failed", "jid", jid, "err", err)
+			slog.Log(context.Background(), config.LevelAudit, "main: insert account failed", "jid", jid, "err", err)
 			return
 		}
 		manager.RegisterPaired(acc.ID)

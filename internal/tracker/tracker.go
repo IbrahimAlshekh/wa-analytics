@@ -11,6 +11,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 )
@@ -138,20 +139,20 @@ func (t *Tracker) Stop() {
 func (t *Tracker) HandleEvent(evt any) {
 	switch v := evt.(type) {
 	case *events.Connected:
-		slog.Info("tracker: connected", "accountID", t.accountID, "jid", t.wa.OwnJID())
+		slog.Log(t.ctx, config.LevelAudit, "tracker: connected", "accountID", t.accountID, "jid", t.wa.OwnJID())
 		t.hub.Broadcast("auth.linked", map[string]any{"accountID": t.accountID, "ownJID": t.wa.OwnJID()})
 		t.onConnected()
 
 	case *events.Disconnected:
-		slog.Warn("tracker: disconnected", "accountID", t.accountID)
+		slog.Log(t.ctx, config.LevelAudit, "tracker: disconnected", "accountID", t.accountID)
 
 	case *events.LoggedOut:
-		slog.Warn("tracker: logged out", "accountID", t.accountID, "reason", v.Reason.String())
+		slog.Log(t.ctx, config.LevelAudit, "tracker: logged out", "accountID", t.accountID, "reason", v.Reason.String())
 		t.hub.Broadcast("auth.logout", map[string]any{"accountID": t.accountID, "reason": v.Reason.String()})
 		t.stopWorkers()
 
 	case *events.PairSuccess:
-		slog.Info("tracker: pair success", "accountID", t.accountID, "jid", v.ID.String())
+		slog.Log(t.ctx, config.LevelAudit, "tracker: pair success", "accountID", t.accountID, "jid", v.ID.String())
 
 	case *events.Presence:
 		t.onPresence(v)

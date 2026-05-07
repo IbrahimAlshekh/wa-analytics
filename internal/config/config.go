@@ -3,18 +3,23 @@ package config
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 )
 
+const LevelAudit slog.Level = slog.LevelError + 1
+
 type Config struct {
-	DataDir      string
-	ListenAddr   string
-	PollInterval time.Duration
-	Bearer       string
-	Dev          bool
-	WALogLevel   string
+	DataDir            string
+	ListenAddr         string
+	PollInterval       time.Duration
+	Bearer             string
+	Dev                bool
+	WALogLevel         string
+	EnableLogs         bool
+	EnableTerminalLogs bool
 }
 
 func Load() (Config, error) {
@@ -29,6 +34,8 @@ func Load() (Config, error) {
 	bearer := flag.String("bearer", os.Getenv("WT_BEARER"), "optional bearer token for /api access")
 	dev := flag.Bool("dev", envBool("WT_DEV", false), "enable dev CORS for Vite proxy")
 	waLog := flag.String("walog", envOr("WT_WA_LOG", "INFO"), "whatsmeow log level (DEBUG|INFO|WARN|ERROR)")
+	enableLogs := flag.Bool("enable-logs", envBool("WT_ENABLE_LOGS", false), "enable logging to file")
+	enableTerminalLogs := flag.Bool("enable-terminal-logs", envBool("WT_ENABLE_TERMINAL_LOGS", false), "enable logging to terminal and file")
 
 	flag.Parse()
 
@@ -37,16 +44,18 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		DataDir:      *dataDir,
-		ListenAddr:   *listen,
-		PollInterval: *poll,
-		Bearer:       *bearer,
-		Dev:          *dev,
-		WALogLevel:   *waLog,
+		DataDir:            *dataDir,
+		ListenAddr:         *listen,
+		PollInterval:       *poll,
+		Bearer:             *bearer,
+		Dev:                *dev,
+		WALogLevel:         *waLog,
+		EnableLogs:         *enableLogs,
+		EnableTerminalLogs: *enableTerminalLogs,
 	}, nil
 }
 
-func (c Config) TrackerDBPath() string  { return filepath.Join(c.DataDir, "tracker.db") }
+func (c Config) TrackerDBPath() string   { return filepath.Join(c.DataDir, "tracker.db") }
 func (c Config) WhatsmeowDBPath() string { return filepath.Join(c.DataDir, "whatsmeow.db") }
 
 func defaultDataDir() (string, error) {

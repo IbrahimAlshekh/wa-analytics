@@ -9,6 +9,7 @@ import (
 
 	"go.mau.fi/whatsmeow/types"
 
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 )
 
@@ -108,8 +109,9 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 	}
 	info, err := t.wa.GetProfilePicture(ctx, jid)
 	if err != nil {
-		// 404 / privacy: nothing to record.
-		if !isExpectedErr(err) {
+		if isRateLimit(err) {
+			slog.Log(ctx, config.LevelAudit, "tracker: rate limited on profile picture", "jid", c.JID, "err", err)
+		} else if !isExpectedErr(err) {
 			slog.Warn("tracker: get profile picture failed", "jid", c.JID, "err", err)
 		}
 		return
@@ -144,7 +146,9 @@ func (t *Tracker) checkAbout(ctx context.Context, c db.Contact) {
 	}
 	info, err := t.wa.GetUserInfo(ctx, []types.JID{jid})
 	if err != nil {
-		if !isExpectedErr(err) {
+		if isRateLimit(err) {
+			slog.Log(ctx, config.LevelAudit, "tracker: rate limited on user info", "jid", c.JID, "err", err)
+		} else if !isExpectedErr(err) {
 			slog.Warn("tracker: get user info failed", "jid", c.JID, "err", err)
 		}
 		return
@@ -171,6 +175,14 @@ func (t *Tracker) checkAbout(ctx context.Context, c db.Contact) {
 		"text":       rec.Text,
 		"capturedAt": rec.CapturedAt,
 	})
+}
+
+func isRateLimit(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "rate") || strings.Contains(msg, "too many") || strings.Contains(msg, "429") || strings.Contains(msg, "backoff") || strings.Contains(msg, "blocked")
 }
 
 func isExpectedErr(err error) bool {

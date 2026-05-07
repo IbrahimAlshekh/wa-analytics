@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 )
 
@@ -36,12 +37,12 @@ func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
 
 // handlePairQR starts a QR pairing flow for a new account.
 func (s *Server) handlePairQR(w http.ResponseWriter, r *http.Request) {
-	slog.Info("accounts: starting QR pairing flow")
+	slog.Log(r.Context(), config.LevelAudit, "accounts: starting QR pairing flow")
 	flowCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	codes, err := s.manager.StartQRPairing(flowCtx)
 	if err != nil {
 		cancel()
-		slog.Warn("accounts: QR flow start failed", "err", err)
+		slog.Log(r.Context(), config.LevelAudit, "accounts: QR flow start failed", "err", err)
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -53,7 +54,7 @@ func (s *Server) handlePairQR(w http.ResponseWriter, r *http.Request) {
 			slog.Debug("accounts: QR code generated", "seq", n)
 			s.hub.Broadcast("auth.qr", map[string]any{"code": code})
 		}
-		slog.Info("accounts: QR flow ended", "codes_sent", n)
+		slog.Log(context.Background(), config.LevelAudit, "accounts: QR flow ended", "codes_sent", n)
 	}()
 	writeJSON(w, http.StatusAccepted, map[string]any{"started": true})
 }
@@ -71,16 +72,16 @@ func (s *Server) handlePairPhone(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, errors.New("phone required"))
 		return
 	}
-	slog.Info("accounts: pairing by phone", "phone", req.Phone)
+	slog.Log(r.Context(), config.LevelAudit, "accounts: pairing by phone", "phone", req.Phone)
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 	code, err := s.manager.PairPhone(ctx, req.Phone)
 	if err != nil {
-		slog.Warn("accounts: phone pair failed", "phone", req.Phone, "err", err)
+		slog.Log(r.Context(), config.LevelAudit, "accounts: phone pair failed", "phone", req.Phone, "err", err)
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	slog.Info("accounts: phone pair code issued", "phone", req.Phone)
+	slog.Log(r.Context(), config.LevelAudit, "accounts: phone pair code issued", "phone", req.Phone)
 	writeJSON(w, http.StatusOK, map[string]string{"code": code})
 }
 
@@ -121,12 +122,12 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	// Remove from WA manager (disconnects + deletes whatsmeow device).
 	if err := s.manager.Remove(r.Context(), id); err != nil {
-		slog.Warn("accounts: manager remove failed (device may already be gone)", "id", id, "err", err)
+		slog.Log(r.Context(), config.LevelAudit, "accounts: manager remove failed (device may already be gone)", "id", id, "err", err)
 	}
 	if err := s.db.DeleteAccount(r.Context(), id); err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	slog.Info("accounts: deleted", "id", id)
+	slog.Log(r.Context(), config.LevelAudit, "accounts: deleted", "id", id)
 	w.WriteHeader(http.StatusNoContent)
 }
