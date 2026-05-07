@@ -3,17 +3,19 @@ export default function SessionTimeline({ entries }) {
     if (!entries.length) {
         return _jsx("div", { className: "muted", children: "No events yet." });
     }
-    const blocks = buildBlocks(entries);
-    if (!blocks.length) {
-        return _jsx("div", { className: "muted", children: "No sessions recorded yet." });
-    }
-    return (_jsx("div", { className: "session-timeline", children: blocks.map((b, i) => {
-            if (b.type === "session")
-                return _jsx(SessionBlock, { session: b.session }, i);
-            if (b.type === "offline-gap")
-                return _jsx(GapBlock, { fromAt: b.fromAt, toAt: b.toAt }, i);
-            return _jsx(EventBlock, { ev: b.ev }, i);
-        }) }));
+    const messages = entries
+        .filter((e) => e.kind === "message")
+        .sort((a, b) => b.at - a.at)
+        .slice(0, 10);
+    const statusEntries = entries.filter((e) => e.kind !== "message");
+    const blocks = buildBlocks(statusEntries);
+    return (_jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 24 }, children: [_jsxs("div", { children: [_jsx("h4", { style: { margin: "0 0 8px", color: "var(--fg-muted, #888)" }, children: "Recent Messages" }), messages.length === 0 ? (_jsx("div", { className: "muted", children: "No messages yet." })) : (_jsx("div", { className: "session-timeline", children: messages.map((e, i) => (_jsxs("div", { className: "session-event", children: [_jsx("time", { className: "session-time", children: formatTime(e.at) }), _jsxs("span", { children: [e.isFromMe ? "Sent" : "Received", ":", " ", _jsx("em", { style: { fontStyle: "normal", color: "var(--fg)" }, children: e.text || _jsx("span", { className: "muted", children: "[media]" }) })] })] }, i))) }))] }), _jsxs("div", { children: [_jsx("h4", { style: { margin: "0 0 8px", color: "var(--fg-muted, #888)" }, children: "Status" }), blocks.length === 0 ? (_jsx("div", { className: "muted", children: "No sessions recorded yet." })) : (_jsx("div", { className: "session-timeline", children: blocks.map((b, i) => {
+                            if (b.type === "session")
+                                return _jsx(SessionBlock, { session: b.session }, i);
+                            if (b.type === "offline-gap")
+                                return _jsx(GapBlock, { fromAt: b.fromAt, toAt: b.toAt }, i);
+                            return _jsx(EventBlock, { ev: b.ev }, i);
+                        }) }))] })] }));
 }
 function SessionBlock({ session }) {
     const start = formatTime(session.startAt);
@@ -29,7 +31,7 @@ function GapBlock({ fromAt, toAt }) {
     return (_jsxs("div", { className: "session-block session-offline", children: [_jsx("span", { className: "session-dot session-dot-offline" }), _jsxs("span", { className: "session-label session-muted", children: ["Offline ", dur] })] }));
 }
 function EventBlock({ ev }) {
-    return (_jsxs("div", { className: "session-event", children: [_jsx("time", { className: "session-time", children: formatTime(ev.at) }), ev.kind === "picture" ? (_jsxs("span", { children: ["Profile picture changed", ev.url ? (_jsxs(_Fragment, { children: [" ", _jsx("a", { href: ev.url, target: "_blank", rel: "noreferrer", children: "view" })] })) : null] })) : ev.kind === "about" ? (_jsxs("span", { children: ["About updated: ", _jsx("em", { children: ev.text || "(empty)" })] })) : (_jsxs("span", { children: [ev.isFromMe ? "Sent message" : "Received message", ":", " ", _jsx("em", { style: { fontStyle: "normal", color: "var(--fg)" }, children: ev.text || _jsx("span", { className: "muted", children: "[media]" }) })] }))] }));
+    return (_jsxs("div", { className: "session-event", children: [_jsx("time", { className: "session-time", children: formatTime(ev.at) }), ev.kind === "picture" ? (_jsxs("span", { children: ["Profile picture changed", ev.url ? (_jsxs(_Fragment, { children: [" ", _jsx("a", { href: ev.url, target: "_blank", rel: "noreferrer", children: "view" })] })) : null] })) : (_jsxs("span", { children: ["About updated: ", _jsx("em", { children: ev.text || "(empty)" })] }))] }));
 }
 // ---------------------------------------------------------------------------
 // Build display blocks from raw timeline entries.
@@ -38,13 +40,12 @@ function buildBlocks(entries) {
         .filter((e) => e.kind === "presence")
         .sort((a, b) => a.at - b.at);
     const nonPresence = entries
-        .filter((e) => e.kind === "picture" || e.kind === "about" || e.kind === "message")
+        .filter((e) => e.kind === "picture" || e.kind === "about")
         .map((e) => ({
         kind: e.kind,
         at: e.at,
         text: e.text,
         url: e.url,
-        isFromMe: e.isFromMe,
     }))
         .sort((a, b) => a.at - b.at);
     // Pair online→offline into sessions.

@@ -12,13 +12,12 @@ interface Session {
   durationSec: number | null;
 }
 
-// A non-presence event (picture / about change / message).
+// A non-presence event (picture / about change).
 interface NonPresence {
-  kind: "picture" | "about" | "message";
+  kind: "picture" | "about";
   at: number;
   text?: string;
   url?: string;
-  isFromMe?: boolean;
 }
 
 type Block =
@@ -31,18 +30,51 @@ export default function SessionTimeline({ entries }: Props) {
     return <div className="muted">No events yet.</div>;
   }
 
-  const blocks = buildBlocks(entries);
-  if (!blocks.length) {
-    return <div className="muted">No sessions recorded yet.</div>;
-  }
+  const messages = entries
+    .filter((e) => e.kind === "message")
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 10);
+
+  const statusEntries = entries.filter((e) => e.kind !== "message");
+  const blocks = buildBlocks(statusEntries);
 
   return (
-    <div className="session-timeline">
-      {blocks.map((b, i) => {
-        if (b.type === "session") return <SessionBlock key={i} session={b.session} />;
-        if (b.type === "offline-gap") return <GapBlock key={i} fromAt={b.fromAt} toAt={b.toAt} />;
-        return <EventBlock key={i} ev={b.ev} />;
-      })}
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div>
+        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>Recent Messages</h4>
+        {messages.length === 0 ? (
+          <div className="muted">No messages yet.</div>
+        ) : (
+          <div className="session-timeline">
+            {messages.map((e, i) => (
+              <div key={i} className="session-event">
+                <time className="session-time">{formatTime(e.at)}</time>
+                <span>
+                  {e.isFromMe ? "Sent" : "Received"}:{" "}
+                  <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
+                    {e.text || <span className="muted">[media]</span>}
+                  </em>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>Status</h4>
+        {blocks.length === 0 ? (
+          <div className="muted">No sessions recorded yet.</div>
+        ) : (
+          <div className="session-timeline">
+            {blocks.map((b, i) => {
+              if (b.type === "session") return <SessionBlock key={i} session={b.session} />;
+              if (b.type === "offline-gap") return <GapBlock key={i} fromAt={b.fromAt} toAt={b.toAt} />;
+              return <EventBlock key={i} ev={b.ev} />;
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -95,15 +127,8 @@ function EventBlock({ ev }: { ev: NonPresence }) {
             <> <a href={ev.url} target="_blank" rel="noreferrer">view</a></>
           ) : null}
         </span>
-      ) : ev.kind === "about" ? (
-        <span>About updated: <em>{ev.text || "(empty)"}</em></span>
       ) : (
-        <span>
-          {ev.isFromMe ? "Sent message" : "Received message"}:{" "}
-          <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
-            {ev.text || <span className="muted">[media]</span>}
-          </em>
-        </span>
+        <span>About updated: <em>{ev.text || "(empty)"}</em></span>
       )}
     </div>
   );
@@ -118,13 +143,12 @@ function buildBlocks(entries: TimelineEntry[]): Block[] {
     .sort((a, b) => a.at - b.at);
 
   const nonPresence: NonPresence[] = entries
-    .filter((e) => e.kind === "picture" || e.kind === "about" || e.kind === "message")
+    .filter((e) => e.kind === "picture" || e.kind === "about")
     .map((e) => ({
-      kind: e.kind as "picture" | "about" | "message",
+      kind: e.kind as "picture" | "about",
       at: e.at,
       text: e.text,
       url: e.url,
-      isFromMe: e.isFromMe,
     }))
     .sort((a, b) => a.at - b.at);
 
