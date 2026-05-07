@@ -15,7 +15,7 @@ web-install:
 	cd web && pnpm install
 
 web-build:
-	cd web && pnpm install --frozen-lockfile && pnpm build
+	cd web && pnpm install && pnpm build
 
 build: web-build
 	mkdir -p bin
