@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -29,14 +29,18 @@ func NewHub() *Hub {
 func (h *Hub) add(c *wsClient) {
 	h.mu.Lock()
 	h.clients[c] = struct{}{}
+	count := len(h.clients)
 	h.mu.Unlock()
+	slog.Info("ws: client connected", "remote", c.conn.RemoteAddr(), "total_clients", count)
 }
 
 func (h *Hub) remove(c *wsClient) {
 	h.mu.Lock()
 	delete(h.clients, c)
+	count := len(h.clients)
 	h.mu.Unlock()
 	close(c.send)
+	slog.Info("ws: client disconnected", "remote", c.conn.RemoteAddr(), "total_clients", count)
 }
 
 // Broadcast sends an envelope `{type: kind, ...payload}` to every connected client.
@@ -54,17 +58,23 @@ func (h *Hub) Broadcast(kind string, payload any) {
 	}
 	body, err := json.Marshal(envelope)
 	if err != nil {
-		log.Printf("hub: marshal: %v", err)
+		slog.Error("ws: broadcast marshal failed", "kind", kind, "err", err)
 		return
 	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+	dropped := 0
 	for c := range h.clients {
 		select {
 		case c.send <- body:
 		default:
-			// drop slow clients silently — clients must tolerate gaps in events
+			dropped++
 		}
+	}
+	if dropped > 0 {
+		slog.Warn("ws: broadcast dropped slow clients", "kind", kind, "dropped", dropped)
+	} else {
+		slog.Debug("ws: broadcast sent", "kind", kind, "clients", len(h.clients))
 	}
 }
 
@@ -97,7 +107,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("ws: upgrade: %v", err)
+		slog.Warn("ws: upgrade failed", "remote", r.RemoteAddr, "err", err)
 		return
 	}
 	c := &wsClient{conn: conn, send: make(chan []byte, wsClientBuffer)}
@@ -122,11 +132,13 @@ func (c *wsClient) writePump(h *Hub) {
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				slog.Debug("ws: write failed", "remote", c.conn.RemoteAddr(), "err", err)
 				return
 			}
 		case <-pingTick.C:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				slog.Debug("ws: ping failed", "remote", c.conn.RemoteAddr(), "err", err)
 				return
 			}
 		}

@@ -3,7 +3,7 @@ package tracker
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -34,11 +34,13 @@ func (t *Tracker) pollLoop(ctx context.Context, name string, scan func(context.C
 	}
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
+	slog.Info("tracker: poll loop started", "name", name, "interval", interval)
 	// Run once immediately on connect, then on cadence.
 	scan(ctx)
 	for {
 		select {
 		case <-ctx.Done():
+			slog.Info("tracker: poll loop stopped", "name", name)
 			return
 		case <-tick.C:
 			if !t.isRunning() || !t.wa.IsConnected() {
@@ -52,12 +54,13 @@ func (t *Tracker) pollLoop(ctx context.Context, name string, scan func(context.C
 func (t *Tracker) scanPictures(ctx context.Context) {
 	contacts, err := t.db.ListTrackedContacts(ctx)
 	if err != nil {
-		log.Printf("tracker: pic scan list: %v", err)
+		slog.Error("tracker: picture scan — list contacts failed", "err", err)
 		return
 	}
 	if len(contacts) == 0 {
 		return
 	}
+	slog.Debug("tracker: scanning pictures", "contacts", len(contacts))
 	gap := t.interval / time.Duration(len(contacts)+1)
 	if gap < 100*time.Millisecond {
 		gap = 100 * time.Millisecond
@@ -76,12 +79,13 @@ func (t *Tracker) scanPictures(ctx context.Context) {
 func (t *Tracker) scanAbout(ctx context.Context) {
 	contacts, err := t.db.ListTrackedContacts(ctx)
 	if err != nil {
-		log.Printf("tracker: about scan list: %v", err)
+		slog.Error("tracker: about scan — list contacts failed", "err", err)
 		return
 	}
 	if len(contacts) == 0 {
 		return
 	}
+	slog.Debug("tracker: scanning about", "contacts", len(contacts))
 	gap := t.interval / time.Duration(len(contacts)+1)
 	if gap < 100*time.Millisecond {
 		gap = 100 * time.Millisecond
@@ -106,7 +110,7 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 	if err != nil {
 		// 404 / privacy: nothing to record.
 		if !isExpectedErr(err) {
-			log.Printf("tracker: get pic %s: %v", c.JID, err)
+			slog.Warn("tracker: get profile picture failed", "jid", c.JID, "err", err)
 		}
 		return
 	}
@@ -120,9 +124,10 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 	now := time.Now().Unix()
 	rec, err := t.db.InsertPicture(ctx, c.ID, info.ID, info.URL, bytesHex(info.Hash), now)
 	if err != nil {
-		log.Printf("tracker: insert pic: %v", err)
+		slog.Error("tracker: insert picture failed", "jid", c.JID, "contact_id", c.ID, "err", err)
 		return
 	}
+	slog.Info("tracker: picture changed", "jid", c.JID, "contact_id", c.ID, "picture_id", rec.PictureID)
 	t.hub.Broadcast("picture", map[string]any{
 		"contactId":  c.ID,
 		"jid":        c.JID,
@@ -140,7 +145,7 @@ func (t *Tracker) checkAbout(ctx context.Context, c db.Contact) {
 	info, err := t.wa.GetUserInfo(ctx, []types.JID{jid})
 	if err != nil {
 		if !isExpectedErr(err) {
-			log.Printf("tracker: get user %s: %v", c.JID, err)
+			slog.Warn("tracker: get user info failed", "jid", c.JID, "err", err)
 		}
 		return
 	}
@@ -156,9 +161,10 @@ func (t *Tracker) checkAbout(ctx context.Context, c db.Contact) {
 	now := time.Now().Unix()
 	rec, err := t.db.InsertAbout(ctx, c.ID, text, nil, now)
 	if err != nil {
-		log.Printf("tracker: insert about: %v", err)
+		slog.Error("tracker: insert about failed", "jid", c.JID, "contact_id", c.ID, "err", err)
 		return
 	}
+	slog.Info("tracker: about changed", "jid", c.JID, "contact_id", c.ID, "text", rec.Text)
 	t.hub.Broadcast("about", map[string]any{
 		"contactId":  c.ID,
 		"jid":        c.JID,
