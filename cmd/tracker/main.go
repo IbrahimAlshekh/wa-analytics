@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/api"
@@ -46,6 +47,15 @@ func main() {
 		// Use a basic logger just for the config error
 		slog.Error("load config", "err", err)
 		os.Exit(1)
+	}
+
+	// Handle subcommands
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "user":
+			handleUserCommand(cfg)
+			return
+		}
 	}
 
 	var logWriter io.Writer = io.Discard
@@ -197,4 +207,65 @@ func startTracker(ctx context.Context, mgr *tracker.TrackerManager, client *wa.C
 	})
 	client.AttachHandler(trk.HandleEvent)
 	slog.Info("main: tracker started", "accountID", accountID)
+}
+
+func handleUserCommand(cfg config.Config) {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: tracker user <add|delete|list> [args]")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	store, err := db.Open(ctx, cfg.TrackerDBPath())
+	if err != nil {
+		fmt.Printf("Failed to open database: %v\n", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	switch os.Args[2] {
+	case "add":
+		if len(os.Args) < 5 {
+			fmt.Println("Usage: tracker user add <username> <password>")
+			os.Exit(1)
+		}
+		username := os.Args[3]
+		password := os.Args[4]
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			fmt.Printf("Failed to hash password: %v\n", err)
+			os.Exit(1)
+		}
+		if err := store.UpsertUser(ctx, username, string(hash)); err != nil {
+			fmt.Printf("Failed to save user: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("User %s added/updated successfully.\n", username)
+
+	case "delete":
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: tracker user delete <username>")
+			os.Exit(1)
+		}
+		username := os.Args[3]
+		if err := store.DeleteUser(ctx, username); err != nil {
+			fmt.Printf("Failed to delete user: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("User %s deleted successfully.\n", username)
+
+	case "list":
+		users, err := store.ListUsers(ctx)
+		if err != nil {
+			fmt.Printf("Failed to list users: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Users:")
+		for _, u := range users {
+			fmt.Printf("- %s\n", u)
+		}
+	default:
+		fmt.Printf("Unknown user subcommand: %s\n", os.Args[2])
+		os.Exit(1)
+	}
 }

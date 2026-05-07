@@ -16,6 +16,11 @@ async function request(method, path, body) {
     });
     if (res.status === 204)
         return undefined;
+    if (res.status === 401) {
+        localStorage.removeItem("wt_bearer");
+        window.location.href = "/login";
+        throw new Error("unauthorized");
+    }
     const text = await res.text();
     const data = text ? JSON.parse(text) : undefined;
     if (!res.ok) {
@@ -24,6 +29,8 @@ async function request(method, path, body) {
     return data;
 }
 export const api = {
+    // Auth
+    login: (username, password) => request("POST", "/login", { username, password }),
     // Accounts
     listAccounts: () => request("GET", "/accounts"),
     startQR: () => request("POST", "/accounts/pair/qr"),

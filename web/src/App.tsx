@@ -1,14 +1,24 @@
 import { useEffect } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
 import Accounts from "./pages/Accounts";
 import Dashboard from "./pages/Dashboard";
 import ContactDetail from "./pages/ContactDetail";
 import Messages from "./pages/Messages";
+import Login from "./pages/Login";
 
 export default function App() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const token = localStorage.getItem("wt_bearer");
+    if (!token && location.pathname !== "/login") {
+      navigate("/login");
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     ws.start();
@@ -48,10 +58,22 @@ export default function App() {
     <div className="container">
       <header className="header">
         <Link to="/" className="title" style={{ textDecoration: "none", color: "var(--fg)" }}>
-          WhatsApp Tracker
+          {location.pathname === "/login" ? "App" : "WhatsApp Tracker"}
         </Link>
+        {localStorage.getItem("wt_bearer") && (
+          <button
+            className="btn btn-danger"
+            onClick={() => {
+              localStorage.removeItem("wt_bearer");
+              navigate("/login");
+            }}
+          >
+            Logout
+          </button>
+        )}
       </header>
       <Routes>
+        <Route path="/login" element={<Login />} />
         <Route path="/" element={<Accounts />} />
         <Route path="/accounts/:id" element={<Dashboard />} />
         <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />

@@ -120,23 +120,39 @@ func (s *Server) routes() {
 	// WebSocket
 	s.mux.Handle("GET /api/ws", apiAuth(s.handleWS))
 
+	// Auth
+	s.mux.HandleFunc("POST /api/login", s.handleLogin)
+
 	s.mux.Handle("/", staticHandler())
 }
 
 func (s *Server) requireAuth(next http.Handler) http.Handler {
-	if s.cfg.Bearer == "" {
-		return next
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. Check for Bearer token (Legacy/System)
 		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") || auth[len("Bearer "):] != s.cfg.Bearer {
-			if r.URL.Query().Get("token") != s.cfg.Bearer {
-				slog.Warn("unauthorized request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+		if s.cfg.Bearer != "" && strings.HasPrefix(auth, "Bearer ") && auth[len("Bearer "):] == s.cfg.Bearer {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// 2. Check for JWT token
+		var tokenStr string
+		if strings.HasPrefix(auth, "Bearer ") {
+			tokenStr = auth[len("Bearer "):]
+		} else {
+			tokenStr = r.URL.Query().Get("token")
+		}
+
+		if tokenStr != "" {
+			username, err := ValidateToken(tokenStr)
+			if err == nil && username != "" {
+				next.ServeHTTP(w, r)
 				return
 			}
 		}
-		next.ServeHTTP(w, r)
+
+		slog.Warn("unauthorized request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
 }
 

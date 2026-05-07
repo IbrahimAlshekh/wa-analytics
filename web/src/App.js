@@ -1,14 +1,23 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
 import Accounts from "./pages/Accounts";
 import Dashboard from "./pages/Dashboard";
 import ContactDetail from "./pages/ContactDetail";
 import Messages from "./pages/Messages";
+import Login from "./pages/Login";
 export default function App() {
     const qc = useQueryClient();
+    const navigate = useNavigate();
+    const location = useLocation();
+    useEffect(() => {
+        const token = localStorage.getItem("wt_bearer");
+        if (!token && location.pathname !== "/login") {
+            navigate("/login");
+        }
+    }, [location, navigate]);
     useEffect(() => {
         ws.start();
         const off = ws.on((msg) => {
@@ -42,5 +51,8 @@ export default function App() {
         });
         return off;
     }, [qc]);
-    return (_jsxs("div", { className: "container", children: [_jsx("header", { className: "header", children: _jsx(Link, { to: "/", className: "title", style: { textDecoration: "none", color: "var(--fg)" }, children: "WhatsApp Tracker" }) }), _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Accounts, {}) }), _jsx(Route, { path: "/accounts/:id", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid", element: _jsx(ContactDetail, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid/messages", element: _jsx(Messages, {}) })] })] }));
+    return (_jsxs("div", { className: "container", children: [_jsxs("header", { className: "header", children: [_jsx(Link, { to: "/", className: "title", style: { textDecoration: "none", color: "var(--fg)" }, children: location.pathname === "/login" ? "App" : "WhatsApp Tracker" }), localStorage.getItem("wt_bearer") && (_jsx("button", { className: "btn btn-danger", onClick: () => {
+                            localStorage.removeItem("wt_bearer");
+                            navigate("/login");
+                        }, children: "Logout" }))] }), _jsxs(Routes, { children: [_jsx(Route, { path: "/login", element: _jsx(Login, {}) }), _jsx(Route, { path: "/", element: _jsx(Accounts, {}) }), _jsx(Route, { path: "/accounts/:id", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid", element: _jsx(ContactDetail, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid/messages", element: _jsx(Messages, {}) })] })] }));
 }

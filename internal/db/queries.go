@@ -627,6 +627,53 @@ func (db *DB) CountAboutChanges(ctx context.Context, contactID, start, end int64
 	return n, err
 }
 
+// --- Users ------------------------------------------------------------------
+
+type User struct {
+	Username     string `json:"username"`
+	PasswordHash string `json:"-"`
+	CreatedAt    int64  `json:"createdAt"`
+}
+
+func (db *DB) UpsertUser(ctx context.Context, username, hash string) error {
+	now := time.Now().Unix()
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)
+		 ON CONFLICT(username) DO UPDATE SET password_hash=excluded.password_hash`,
+		username, hash, now)
+	return err
+}
+
+func (db *DB) GetUser(ctx context.Context, username string) (User, error) {
+	var u User
+	err := db.QueryRowContext(ctx,
+		`SELECT username, password_hash, created_at FROM users WHERE username=?`, username).
+		Scan(&u.Username, &u.PasswordHash, &u.CreatedAt)
+	return u, err
+}
+
+func (db *DB) DeleteUser(ctx context.Context, username string) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM users WHERE username=?`, username)
+	return err
+}
+
+func (db *DB) ListUsers(ctx context.Context) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT username FROM users ORDER BY username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
 // --- Helpers ----------------------------------------------------------------
 
 func nullStr(s string) any {

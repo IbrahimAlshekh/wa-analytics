@@ -23,6 +23,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 204) return undefined as T;
+  if (res.status === 401) {
+    localStorage.removeItem("wt_bearer");
+    window.location.href = "/login";
+    throw new Error("unauthorized");
+  }
   const text = await res.text();
   const data = text ? JSON.parse(text) : undefined;
   if (!res.ok) {
@@ -32,6 +37,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  // Auth
+  login: (username: string, password: string) =>
+    request<{ token: string }>("POST", "/login", { username, password }),
+
   // Accounts
   listAccounts: () => request<Account[]>("GET", "/accounts"),
   startQR: () => request<{ started: boolean }>("POST", "/accounts/pair/qr"),

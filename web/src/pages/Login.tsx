@@ -1,29 +1,66 @@
 import { useState } from "react";
-import QRView from "../components/QRView";
-import PhoneCodeView from "../components/PhoneCodeView";
+import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
 
 export default function Login() {
-  const [tab, setTab] = useState<"qr" | "phone">("qr");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const { token } = await api.login(username, password);
+      localStorage.setItem("wt_bearer", token);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="card" style={{ maxWidth: 480, margin: "0 auto" }}>
-      <h2 style={{ marginTop: 0 }}>Link your WhatsApp</h2>
-      <div className="tabs">
-        <button
-          className="btn"
-          aria-current={tab === "qr"}
-          onClick={() => setTab("qr")}
-        >
-          QR code
-        </button>
-        <button
-          className="btn"
-          aria-current={tab === "phone"}
-          onClick={() => setTab("phone")}
-        >
-          Phone code
-        </button>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "70vh",
+      }}
+    >
+      <div className="card" style={{ width: 320 }}>
+        <h2 style={{ marginTop: 0 }}>Login</h2>
+        <form onSubmit={handleSubmit} className="col" style={{ gap: 12 }}>
+          <input
+            className="input"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            className="input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button
+            className="btn btn-primary"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+        {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
       </div>
-      {tab === "qr" ? <QRView /> : <PhoneCodeView />}
     </div>
   );
 }
