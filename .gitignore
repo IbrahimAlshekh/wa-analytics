@@ -1,0 +1,23 @@
+# build artifacts
+/bin/
+/tracker
+whatsapp-tracker
+
+# data dirs
+/data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# frontend
+web/node_modules/
+web/dist/
+
+# editor
+.idea/
+.vscode/
+.DS_Store
+
+# logs
+*.log
