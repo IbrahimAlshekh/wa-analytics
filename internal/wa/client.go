@@ -221,6 +221,20 @@ func (c *Client) GetUserInfo(ctx context.Context, jids []types.JID) (map[types.J
 	return c.cli.GetUserInfo(ctx, jids)
 }
 
+// GetLIDForJID returns the LID (anonymous identifier) WhatsApp uses for the given JID.
+// Returns an empty JID if the user has no LID or it can't be fetched.
+func (c *Client) GetLIDForJID(ctx context.Context, jid types.JID) (types.JID, error) {
+	info, err := c.cli.GetUserInfo(ctx, []types.JID{jid})
+	if err != nil {
+		return types.JID{}, err
+	}
+	u, ok := info[jid]
+	if !ok {
+		return types.JID{}, nil
+	}
+	return u.LID, nil
+}
+
 // JIDFromPhone converts +1-415-555-1234 → 14155551234@s.whatsapp.net
 func JIDFromPhone(phone string) (types.JID, error) {
 	digits := normalizePhone(phone)

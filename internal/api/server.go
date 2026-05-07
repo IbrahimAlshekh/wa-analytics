@@ -1,10 +1,12 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,6 +45,7 @@ func NewServer(cfg Config, store *db.DB, waClient *wa.Client, trk Tracker, hub *
 }
 
 // responseWriter wraps http.ResponseWriter to capture the status code for logging.
+// It also forwards http.Hijacker so WebSocket upgrades work correctly.
 type responseWriter struct {
 	http.ResponseWriter
 	status int
@@ -51,6 +54,14 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.status = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("underlying ResponseWriter does not implement http.Hijacker")
+	}
+	return h.Hijack()
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

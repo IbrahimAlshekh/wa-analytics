@@ -10,6 +10,7 @@ import (
 type Contact struct {
 	ID              int64  `json:"id"`
 	JID             string `json:"jid"`
+	LID             string `json:"-"` // WhatsApp anonymous LID (not exposed in API)
 	Phone           string `json:"phone"`
 	DisplayName     string `json:"displayName"`
 	AddedAt         int64  `json:"addedAt"`
@@ -50,33 +51,42 @@ const (
 )
 
 type TimelineEntry struct {
-	Kind       TimelineKind `json:"kind"`
-	At         int64        `json:"at"`
-	State      string       `json:"state,omitempty"`
-	LastSeen   *int64       `json:"lastSeen,omitempty"`
-	Text       string       `json:"text,omitempty"`
-	PictureID  string       `json:"pictureId,omitempty"`
-	URL        string       `json:"url,omitempty"`
+	Kind      TimelineKind `json:"kind"`
+	At        int64        `json:"at"`
+	State     string       `json:"state,omitempty"`
+	LastSeen  *int64       `json:"lastSeen,omitempty"`
+	Text      string       `json:"text,omitempty"`
+	PictureID string       `json:"pictureId,omitempty"`
+	URL       string       `json:"url,omitempty"`
 }
 
 // --- contacts -----------------------------------------------------------
 
+const contactCols = `id, jid, COALESCE(lid,''), phone, COALESCE(display_name,''), added_at, tracking_enabled`
+
+func scanContact(row interface{ Scan(...any) error }) (Contact, error) {
+	var c Contact
+	var enabled int
+	if err := row.Scan(&c.ID, &c.JID, &c.LID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
+		return Contact{}, err
+	}
+	c.TrackingEnabled = enabled == 1
+	return c, nil
+}
+
 func (db *DB) ListContacts(ctx context.Context) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, jid, phone, COALESCE(display_name,''), added_at, tracking_enabled
-		   FROM contacts ORDER BY added_at DESC`)
+		`SELECT `+contactCols+` FROM contacts ORDER BY added_at DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []Contact
 	for rows.Next() {
-		var c Contact
-		var enabled int
-		if err := rows.Scan(&c.ID, &c.JID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
+		c, err := scanContact(rows)
+		if err != nil {
 			return nil, err
 		}
-		c.TrackingEnabled = enabled == 1
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -84,51 +94,40 @@ func (db *DB) ListContacts(ctx context.Context) ([]Contact, error) {
 
 func (db *DB) ListTrackedContacts(ctx context.Context) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, jid, phone, COALESCE(display_name,''), added_at, tracking_enabled
-		   FROM contacts WHERE tracking_enabled=1`)
+		`SELECT `+contactCols+` FROM contacts WHERE tracking_enabled=1`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []Contact
 	for rows.Next() {
-		var c Contact
-		var enabled int
-		if err := rows.Scan(&c.ID, &c.JID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
+		c, err := scanContact(rows)
+		if err != nil {
 			return nil, err
 		}
-		c.TrackingEnabled = enabled == 1
 		out = append(out, c)
 	}
 	return out, rows.Err()
 }
 
 func (db *DB) GetContact(ctx context.Context, id int64) (Contact, error) {
-	var c Contact
-	var enabled int
-	err := db.QueryRowContext(ctx,
-		`SELECT id, jid, phone, COALESCE(display_name,''), added_at, tracking_enabled
-		   FROM contacts WHERE id=?`, id).
-		Scan(&c.ID, &c.JID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled)
-	if err != nil {
-		return Contact{}, err
-	}
-	c.TrackingEnabled = enabled == 1
-	return c, nil
+	return scanContact(db.QueryRowContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE id=?`, id))
 }
 
 func (db *DB) GetContactByJID(ctx context.Context, jid string) (Contact, error) {
-	var c Contact
-	var enabled int
-	err := db.QueryRowContext(ctx,
-		`SELECT id, jid, phone, COALESCE(display_name,''), added_at, tracking_enabled
-		   FROM contacts WHERE jid=?`, jid).
-		Scan(&c.ID, &c.JID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled)
-	if err != nil {
-		return Contact{}, err
-	}
-	c.TrackingEnabled = enabled == 1
-	return c, nil
+	return scanContact(db.QueryRowContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE jid=?`, jid))
+}
+
+func (db *DB) GetContactByLID(ctx context.Context, lid string) (Contact, error) {
+	return scanContact(db.QueryRowContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE lid=?`, lid))
+}
+
+func (db *DB) UpdateContactLID(ctx context.Context, id int64, lid string) error {
+	_, err := db.ExecContext(ctx, `UPDATE contacts SET lid=? WHERE id=?`, lid, id)
+	return err
 }
 
 func (db *DB) InsertContact(ctx context.Context, jid, phone, name string) (Contact, error) {

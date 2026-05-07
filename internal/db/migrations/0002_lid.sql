@@ -1,0 +1,2 @@
+ALTER TABLE contacts ADD COLUMN lid TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_lid ON contacts(lid) WHERE lid IS NOT NULL;

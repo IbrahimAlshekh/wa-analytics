@@ -92,6 +92,12 @@ func (t *Tracker) onConnected() {
 	t.running = true
 	t.mu.Unlock()
 
+	// SendAvailable must be called before subscribing to presence so WhatsApp
+	// knows to push events to us.
+	if err := t.wa.SendAvailable(t.ctx); err != nil {
+		slog.Warn("tracker: send available failed", "err", err)
+	}
+
 	slog.Info("tracker: starting workers", "poll_interval", t.interval)
 	t.wg.Add(4)
 	go t.runPictureLoop()
@@ -101,10 +107,6 @@ func (t *Tracker) onConnected() {
 		defer t.wg.Done()
 		t.startSubscriptions()
 	}()
-
-	if err := t.wa.SendAvailable(t.ctx); err != nil {
-		slog.Warn("tracker: send available failed", "err", err)
-	}
 }
 
 func (t *Tracker) stopWorkers() {
@@ -132,6 +134,13 @@ func (t *Tracker) startSubscriptions() {
 		if err := t.wa.SubscribePresence(t.ctx, jid); err != nil {
 			slog.Warn("tracker: subscribe presence failed", "jid", c.JID, "err", err)
 			failed++
+		} else {
+			slog.Debug("tracker: subscribed", "jid", c.JID)
+			// Fetch and store the LID if we don't have it yet — WhatsApp sends
+			// presence events using the LID rather than the phone JID.
+			if c.LID == "" {
+				t.storeLID(c, jid)
+			}
 		}
 	}
 	if failed > 0 {
@@ -155,14 +164,45 @@ func (t *Tracker) SubscribeContact(ctx context.Context, c db.Contact) {
 		return
 	}
 	slog.Info("tracker: subscribed to presence", "jid", c.JID)
+	t.storeLID(c, jid)
+}
+
+// storeLID fetches the LID for a contact from WhatsApp and persists it.
+func (t *Tracker) storeLID(c db.Contact, jid types.JID) {
+	lid, err := t.wa.GetLIDForJID(t.ctx, jid)
+	if err != nil {
+		slog.Warn("tracker: fetch LID failed", "jid", c.JID, "err", err)
+		return
+	}
+	if lid.IsEmpty() {
+		slog.Debug("tracker: no LID for contact", "jid", c.JID)
+		return
+	}
+	lidStr := lid.ToNonAD().String()
+	if err := t.db.UpdateContactLID(t.ctx, c.ID, lidStr); err != nil {
+		slog.Error("tracker: store LID failed", "jid", c.JID, "lid", lidStr, "err", err)
+		return
+	}
+	slog.Info("tracker: stored LID", "jid", c.JID, "lid", lidStr)
 }
 
 // onPresence persists a presence event (deduping flips of the same state) and broadcasts.
 func (t *Tracker) onPresence(p *events.Presence) {
-	jidStr := p.From.ToNonAD().String()
-	c, err := t.db.GetContactByJID(t.ctx, jidStr)
+	fromJID := p.From.ToNonAD()
+	jidStr := fromJID.String()
+	slog.Debug("tracker: presence event received", "jid", jidStr, "unavailable", p.Unavailable, "last_seen", p.LastSeen)
+
+	// WhatsApp sends presence events using the LID (anonymous ID) rather than
+	// the phone JID. Try LID lookup first, fall back to phone JID.
+	var c db.Contact
+	var err error
+	if fromJID.Server == types.HiddenUserServer {
+		c, err = t.db.GetContactByLID(t.ctx, jidStr)
+	} else {
+		c, err = t.db.GetContactByJID(t.ctx, jidStr)
+	}
 	if err != nil {
-		// Not tracked — drop.
+		slog.Debug("tracker: presence event for untracked jid, dropping", "jid", jidStr, "err", err)
 		return
 	}
 
