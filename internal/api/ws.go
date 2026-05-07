@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -62,7 +63,7 @@ func (h *Hub) Broadcast(kind string, payload any) {
 		select {
 		case c.send <- body:
 		default:
-			// drop slow clients silently — the next tick will pick them up
+			// drop slow clients silently — clients must tolerate gaps in events
 		}
 	}
 }
@@ -72,13 +73,28 @@ type wsClient struct {
 	send chan []byte
 }
 
-var upgrader = websocket.Upgrader{
+var defaultUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 4096,
-	CheckOrigin:     func(r *http.Request) bool { return true }, // local tool
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
+	upgrader := defaultUpgrader
+	upgrader.CheckOrigin = func(req *http.Request) bool {
+		if s.cfg.Dev {
+			return true
+		}
+		origin := req.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Host == req.Host
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ws: upgrade: %v", err)

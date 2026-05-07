@@ -18,6 +18,9 @@ type DB struct {
 	*sql.DB
 }
 
+// Open opens the SQLite database at path.
+// Note: Migrations are applied unconditionally on every start.
+// All migration SQL scripts MUST be fully idempotent (e.g. use IF NOT EXISTS).
 func Open(ctx context.Context, path string) (*DB, error) {
 	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", path)
 	sqlDB, err := sql.Open("sqlite3", dsn)

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,12 +18,18 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("load config", "err", err)
+		os.Exit(1)
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		log.Fatalf("data dir: %v", err)
+		slog.Error("create data dir", "path", cfg.DataDir, "err", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -31,7 +37,8 @@ func main() {
 
 	store, err := db.Open(ctx, cfg.TrackerDBPath())
 	if err != nil {
-		log.Fatalf("open tracker db: %v", err)
+		slog.Error("open tracker db", "path", cfg.TrackerDBPath(), "err", err)
+		os.Exit(1)
 	}
 	defer store.Close()
 
@@ -42,7 +49,8 @@ func main() {
 		LogLevel: cfg.WALogLevel,
 	})
 	if err != nil {
-		log.Fatalf("whatsmeow init: %v", err)
+		slog.Error("whatsmeow init", "err", err)
+		os.Exit(1)
 	}
 
 	trk := tracker.New(tracker.Deps{
@@ -55,7 +63,7 @@ func main() {
 
 	if waClient.IsLoggedIn() {
 		if err := waClient.Connect(ctx); err != nil {
-			log.Printf("auto-connect: %v", err)
+			slog.Warn("auto-connect failed", "err", err)
 		}
 	}
 
@@ -71,14 +79,15 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("listening on %s (data=%s)", cfg.ListenAddr, cfg.DataDir)
+		slog.Info("server listening", "addr", cfg.ListenAddr, "data", cfg.DataDir)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("http: %v", err)
+			slog.Error("http server", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Printf("shutting down")
+	slog.Info("shutting down")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()

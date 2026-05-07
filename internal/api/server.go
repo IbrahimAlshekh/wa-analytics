@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
@@ -31,10 +33,24 @@ type Server struct {
 }
 
 func NewServer(cfg Config, store *db.DB, waClient *wa.Client, trk Tracker, hub *Hub) *Server {
+	if cfg.Bearer != "" {
+		slog.Warn("bearer token auth enabled — token may appear in server access logs via ws ?token= query string")
+	}
 	s := &Server{cfg: cfg, db: store, wa: waClient, tracker: trk, hub: hub}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
+}
+
+// responseWriter wraps http.ResponseWriter to capture the status code for logging.
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +67,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.mux.ServeHTTP(w, r)
+
+	rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+	start := time.Now()
+	s.mux.ServeHTTP(rw, r)
+	dur := time.Since(start)
+
+	level := slog.LevelInfo
+	if rw.status >= 500 {
+		level = slog.LevelError
+	} else if rw.status >= 400 {
+		level = slog.LevelWarn
+	}
+	slog.Log(r.Context(), level, "api request",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"status", rw.status,
+		"duration_ms", dur.Milliseconds(),
+	)
 }
 
 func (s *Server) routes() {
@@ -84,6 +117,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		if !strings.HasPrefix(auth, "Bearer ") || auth[len("Bearer "):] != s.cfg.Bearer {
 			// Allow query-string token for ws upgrade convenience
 			if r.URL.Query().Get("token") != s.cfg.Bearer {
+				slog.Warn("unauthorized request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -99,6 +133,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, err error) {
+	if status >= 500 {
+		slog.Error("handler error", "status", status, "err", err)
+	} else {
+		slog.Warn("handler error", "status", status, "err", err)
+	}
 	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
 

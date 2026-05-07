@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,17 +25,20 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	contact, err := s.db.GetContact(r.Context(), id)
 	if err != nil {
+		slog.Warn("timeline: contact not found", "id", id, "err", err)
 		writeErr(w, http.StatusNotFound, err)
 		return
 	}
 	entries, err := s.db.Timeline(r.Context(), id, since)
 	if err != nil {
+		slog.Error("timeline: query failed", "id", id, "since", since, "err", err)
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
 	if entries == nil {
 		entries = []db.TimelineEntry{}
 	}
+	slog.Debug("timeline: fetched", "contact_id", id, "entries", len(entries), "since", since)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"contact": contact,
 		"entries": entries,
@@ -53,9 +57,11 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := stats.Compute(r.Context(), s.db, id, rng, time.Now())
 	if err != nil {
+		slog.Warn("stats: compute failed", "contact_id", id, "range", rng, "err", err)
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	slog.Debug("stats: computed", "contact_id", id, "range", rng, "online_seconds", out.OnlineSecondsAll)
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -67,4 +73,3 @@ func wajid(phone string) (string, error) {
 	}
 	return jid.String(), nil
 }
-

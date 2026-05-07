@@ -90,11 +90,14 @@ func (t *Tracker) onConnected() {
 	t.running = true
 	t.mu.Unlock()
 
-	t.wg.Add(3)
+	t.wg.Add(4)
 	go t.runPictureLoop()
 	go t.runAboutLoop()
 	go t.runResubLoop()
-	go t.startSubscriptions()
+	go func() {
+		defer t.wg.Done()
+		t.startSubscriptions()
+	}()
 
 	if err := t.wa.SendAvailable(t.ctx); err != nil {
 		log.Printf("tracker: send available: %v", err)
