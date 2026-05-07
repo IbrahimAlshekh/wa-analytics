@@ -2,12 +2,16 @@
 set -e
 
 # Configuration
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SERVICE_NAME="whatsapp-tracker"
 PORT="8888"
 BIN_DEST="/usr/local/bin/whatsapp-tracker"
 USER=$(whoami)
-WORKDIR=$(pwd)
+WORKDIR="$PROJECT_ROOT"
 DATA_DIR="$HOME/.local/share/whatsapp-tracker"
+
+cd "$PROJECT_ROOT"
 
 echo "--- Building WhatsApp Tracker ---"
 make build
