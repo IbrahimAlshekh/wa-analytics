@@ -24,14 +24,22 @@ async function request(method, path, body) {
     return data;
 }
 export const api = {
-    status: () => request("GET", "/auth/status"),
-    startQR: () => request("POST", "/auth/qr"),
-    pairPhone: (phone) => request("POST", "/auth/phone", { phone }),
-    logout: () => request("POST", "/auth/logout"),
-    listContacts: () => request("GET", "/contacts"),
-    createContact: (phone, displayName) => request("POST", "/contacts", { phone, displayName }),
-    updateContact: (id, body) => request("PATCH", `/contacts/${id}`, body),
-    deleteContact: (id) => request("DELETE", `/contacts/${id}`),
-    timeline: (id, since = 0) => request("GET", `/contacts/${id}/timeline?since=${since}`),
-    stats: (id, range) => request("GET", `/contacts/${id}/stats?range=${range}`),
+    // Accounts
+    listAccounts: () => request("GET", "/accounts"),
+    startQR: () => request("POST", "/accounts/pair/qr"),
+    pairPhone: (phone) => request("POST", "/accounts/pair/phone", { phone }),
+    updateAccount: (id, body) => request("PATCH", `/accounts/${id}`, body),
+    deleteAccount: (id) => request("DELETE", `/accounts/${id}`),
+    // Contacts (per-account)
+    listContacts: (accountId) => request("GET", `/accounts/${accountId}/contacts`),
+    createContact: (accountId, phone, displayName) => request("POST", `/accounts/${accountId}/contacts`, { phone, displayName }),
+    updateContact: (accountId, id, body) => request("PATCH", `/accounts/${accountId}/contacts/${id}`, body),
+    deleteContact: (accountId, id) => request("DELETE", `/accounts/${accountId}/contacts/${id}`),
+    // Timeline / Stats / Messages (per-contact)
+    timeline: (accountId, contactId, since = 0) => request("GET", `/accounts/${accountId}/contacts/${contactId}/timeline?since=${since}`),
+    stats: (accountId, contactId, range) => request("GET", `/accounts/${accountId}/contacts/${contactId}/stats?range=${range}`),
+    messages: (accountId, contactId, before = 0, limit = 50) => {
+        const q = before ? `before=${before}&limit=${limit}` : `limit=${limit}`;
+        return request("GET", `/accounts/${accountId}/contacts/${contactId}/messages?${q}`);
+    },
 };

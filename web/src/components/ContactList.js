@@ -3,43 +3,46 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-export default function ContactList() {
+export default function ContactList({ accountId }) {
     const qc = useQueryClient();
-    const contacts = useQuery({ queryKey: ["contacts"], queryFn: api.listContacts });
+    const contacts = useQuery({
+        queryKey: ["contacts", accountId],
+        queryFn: () => api.listContacts(accountId),
+    });
     const [phone, setPhone] = useState("");
     const [name, setName] = useState("");
     const [error, setError] = useState(null);
     const addMutation = useMutation({
-        mutationFn: () => api.createContact(phone, name),
+        mutationFn: () => api.createContact(accountId, phone, name),
         onSuccess: () => {
             setPhone("");
             setName("");
             setError(null);
-            qc.invalidateQueries({ queryKey: ["contacts"] });
+            qc.invalidateQueries({ queryKey: ["contacts", accountId] });
         },
         onError: (e) => setError(e instanceof Error ? e.message : String(e)),
     });
     const toggle = useMutation({
-        mutationFn: ({ id, enabled }) => api.updateContact(id, { trackingEnabled: enabled }),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts"] }),
+        mutationFn: ({ id, enabled }) => api.updateContact(accountId, id, { trackingEnabled: enabled }),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
     });
     const remove = useMutation({
-        mutationFn: (id) => api.deleteContact(id),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts"] }),
+        mutationFn: (id) => api.deleteContact(accountId, id),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
     });
     return (_jsxs("div", { className: "col", style: { gap: 16 }, children: [_jsxs("div", { className: "card", children: [_jsx("h3", { style: { marginTop: 0 }, children: "Add contact" }), _jsxs("form", { onSubmit: (e) => {
                             e.preventDefault();
                             addMutation.mutate();
-                        }, className: "row", style: { gap: 8 }, children: [_jsx("input", { className: "input", placeholder: "+14155551234", value: phone, onChange: (e) => setPhone(e.target.value) }), _jsx("input", { className: "input", placeholder: "Display name (optional)", value: name, onChange: (e) => setName(e.target.value) }), _jsx("button", { className: "btn btn-primary", type: "submit", disabled: !phone, children: "Add" })] }), error && _jsx("div", { className: "error", style: { marginTop: 8 }, children: error })] }), _jsx("div", { className: "card", style: { padding: 0, overflow: "hidden" }, children: _jsxs("table", { className: "contact-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", {}), _jsx("th", { children: "Name" }), _jsx("th", { children: "Phone" }), _jsx("th", { children: "About" }), _jsx("th", { children: "Tracking" }), _jsx("th", {})] }) }), _jsxs("tbody", { children: [(contacts.data ?? []).map((c) => (_jsx(ContactRow, { contact: c, onToggle: (enabled) => toggle.mutate({ id: c.id, enabled }), onDelete: () => {
+                        }, className: "row", style: { gap: 8 }, children: [_jsx("input", { className: "input", placeholder: "+14155551234", value: phone, onChange: (e) => setPhone(e.target.value) }), _jsx("input", { className: "input", placeholder: "Display name (optional)", value: name, onChange: (e) => setName(e.target.value) }), _jsx("button", { className: "btn btn-primary", type: "submit", disabled: !phone, children: "Add" })] }), error && _jsx("div", { className: "error", style: { marginTop: 8 }, children: error })] }), _jsx("div", { className: "card", style: { padding: 0, overflow: "hidden" }, children: _jsxs("table", { className: "contact-table", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", {}), _jsx("th", { children: "Name" }), _jsx("th", { children: "Phone" }), _jsx("th", { children: "About" }), _jsx("th", { children: "Tracking" }), _jsx("th", {})] }) }), _jsxs("tbody", { children: [(contacts.data ?? []).map((c) => (_jsx(ContactRow, { accountId: accountId, contact: c, onToggle: (enabled) => toggle.mutate({ id: c.id, enabled }), onDelete: () => {
                                         if (confirm(`Stop tracking ${c.displayName || c.phone}?`)) {
                                             remove.mutate(c.id);
                                         }
                                     } }, c.id))), contacts.data && contacts.data.length === 0 && (_jsx("tr", { children: _jsx("td", { colSpan: 6, className: "muted", style: { padding: 24 }, children: "No contacts yet \u2014 add one above." }) }))] })] }) })] }));
 }
-function ContactRow({ contact, onToggle, onDelete, }) {
+function ContactRow({ accountId, contact, onToggle, onDelete, }) {
     const timeline = useQuery({
-        queryKey: ["timeline", contact.id],
-        queryFn: () => api.timeline(contact.id, 0),
+        queryKey: ["timeline", accountId, contact.id],
+        queryFn: () => api.timeline(accountId, contact.id, 0),
         refetchInterval: 60_000,
     });
     const entries = timeline.data?.entries ?? [];
@@ -47,7 +50,7 @@ function ContactRow({ contact, onToggle, onDelete, }) {
     const lastAbout = [...entries].reverse().find((e) => e.kind === "about");
     const lastPic = [...entries].reverse().find((e) => e.kind === "picture");
     const online = lastPresence?.state === "available";
-    return (_jsxs("tr", { children: [_jsx("td", { children: _jsx("span", { className: `dot ${online ? "online" : ""}` }) }), _jsxs("td", { children: [_jsx(Link, { to: `/contacts/${contact.id}`, children: contact.displayName || contact.phone }), lastPresence && (_jsx("div", { className: "muted", style: { fontSize: 11 }, children: online
+    return (_jsxs("tr", { children: [_jsx("td", { children: _jsx("span", { className: `dot ${online ? "online" : ""}` }) }), _jsxs("td", { children: [_jsx(Link, { to: `/accounts/${accountId}/contacts/${contact.id}`, children: contact.displayName || contact.phone }), lastPresence && (_jsx("div", { className: "muted", style: { fontSize: 11 }, children: online
                             ? "Online now"
                             : lastPresence.lastSeen
                                 ? `Last seen ${formatRelative(lastPresence.lastSeen)}`

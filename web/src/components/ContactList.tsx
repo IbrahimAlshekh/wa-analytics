@@ -4,33 +4,40 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
 
-export default function ContactList() {
+interface Props {
+  accountId: number;
+}
+
+export default function ContactList({ accountId }: Props) {
   const qc = useQueryClient();
-  const contacts = useQuery({ queryKey: ["contacts"], queryFn: api.listContacts });
+  const contacts = useQuery({
+    queryKey: ["contacts", accountId],
+    queryFn: () => api.listContacts(accountId),
+  });
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const addMutation = useMutation({
-    mutationFn: () => api.createContact(phone, name),
+    mutationFn: () => api.createContact(accountId, phone, name),
     onSuccess: () => {
       setPhone("");
       setName("");
       setError(null);
-      qc.invalidateQueries({ queryKey: ["contacts"] });
+      qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
   });
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
-      api.updateContact(id, { trackingEnabled: enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts"] }),
+      api.updateContact(accountId, id, { trackingEnabled: enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
   });
 
   const remove = useMutation({
-    mutationFn: (id: number) => api.deleteContact(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts"] }),
+    mutationFn: (id: number) => api.deleteContact(accountId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
   });
 
   return (
@@ -80,10 +87,9 @@ export default function ContactList() {
             {(contacts.data ?? []).map((c: Contact) => (
               <ContactRow
                 key={c.id}
+                accountId={accountId}
                 contact={c}
-                onToggle={(enabled) =>
-                  toggle.mutate({ id: c.id, enabled })
-                }
+                onToggle={(enabled) => toggle.mutate({ id: c.id, enabled })}
                 onDelete={() => {
                   if (confirm(`Stop tracking ${c.displayName || c.phone}?`)) {
                     remove.mutate(c.id);
@@ -106,17 +112,19 @@ export default function ContactList() {
 }
 
 function ContactRow({
+  accountId,
   contact,
   onToggle,
   onDelete,
 }: {
+  accountId: number;
   contact: Contact;
   onToggle: (enabled: boolean) => void;
   onDelete: () => void;
 }) {
   const timeline = useQuery({
-    queryKey: ["timeline", contact.id],
-    queryFn: () => api.timeline(contact.id, 0),
+    queryKey: ["timeline", accountId, contact.id],
+    queryFn: () => api.timeline(accountId, contact.id, 0),
     refetchInterval: 60_000,
   });
   const entries = timeline.data?.entries ?? [];
@@ -132,7 +140,7 @@ function ContactRow({
         <span className={`dot ${online ? "online" : ""}`} />
       </td>
       <td>
-        <Link to={`/contacts/${contact.id}`}>
+        <Link to={`/accounts/${accountId}/contacts/${contact.id}`}>
           {contact.displayName || contact.phone}
         </Link>
         {lastPresence && (

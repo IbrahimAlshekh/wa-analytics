@@ -2,32 +2,46 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 )
 
-func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"linked":    s.wa.IsLoggedIn(),
-		"connected": s.wa.IsConnected(),
-		"ownJID":    s.wa.OwnJID(),
-	})
-}
-
-func (s *Server) handleAuthQR(w http.ResponseWriter, r *http.Request) {
-	if s.wa.IsLoggedIn() {
-		writeErr(w, http.StatusConflict, errors.New("already linked"))
+// handleListAccounts returns all paired accounts with live connection status.
+func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
+	accounts, err := s.db.ListAccounts(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	slog.Info("auth: starting QR flow")
+	if accounts == nil {
+		accounts = []db.Account{}
+	}
+	type accountResp struct {
+		db.Account
+		Connected bool `json:"connected"`
+	}
+	out := make([]accountResp, len(accounts))
+	for i, a := range accounts {
+		out[i] = accountResp{
+			Account:   a,
+			Connected: s.manager.IsConnected(a.ID),
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handlePairQR starts a QR pairing flow for a new account.
+func (s *Server) handlePairQR(w http.ResponseWriter, r *http.Request) {
+	slog.Info("accounts: starting QR pairing flow")
 	flowCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	codes, err := s.wa.StartQRFlow(flowCtx)
+	codes, err := s.manager.StartQRPairing(flowCtx)
 	if err != nil {
 		cancel()
-		slog.Warn("auth: QR flow start failed", "err", err)
+		slog.Warn("accounts: QR flow start failed", "err", err)
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -36,25 +50,20 @@ func (s *Server) handleAuthQR(w http.ResponseWriter, r *http.Request) {
 		n := 0
 		for code := range codes {
 			n++
-			slog.Debug("auth: QR code generated", "seq", n)
+			slog.Debug("accounts: QR code generated", "seq", n)
 			s.hub.Broadcast("auth.qr", map[string]any{"code": code})
 		}
-		slog.Info("auth: QR flow ended", "codes_sent", n)
+		slog.Info("accounts: QR flow ended", "codes_sent", n)
 	}()
 	writeJSON(w, http.StatusAccepted, map[string]any{"started": true})
 }
 
-type phoneReq struct {
-	Phone string `json:"phone"`
-}
-
-func (s *Server) handleAuthPhone(w http.ResponseWriter, r *http.Request) {
-	if s.wa.IsLoggedIn() {
-		writeErr(w, http.StatusConflict, errors.New("already linked"))
-		return
+// handlePairPhone starts a phone-number pairing flow for a new account.
+func (s *Server) handlePairPhone(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone string `json:"phone"`
 	}
-	var req phoneReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := readJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -62,28 +71,62 @@ func (s *Server) handleAuthPhone(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, errors.New("phone required"))
 		return
 	}
-	slog.Info("auth: pairing phone", "phone", req.Phone)
+	slog.Info("accounts: pairing by phone", "phone", req.Phone)
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	code, err := s.wa.PairPhone(ctx, req.Phone)
+	code, err := s.manager.PairPhone(ctx, req.Phone)
 	if err != nil {
-		slog.Warn("auth: phone pair failed", "phone", req.Phone, "err", err)
+		slog.Warn("accounts: phone pair failed", "phone", req.Phone, "err", err)
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	slog.Info("auth: phone pair code issued", "phone", req.Phone)
+	slog.Info("accounts: phone pair code issued", "phone", req.Phone)
 	writeJSON(w, http.StatusOK, map[string]string{"code": code})
 }
 
-func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
-	slog.Info("auth: logout requested")
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	if err := s.wa.Logout(ctx); err != nil {
-		slog.Error("auth: logout failed", "err", err)
+// handlePatchAccount updates label or tracking_active for an account.
+func (s *Server) handlePatchAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	var req struct {
+		Label          *string `json:"label,omitempty"`
+		TrackingActive *bool   `json:"trackingActive,omitempty"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.db.UpdateAccount(r.Context(), id, req.Label, req.TrackingActive); err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	slog.Info("auth: logged out successfully")
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	acc, err := s.db.GetAccount(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	slog.Info("accounts: patched", "id", id)
+	writeJSON(w, http.StatusOK, acc)
+}
+
+// handleDeleteAccount removes an account and all its data.
+func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	// Remove from WA manager (disconnects + deletes whatsmeow device).
+	if err := s.manager.Remove(r.Context(), id); err != nil {
+		slog.Warn("accounts: manager remove failed (device may already be gone)", "id", id, "err", err)
+	}
+	if err := s.db.DeleteAccount(r.Context(), id); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	slog.Info("accounts: deleted", "id", id)
+	w.WriteHeader(http.StatusNoContent)
 }

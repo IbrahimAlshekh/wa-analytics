@@ -16,6 +16,7 @@ import (
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 )
 
+// Tracker is the interface the API uses to subscribe contacts to presence.
 type Tracker interface {
 	SubscribeContact(ctx context.Context, c db.Contact)
 }
@@ -28,17 +29,14 @@ type Config struct {
 type Server struct {
 	cfg     Config
 	db      *db.DB
-	wa      *wa.Client
+	manager *wa.ClientManager
 	tracker Tracker
 	hub     *Hub
 	mux     *http.ServeMux
 }
 
-func NewServer(cfg Config, store *db.DB, waClient *wa.Client, trk Tracker, hub *Hub) *Server {
-	if cfg.Bearer != "" {
-		slog.Warn("bearer token auth enabled — token may appear in server access logs via ws ?token= query string")
-	}
-	s := &Server{cfg: cfg, db: store, wa: waClient, tracker: trk, hub: hub}
+func NewServer(cfg Config, store *db.DB, manager *wa.ClientManager, trk Tracker, hub *Hub) *Server {
+	s := &Server{cfg: cfg, db: store, manager: manager, tracker: trk, hub: hub}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
@@ -101,19 +99,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	apiAuth := func(h http.HandlerFunc) http.Handler { return s.requireAuth(http.HandlerFunc(h)) }
 
-	s.mux.Handle("GET /api/auth/status", apiAuth(s.handleAuthStatus))
-	s.mux.Handle("POST /api/auth/qr", apiAuth(s.handleAuthQR))
-	s.mux.Handle("POST /api/auth/phone", apiAuth(s.handleAuthPhone))
-	s.mux.Handle("POST /api/auth/logout", apiAuth(s.handleAuthLogout))
+	// Accounts
+	s.mux.Handle("GET /api/accounts", apiAuth(s.handleListAccounts))
+	s.mux.Handle("POST /api/accounts/pair/qr", apiAuth(s.handlePairQR))
+	s.mux.Handle("POST /api/accounts/pair/phone", apiAuth(s.handlePairPhone))
+	s.mux.Handle("PATCH /api/accounts/{id}", apiAuth(s.handlePatchAccount))
+	s.mux.Handle("DELETE /api/accounts/{id}", apiAuth(s.handleDeleteAccount))
 
-	s.mux.Handle("GET /api/contacts", apiAuth(s.handleListContacts))
-	s.mux.Handle("POST /api/contacts", apiAuth(s.handleCreateContact))
-	s.mux.Handle("PATCH /api/contacts/{id}", apiAuth(s.handlePatchContact))
-	s.mux.Handle("DELETE /api/contacts/{id}", apiAuth(s.handleDeleteContact))
+	// Contacts (per-account)
+	s.mux.Handle("GET /api/accounts/{id}/contacts", apiAuth(s.handleListContacts))
+	s.mux.Handle("POST /api/accounts/{id}/contacts", apiAuth(s.handleCreateContact))
+	s.mux.Handle("PATCH /api/accounts/{id}/contacts/{cid}", apiAuth(s.handlePatchContact))
+	s.mux.Handle("DELETE /api/accounts/{id}/contacts/{cid}", apiAuth(s.handleDeleteContact))
 
-	s.mux.Handle("GET /api/contacts/{id}/timeline", apiAuth(s.handleTimeline))
-	s.mux.Handle("GET /api/contacts/{id}/stats", apiAuth(s.handleStats))
+	// Timeline / Stats / Messages (per-contact)
+	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/timeline", apiAuth(s.handleTimeline))
+	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stats", apiAuth(s.handleStats))
+	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))
 
+	// WebSocket
 	s.mux.Handle("GET /api/ws", apiAuth(s.handleWS))
 
 	s.mux.Handle("/", staticHandler())
@@ -126,7 +130,6 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if !strings.HasPrefix(auth, "Bearer ") || auth[len("Bearer "):] != s.cfg.Bearer {
-			// Allow query-string token for ws upgrade convenience
 			if r.URL.Query().Get("token") != s.cfg.Bearer {
 				slog.Warn("unauthorized request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -162,6 +165,14 @@ func parseID(r *http.Request) (int64, error) {
 	v := r.PathValue("id")
 	if v == "" {
 		return 0, errors.New("missing id")
+	}
+	return strconv.ParseInt(v, 10, 64)
+}
+
+func parseCID(r *http.Request) (int64, error) {
+	v := r.PathValue("cid")
+	if v == "" {
+		return 0, errors.New("missing cid")
 	}
 	return strconv.ParseInt(v, 10, 64)
 }

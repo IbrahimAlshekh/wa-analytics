@@ -1,43 +1,156 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-export default function Timeline({ entries }) {
+export default function SessionTimeline({ entries }) {
     if (!entries.length) {
         return _jsx("div", { className: "muted", children: "No events yet." });
     }
-    const groups = groupByDay(entries);
-    return (_jsx("div", { className: "timeline", children: groups.map(([day, group]) => (_jsxs("div", { className: "timeline-day", children: [_jsx("h3", { children: day }), group.map((entry, i) => (_jsxs("div", { className: "timeline-entry", children: [_jsx("time", { children: formatTime(entry.at) }), _jsx(EntryLine, { entry: entry })] }, `${day}-${i}`)))] }, day))) }));
-}
-function EntryLine({ entry }) {
-    switch (entry.kind) {
-        case "presence":
-            if (entry.state === "available")
-                return _jsx("span", { children: _jsx("strong", { children: "Online" }) });
-            return (_jsxs("span", { children: [_jsx("strong", { children: "Offline" }), entry.lastSeen
-                        ? ` (last seen ${formatTime(entry.lastSeen)})`
-                        : ""] }));
-        case "picture":
-            return (_jsxs("span", { children: ["Profile picture changed", entry.url ? (_jsxs(_Fragment, { children: [" ", _jsx("a", { href: entry.url, target: "_blank", rel: "noreferrer", children: "view" })] })) : null] }));
-        case "about":
-            return (_jsxs("span", { children: ["About updated:", " ", _jsx("em", { children: entry.text || "(empty)" })] }));
+    const blocks = buildBlocks(entries);
+    if (!blocks.length) {
+        return _jsx("div", { className: "muted", children: "No sessions recorded yet." });
     }
+    return (_jsx("div", { className: "session-timeline", children: blocks.map((b, i) => {
+            if (b.type === "session")
+                return _jsx(SessionBlock, { session: b.session }, i);
+            if (b.type === "offline-gap")
+                return _jsx(GapBlock, { fromAt: b.fromAt, toAt: b.toAt }, i);
+            return _jsx(EventBlock, { ev: b.ev }, i);
+        }) }));
 }
-function groupByDay(entries) {
-    const map = new Map();
-    for (const e of entries) {
-        const d = new Date(e.at * 1000);
-        const key = d.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "short",
-            day: "numeric",
+function SessionBlock({ session }) {
+    const start = formatTime(session.startAt);
+    const end = session.endAt ? formatTime(session.endAt) : "now";
+    const dur = session.durationSec != null ? formatDuration(session.durationSec) : null;
+    const lastSeenDiff = session.lastSeen != null && session.endAt != null
+        ? session.endAt - session.lastSeen
+        : null;
+    return (_jsxs("div", { className: "session-block session-online", children: [_jsxs("div", { className: "session-header", children: [_jsx("span", { className: "session-dot session-dot-online" }), _jsxs("span", { className: "session-label", children: ["Online ", start, " \u2013 ", end, dur ? _jsxs("span", { className: "session-duration", children: ["(", dur, ")"] }) : null] })] }), lastSeenDiff != null && lastSeenDiff > 0 && (_jsxs("div", { className: "session-meta", children: ["Last activity ", formatDuration(lastSeenDiff), " before going offline"] }))] }));
+}
+function GapBlock({ fromAt, toAt }) {
+    const dur = formatDuration(toAt - fromAt);
+    return (_jsxs("div", { className: "session-block session-offline", children: [_jsx("span", { className: "session-dot session-dot-offline" }), _jsxs("span", { className: "session-label session-muted", children: ["Offline ", dur] })] }));
+}
+function EventBlock({ ev }) {
+    return (_jsxs("div", { className: "session-event", children: [_jsx("time", { className: "session-time", children: formatTime(ev.at) }), ev.kind === "picture" ? (_jsxs("span", { children: ["Profile picture changed", ev.url ? (_jsxs(_Fragment, { children: [" ", _jsx("a", { href: ev.url, target: "_blank", rel: "noreferrer", children: "view" })] })) : null] })) : ev.kind === "about" ? (_jsxs("span", { children: ["About updated: ", _jsx("em", { children: ev.text || "(empty)" })] })) : (_jsxs("span", { children: [ev.isFromMe ? "Sent message" : "Received message", ":", " ", _jsx("em", { style: { fontStyle: "normal", color: "var(--fg)" }, children: ev.text || _jsx("span", { className: "muted", children: "[media]" }) })] }))] }));
+}
+// ---------------------------------------------------------------------------
+// Build display blocks from raw timeline entries.
+function buildBlocks(entries) {
+    const presence = entries
+        .filter((e) => e.kind === "presence")
+        .sort((a, b) => a.at - b.at);
+    const nonPresence = entries
+        .filter((e) => e.kind === "picture" || e.kind === "about" || e.kind === "message")
+        .map((e) => ({
+        kind: e.kind,
+        at: e.at,
+        text: e.text,
+        url: e.url,
+        isFromMe: e.isFromMe,
+    }))
+        .sort((a, b) => a.at - b.at);
+    // Pair online→offline into sessions.
+    const sessions = [];
+    let sessionStart = null;
+    let sessionLastSeen = null;
+    let lastOfflineAt = null;
+    for (const p of presence) {
+        if (p.state === "available") {
+            sessionStart = p.at;
+            sessionLastSeen = null;
+        }
+        else if (p.state === "unavailable" && sessionStart != null) {
+            const dur = p.at - sessionStart;
+            sessions.push({
+                startAt: sessionStart,
+                endAt: p.at,
+                lastSeen: p.lastSeen ?? null,
+                durationSec: dur,
+            });
+            sessionStart = null;
+            sessionLastSeen = null;
+            lastOfflineAt = p.at;
+        }
+        else if (p.state === "unavailable") {
+            // Standalone unavailable (no prior available in this window)
+            lastOfflineAt = p.at;
+        }
+    }
+    // Currently online
+    if (sessionStart != null) {
+        sessions.push({
+            startAt: sessionStart,
+            endAt: null,
+            lastSeen: sessionLastSeen,
+            durationSec: null,
         });
-        if (!map.has(key))
-            map.set(key, []);
-        map.get(key).push(e);
+        // Clear offline marker — currently online
+        lastOfflineAt = null;
     }
-    return Array.from(map.entries()).reverse();
+    // Build alternating blocks: offline-gap then session.
+    const blocks = [];
+    for (let i = 0; i < sessions.length; i++) {
+        const prev = sessions[i - 1];
+        const cur = sessions[i];
+        if (prev && prev.endAt != null) {
+            const gapSec = cur.startAt - prev.endAt;
+            if (gapSec > 30) {
+                blocks.push({ type: "offline-gap", fromAt: prev.endAt, toAt: cur.startAt });
+            }
+        }
+        blocks.push({ type: "session", session: cur });
+    }
+    // Interleave non-presence events at their natural position.
+    const mixed = [];
+    let bi = 0;
+    for (const ev of nonPresence) {
+        while (bi < blocks.length) {
+            const b = blocks[bi];
+            const bAt = b.type === "session"
+                ? b.session.startAt
+                : b.type === "offline-gap"
+                    ? b.fromAt
+                    : b.ev.at;
+            if (bAt > ev.at)
+                break;
+            mixed.push(blocks[bi++]);
+        }
+        mixed.push({ type: "event", ev });
+    }
+    while (bi < blocks.length)
+        mixed.push(blocks[bi++]);
+    // Reverse so newest is at top.
+    const reversed = mixed.reverse();
+    // If the person is currently offline (no open session), prepend an indicator.
+    if (lastOfflineAt != null) {
+        const offlineSince = Math.floor(Date.now() / 1000 - lastOfflineAt);
+        const offlineBlock = {
+            type: "offline-gap",
+            fromAt: lastOfflineAt,
+            toAt: Math.floor(Date.now() / 1000),
+        };
+        // Only prepend if it's a meaningful gap (>30s) and not already shown.
+        if (offlineSince > 30) {
+            return [offlineBlock, ...reversed];
+        }
+    }
+    return reversed;
 }
+// ---------------------------------------------------------------------------
+// Helpers
 function formatTime(unix) {
     return new Date(unix * 1000).toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
     });
+}
+function formatDuration(sec) {
+    if (sec < 60)
+        return `${sec}s`;
+    const m = Math.floor(sec / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
+    if (d > 0)
+        return `${d}d ${h % 24}h`;
+    if (h > 0)
+        return `${h}h ${m % 60}m`;
+    return `${m}m`;
 }

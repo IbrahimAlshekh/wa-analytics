@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
@@ -19,6 +20,73 @@ type Hub interface {
 	Broadcast(kind string, payload any)
 }
 
+// TrackerManager owns one Tracker per account.
+type TrackerManager struct {
+	mu       sync.RWMutex
+	trackers map[int64]*Tracker
+}
+
+func NewTrackerManager() *TrackerManager {
+	return &TrackerManager{trackers: make(map[int64]*Tracker)}
+}
+
+// Add registers a new account tracker. If one already exists for this account it is returned as-is.
+func (m *TrackerManager) Add(accountID int64, deps Deps) *Tracker {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t, ok := m.trackers[accountID]; ok {
+		return t
+	}
+	t := newTracker(accountID, deps)
+	m.trackers[accountID] = t
+	return t
+}
+
+// Get returns the Tracker for an account, or nil.
+func (m *TrackerManager) Get(accountID int64) *Tracker {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.trackers[accountID]
+}
+
+// Remove stops and removes a tracker.
+func (m *TrackerManager) Remove(accountID int64) {
+	m.mu.Lock()
+	t, ok := m.trackers[accountID]
+	if ok {
+		delete(m.trackers, accountID)
+	}
+	m.mu.Unlock()
+	if t != nil {
+		t.Stop()
+	}
+}
+
+// StopAll stops all trackers.
+func (m *TrackerManager) StopAll() {
+	m.mu.RLock()
+	ts := make([]*Tracker, 0, len(m.trackers))
+	for _, t := range m.trackers {
+		ts = append(ts, t)
+	}
+	m.mu.RUnlock()
+	for _, t := range ts {
+		t.Stop()
+	}
+}
+
+// SubscribeContact delegates to the correct account's tracker.
+func (m *TrackerManager) SubscribeContact(ctx context.Context, c db.Contact) {
+	t := m.Get(c.AccountID)
+	if t == nil {
+		slog.Warn("tracker manager: no tracker for account", "accountID", c.AccountID)
+		return
+	}
+	t.SubscribeContact(ctx, c)
+}
+
+// ---------------------------------------------------------------------------
+
 type Deps struct {
 	WA       *wa.Client
 	DB       *db.DB
@@ -27,10 +95,11 @@ type Deps struct {
 }
 
 type Tracker struct {
-	wa       *wa.Client
-	db       *db.DB
-	hub      Hub
-	interval time.Duration
+	accountID int64
+	wa        *wa.Client
+	db        *db.DB
+	hub       Hub
+	interval  time.Duration
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -40,46 +109,55 @@ type Tracker struct {
 	running bool
 }
 
-func New(d Deps) *Tracker {
+func newTracker(accountID int64, d Deps) *Tracker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Tracker{
-		wa:       d.WA,
-		db:       d.DB,
-		hub:      d.Hub,
-		interval: d.Interval,
-		ctx:      ctx,
-		cancel:   cancel,
+		accountID: accountID,
+		wa:        d.WA,
+		db:        d.DB,
+		hub:       d.Hub,
+		interval:  d.Interval,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }
 
+// New creates a standalone tracker (single-account convenience wrapper).
+func New(d Deps) *Tracker {
+	return newTracker(0, d)
+}
+
 func (t *Tracker) Stop() {
-	slog.Info("tracker: stopping")
+	slog.Info("tracker: stopping", "accountID", t.accountID)
 	t.cancel()
 	t.wg.Wait()
-	slog.Info("tracker: stopped")
+	slog.Info("tracker: stopped", "accountID", t.accountID)
 }
 
 // HandleEvent is the single entry point for whatsmeow events. Wired into wa.Client.AttachHandler.
 func (t *Tracker) HandleEvent(evt any) {
 	switch v := evt.(type) {
 	case *events.Connected:
-		slog.Info("tracker: connected", "jid", t.wa.OwnJID())
-		t.hub.Broadcast("auth.linked", map[string]any{"ownJID": t.wa.OwnJID()})
+		slog.Info("tracker: connected", "accountID", t.accountID, "jid", t.wa.OwnJID())
+		t.hub.Broadcast("auth.linked", map[string]any{"accountID": t.accountID, "ownJID": t.wa.OwnJID()})
 		t.onConnected()
 
 	case *events.Disconnected:
-		slog.Warn("tracker: disconnected")
+		slog.Warn("tracker: disconnected", "accountID", t.accountID)
 
 	case *events.LoggedOut:
-		slog.Warn("tracker: logged out", "reason", v.Reason.String())
-		t.hub.Broadcast("auth.logout", map[string]any{"reason": v.Reason.String()})
+		slog.Warn("tracker: logged out", "accountID", t.accountID, "reason", v.Reason.String())
+		t.hub.Broadcast("auth.logout", map[string]any{"accountID": t.accountID, "reason": v.Reason.String()})
 		t.stopWorkers()
 
 	case *events.PairSuccess:
-		slog.Info("tracker: pair success", "jid", v.ID.String())
+		slog.Info("tracker: pair success", "accountID", t.accountID, "jid", v.ID.String())
 
 	case *events.Presence:
 		t.onPresence(v)
+
+	case *events.Message:
+		t.onMessage(v)
 	}
 }
 
@@ -95,10 +173,10 @@ func (t *Tracker) onConnected() {
 	// SendAvailable must be called before subscribing to presence so WhatsApp
 	// knows to push events to us.
 	if err := t.wa.SendAvailable(t.ctx); err != nil {
-		slog.Warn("tracker: send available failed", "err", err)
+		slog.Warn("tracker: send available failed", "accountID", t.accountID, "err", err)
 	}
 
-	slog.Info("tracker: starting workers", "poll_interval", t.interval)
+	slog.Info("tracker: starting workers", "accountID", t.accountID, "poll_interval", t.interval)
 	t.wg.Add(4)
 	go t.runPictureLoop()
 	go t.runAboutLoop()
@@ -113,57 +191,56 @@ func (t *Tracker) stopWorkers() {
 	t.mu.Lock()
 	t.running = false
 	t.mu.Unlock()
-	slog.Info("tracker: workers stopped")
+	slog.Info("tracker: workers stopped", "accountID", t.accountID)
 }
 
 func (t *Tracker) startSubscriptions() {
-	contacts, err := t.db.ListTrackedContacts(t.ctx)
+	contacts, err := t.db.ListTrackedContacts(t.ctx, t.accountID)
 	if err != nil {
-		slog.Error("tracker: list contacts for subscription", "err", err)
+		slog.Error("tracker: list contacts for subscription", "accountID", t.accountID, "err", err)
 		return
 	}
-	slog.Info("tracker: subscribing to presence", "count", len(contacts))
+	slog.Info("tracker: subscribing to presence", "accountID", t.accountID, "count", len(contacts))
 	failed := 0
 	for _, c := range contacts {
 		jid, err := types.ParseJID(c.JID)
 		if err != nil {
-			slog.Error("tracker: invalid jid", "jid", c.JID, "err", err)
+			slog.Error("tracker: invalid jid", "accountID", t.accountID, "jid", c.JID, "err", err)
 			failed++
 			continue
 		}
 		if err := t.wa.SubscribePresence(t.ctx, jid); err != nil {
-			slog.Warn("tracker: subscribe presence failed", "jid", c.JID, "err", err)
+			slog.Warn("tracker: subscribe presence failed", "accountID", t.accountID, "jid", c.JID, "err", err)
 			failed++
 		} else {
-			slog.Debug("tracker: subscribed", "jid", c.JID)
-			// Fetch and store the LID if we don't have it yet — WhatsApp sends
-			// presence events using the LID rather than the phone JID.
+			slog.Debug("tracker: subscribed", "accountID", t.accountID, "jid", c.JID)
 			if c.LID == "" {
 				t.storeLID(c, jid)
 			}
 		}
 	}
 	if failed > 0 {
-		slog.Warn("tracker: some subscriptions failed", "failed", failed, "total", len(contacts))
+		slog.Warn("tracker: some subscriptions failed", "accountID", t.accountID, "failed", failed, "total", len(contacts))
 	}
 }
 
 // SubscribeContact lets the API tell us about a freshly added contact.
 func (t *Tracker) SubscribeContact(ctx context.Context, c db.Contact) {
 	if !t.wa.IsConnected() || !c.TrackingEnabled {
-		slog.Debug("tracker: skip subscribe (not connected or tracking disabled)", "jid", c.JID, "connected", t.wa.IsConnected(), "tracking", c.TrackingEnabled)
+		slog.Debug("tracker: skip subscribe (not connected or tracking disabled)",
+			"accountID", t.accountID, "jid", c.JID, "connected", t.wa.IsConnected(), "tracking", c.TrackingEnabled)
 		return
 	}
 	jid, err := types.ParseJID(c.JID)
 	if err != nil {
-		slog.Error("tracker: invalid jid for subscribe", "jid", c.JID, "err", err)
+		slog.Error("tracker: invalid jid for subscribe", "accountID", t.accountID, "jid", c.JID, "err", err)
 		return
 	}
 	if err := t.wa.SubscribePresence(ctx, jid); err != nil {
-		slog.Warn("tracker: subscribe presence failed", "jid", c.JID, "err", err)
+		slog.Warn("tracker: subscribe presence failed", "accountID", t.accountID, "jid", c.JID, "err", err)
 		return
 	}
-	slog.Info("tracker: subscribed to presence", "jid", c.JID)
+	slog.Info("tracker: subscribed to presence", "accountID", t.accountID, "jid", c.JID)
 	t.storeLID(c, jid)
 }
 
@@ -171,38 +248,38 @@ func (t *Tracker) SubscribeContact(ctx context.Context, c db.Contact) {
 func (t *Tracker) storeLID(c db.Contact, jid types.JID) {
 	lid, err := t.wa.GetLIDForJID(t.ctx, jid)
 	if err != nil {
-		slog.Warn("tracker: fetch LID failed", "jid", c.JID, "err", err)
+		slog.Warn("tracker: fetch LID failed", "accountID", t.accountID, "jid", c.JID, "err", err)
 		return
 	}
 	if lid.IsEmpty() {
-		slog.Debug("tracker: no LID for contact", "jid", c.JID)
+		slog.Debug("tracker: no LID for contact", "accountID", t.accountID, "jid", c.JID)
 		return
 	}
 	lidStr := lid.ToNonAD().String()
 	if err := t.db.UpdateContactLID(t.ctx, c.ID, lidStr); err != nil {
-		slog.Error("tracker: store LID failed", "jid", c.JID, "lid", lidStr, "err", err)
+		slog.Error("tracker: store LID failed", "accountID", t.accountID, "jid", c.JID, "lid", lidStr, "err", err)
 		return
 	}
-	slog.Info("tracker: stored LID", "jid", c.JID, "lid", lidStr)
+	slog.Info("tracker: stored LID", "accountID", t.accountID, "jid", c.JID, "lid", lidStr)
 }
 
 // onPresence persists a presence event (deduping flips of the same state) and broadcasts.
 func (t *Tracker) onPresence(p *events.Presence) {
 	fromJID := p.From.ToNonAD()
 	jidStr := fromJID.String()
-	slog.Debug("tracker: presence event received", "jid", jidStr, "unavailable", p.Unavailable, "last_seen", p.LastSeen)
+	slog.Debug("tracker: presence event received", "accountID", t.accountID, "jid", jidStr, "unavailable", p.Unavailable, "last_seen", p.LastSeen)
 
 	// WhatsApp sends presence events using the LID (anonymous ID) rather than
 	// the phone JID. Try LID lookup first, fall back to phone JID.
 	var c db.Contact
 	var err error
 	if fromJID.Server == types.HiddenUserServer {
-		c, err = t.db.GetContactByLID(t.ctx, jidStr)
+		c, err = t.db.GetContactByLID(t.ctx, t.accountID, jidStr)
 	} else {
-		c, err = t.db.GetContactByJID(t.ctx, jidStr)
+		c, err = t.db.GetContactByJID(t.ctx, t.accountID, jidStr)
 	}
 	if err != nil {
-		slog.Debug("tracker: presence event for untracked jid, dropping", "jid", jidStr, "err", err)
+		slog.Debug("tracker: presence event for untracked jid, dropping", "accountID", t.accountID, "jid", jidStr, "err", err)
 		return
 	}
 
@@ -221,24 +298,159 @@ func (t *Tracker) onPresence(p *events.Presence) {
 	sameState := prev.State == state
 	sameLastSeen := equalIntPtr(prev.LastSeen, lastSeen)
 	if sameState && sameLastSeen {
-		slog.Debug("tracker: presence unchanged, skipping", "jid", jidStr, "state", state)
-		return // collapse identical re-emits
+		slog.Debug("tracker: presence unchanged, skipping", "accountID", t.accountID, "jid", jidStr, "state", state)
+		return
 	}
 
 	ev, err := t.db.InsertPresence(t.ctx, c.ID, state, lastSeen, now)
 	if err != nil {
-		slog.Error("tracker: insert presence failed", "jid", jidStr, "contact_id", c.ID, "err", err)
+		slog.Error("tracker: insert presence failed", "accountID", t.accountID, "jid", jidStr, "contact_id", c.ID, "err", err)
 		return
 	}
 
-	slog.Info("tracker: presence update", "jid", jidStr, "contact_id", c.ID, "state", state, "observed_at", ev.ObservedAt)
+	slog.Info("tracker: presence update", "accountID", t.accountID, "jid", jidStr, "contact_id", c.ID, "state", state, "observed_at", ev.ObservedAt)
 	t.hub.Broadcast("presence", map[string]any{
+		"accountId":  t.accountID,
 		"contactId":  c.ID,
 		"jid":        c.JID,
 		"state":      state,
 		"lastSeen":   lastSeen,
 		"observedAt": ev.ObservedAt,
 	})
+}
+
+// onMessage stores an incoming real-time message.
+func (t *Tracker) onMessage(msg *events.Message) {
+	info := msg.Info
+	now := time.Now().Unix()
+
+	// Determine text and media type.
+	text := extractText(msg.Message)
+	mediaType := extractMediaType(msg.Message)
+
+	// Try to resolve the contact by sender JID.
+	senderJID := info.Sender.ToNonAD()
+	senderStr := senderJID.String()
+
+	var contactID *int64
+	if senderJID.Server == types.HiddenUserServer {
+		c, err := t.db.GetContactByLID(t.ctx, t.accountID, senderStr)
+		if err == nil {
+			contactID = &c.ID
+		}
+	} else {
+		c, err := t.db.GetContactByJID(t.ctx, t.accountID, senderStr)
+		if err == nil {
+			contactID = &c.ID
+		}
+	}
+
+	chatJID := info.Chat.ToNonAD()
+	chatStr := chatJID.String()
+
+	if contactID == nil {
+		// Try resolving by Chat JID (for messages sent by me in 1-to-1)
+		if chatJID.Server == types.HiddenUserServer {
+			c, err := t.db.GetContactByLID(t.ctx, t.accountID, chatStr)
+			if err == nil {
+				contactID = &c.ID
+			}
+		} else {
+			c, err := t.db.GetContactByJID(t.ctx, t.accountID, chatStr)
+			if err == nil {
+				contactID = &c.ID
+			}
+		}
+	}
+
+	m := db.Message{
+		AccountID:  t.accountID,
+		ContactID:  contactID,
+		ChatJID:    chatStr,
+		MessageID:  info.ID,
+		SenderJID:  senderStr,
+		IsFromMe:   info.IsFromMe,
+		Timestamp:  info.Timestamp.Unix(),
+		Text:       text,
+		MediaType:  mediaType,
+		ReceivedAt: now,
+	}
+	saved, err := t.db.InsertMessage(t.ctx, m)
+	if err != nil {
+		slog.Error("tracker: insert message failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
+		return
+	}
+	if saved.ID == 0 {
+		return // duplicate
+	}
+	slog.Debug("tracker: message stored", "accountID", t.accountID, "messageID", info.ID, "chat", chatStr, "from", senderStr)
+
+	// If we found a contact, also record a presence event to mark them active/online.
+	if contactID != nil && !info.IsFromMe {
+		_, _ = t.db.InsertPresence(t.ctx, *contactID, "available", nil, now)
+		t.hub.Broadcast("presence", map[string]any{
+			"accountId":  t.accountID,
+			"contactId":  *contactID,
+			"jid":        senderStr,
+			"state":      "available",
+			"observedAt": now,
+		})
+	}
+
+	t.hub.Broadcast("message", map[string]any{
+		"accountId": t.accountID,
+		"contactId": contactID,
+		"chatJid":   chatStr,
+		"messageId": info.ID,
+		"from":      senderStr,
+		"isFromMe":  info.IsFromMe,
+		"text":      text,
+		"timestamp": info.Timestamp.Unix(),
+	})
+}
+
+func extractText(msg *waE2E.Message) string {
+	if msg == nil {
+		return ""
+	}
+	if t := msg.GetConversation(); t != "" {
+		return t
+	}
+	if ext := msg.GetExtendedTextMessage(); ext != nil {
+		return ext.GetText()
+	}
+	if img := msg.GetImageMessage(); img != nil {
+		return img.GetCaption()
+	}
+	if vid := msg.GetVideoMessage(); vid != nil {
+		return vid.GetCaption()
+	}
+	if doc := msg.GetDocumentMessage(); doc != nil {
+		return doc.GetCaption()
+	}
+	return ""
+}
+
+func extractMediaType(msg *waE2E.Message) string {
+	if msg == nil {
+		return ""
+	}
+	if msg.ImageMessage != nil {
+		return "image"
+	}
+	if msg.VideoMessage != nil {
+		return "video"
+	}
+	if msg.AudioMessage != nil {
+		return "audio"
+	}
+	if msg.DocumentMessage != nil {
+		return "document"
+	}
+	if msg.StickerMessage != nil {
+		return "sticker"
+	}
+	return ""
 }
 
 func (t *Tracker) runResubLoop() {
@@ -253,7 +465,7 @@ func (t *Tracker) runResubLoop() {
 			if !t.isRunning() || !t.wa.IsConnected() {
 				continue
 			}
-			slog.Debug("tracker: re-subscribing to presence")
+			slog.Debug("tracker: re-subscribing to presence", "accountID", t.accountID)
 			t.startSubscriptions()
 		}
 	}

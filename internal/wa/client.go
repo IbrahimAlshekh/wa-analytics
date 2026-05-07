@@ -23,10 +23,9 @@ type Options struct {
 }
 
 type Client struct {
-	container *sqlstore.Container
-	device    *store.Device
-	cli       *whatsmeow.Client
-	log       waLog.Logger
+	device *store.Device
+	cli    *whatsmeow.Client
+	log    waLog.Logger
 
 	mu          sync.Mutex
 	handler     func(any)
@@ -34,14 +33,27 @@ type Client struct {
 	qrCancel    context.CancelFunc
 }
 
+// NewFromDevice creates a Client from an existing whatsmeow device.
+func NewFromDevice(_ context.Context, device *store.Device, logLevel string) (*Client, error) {
+	level := strings.ToUpper(logLevel)
+	if level == "" {
+		level = "INFO"
+	}
+	log := waLog.Stdout("WA", level, true)
+	c := &Client{device: device, log: log}
+	c.cli = whatsmeow.NewClient(device, log)
+	c.cli.AddEventHandler(c.dispatch)
+	return c, nil
+}
+
+// New is a convenience constructor for single-account use.
+// It opens its own sqlstore container and picks the first device.
 func New(ctx context.Context, opts Options) (*Client, error) {
 	level := strings.ToUpper(opts.LogLevel)
 	if level == "" {
 		level = "INFO"
 	}
-	log := waLog.Stdout("WA", level, true)
 	dbLog := waLog.Stdout("WA-DB", "WARN", true)
-
 	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", opts.DBPath)
 	container, err := sqlstore.New(ctx, "sqlite3", dsn, dbLog)
 	if err != nil {
@@ -51,15 +63,7 @@ func New(ctx context.Context, opts Options) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get device: %w", err)
 	}
-
-	c := &Client{
-		container: container,
-		device:    device,
-		log:       log,
-	}
-	c.cli = whatsmeow.NewClient(device, log)
-	c.cli.AddEventHandler(c.dispatch)
-	return c, nil
+	return NewFromDevice(ctx, device, opts.LogLevel)
 }
 
 func (c *Client) dispatch(evt any) {
@@ -77,13 +81,8 @@ func (c *Client) AttachHandler(h func(any)) {
 	c.mu.Unlock()
 }
 
-func (c *Client) IsLoggedIn() bool {
-	return c.device != nil && c.device.ID != nil
-}
-
-func (c *Client) IsConnected() bool {
-	return c.cli != nil && c.cli.IsConnected()
-}
+func (c *Client) IsLoggedIn() bool  { return c.device != nil && c.device.ID != nil }
+func (c *Client) IsConnected() bool { return c.cli != nil && c.cli.IsConnected() }
 
 func (c *Client) OwnJID() string {
 	if !c.IsLoggedIn() {
@@ -92,6 +91,9 @@ func (c *Client) OwnJID() string {
 	return c.device.ID.String()
 }
 
+// DeviceJID returns the device JID used to look up this client in the manager.
+func (c *Client) DeviceJID() *store.Device { return c.device }
+
 func (c *Client) Connect(ctx context.Context) error {
 	if c.cli.IsConnected() {
 		return nil
@@ -99,8 +101,6 @@ func (c *Client) Connect(ctx context.Context) error {
 	return c.cli.Connect()
 }
 
-// StartQRFlow returns a channel of QR code strings. The channel is closed when
-// the flow ends (success, timeout, or error). Cancel ctx to abort.
 func (c *Client) StartQRFlow(ctx context.Context) (<-chan string, error) {
 	c.mu.Lock()
 	if c.IsLoggedIn() {
@@ -114,7 +114,6 @@ func (c *Client) StartQRFlow(ctx context.Context) (<-chan string, error) {
 	if c.cli.IsConnected() {
 		c.cli.Disconnect()
 	}
-
 	flowCtx, cancel := context.WithCancel(context.Background())
 	qrCh, err := c.cli.GetQRChannel(flowCtx)
 	if err != nil {
@@ -127,7 +126,6 @@ func (c *Client) StartQRFlow(ctx context.Context) (<-chan string, error) {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("connect: %w", err)
 	}
-
 	out := make(chan string, 4)
 	c.qrFlowAlive = true
 	c.qrCancel = cancel
@@ -157,7 +155,6 @@ func (c *Client) StartQRFlow(ctx context.Context) (<-chan string, error) {
 					case <-time.After(2 * time.Second):
 					}
 				default:
-					// success | timeout | err-* — stop forwarding
 					return
 				}
 			}
@@ -177,7 +174,6 @@ func (c *Client) PairPhone(ctx context.Context, phone string) (string, error) {
 		return "", errors.New("another auth flow in progress")
 	}
 	c.mu.Unlock()
-
 	if !c.cli.IsConnected() {
 		if err := c.cli.Connect(); err != nil {
 			return "", fmt.Errorf("connect: %w", err)
@@ -222,7 +218,6 @@ func (c *Client) GetUserInfo(ctx context.Context, jids []types.JID) (map[types.J
 }
 
 // GetLIDForJID returns the LID (anonymous identifier) WhatsApp uses for the given JID.
-// Returns an empty JID if the user has no LID or it can't be fetched.
 func (c *Client) GetLIDForJID(ctx context.Context, jid types.JID) (types.JID, error) {
 	info, err := c.cli.GetUserInfo(ctx, []types.JID{jid})
 	if err != nil {

@@ -1,15 +1,17 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import Timeline from "../components/Timeline";
+import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
 
 export default function ContactDetail() {
-  const { id: idStr } = useParams<{ id: string }>();
-  const id = Number(idStr);
+  const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
+  const accountId = Number(accountIdStr);
+  const cid = Number(cidStr);
+
   const tl = useQuery({
-    queryKey: ["timeline", id],
-    queryFn: () => api.timeline(id, 0),
+    queryKey: ["timeline", accountId, cid],
+    queryFn: () => api.timeline(accountId, cid, 0),
     refetchInterval: 30_000,
   });
 
@@ -24,7 +26,7 @@ export default function ContactDetail() {
     <div className="col" style={{ gap: 16 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>
-          <Link to="/" className="muted">
+          <Link to={`/accounts/${accountId}`} className="muted">
             ← back
           </Link>
           <h2 style={{ margin: "4px 0 0" }}>
@@ -32,14 +34,22 @@ export default function ContactDetail() {
           </h2>
           <span className="muted">{contact.phone}</span>
         </div>
-        <span className="tag">{contact.trackingEnabled ? "Tracking" : "Paused"}</span>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <span className="tag">{contact.trackingEnabled ? "Tracking" : "Paused"}</span>
+          <Link
+            to={`/accounts/${accountId}/contacts/${cid}/messages`}
+            className="btn"
+          >
+            Messages
+          </Link>
+        </div>
       </div>
 
-      <StatsStrip contactId={id} />
+      <StatsStrip accountId={accountId} contactId={cid} />
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Timeline</h3>
-        <Timeline entries={entries} />
+        <h3 style={{ marginTop: 0 }}>Activity timeline</h3>
+        <SessionTimeline entries={entries} />
       </div>
     </div>
   );

@@ -1,87 +1,61 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./lib/api";
+import { Link, Route, Routes } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
-import Login from "./pages/Login";
+import Accounts from "./pages/Accounts";
 import Dashboard from "./pages/Dashboard";
 import ContactDetail from "./pages/ContactDetail";
+import Messages from "./pages/Messages";
 
 export default function App() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
-  const status = useQuery({
-    queryKey: ["status"],
-    queryFn: api.status,
-    refetchInterval: 30_000,
-  });
 
   useEffect(() => {
     ws.start();
     const off = ws.on((msg) => {
       switch (msg.type) {
         case "auth.linked":
-          qc.invalidateQueries({ queryKey: ["status"] });
-          navigate("/");
-          break;
         case "auth.logout":
-          qc.invalidateQueries({ queryKey: ["status"] });
-          navigate("/login");
+          qc.invalidateQueries({ queryKey: ["accounts"] });
           break;
-        case "presence":
-          qc.setQueryData(["contacts"], (prev: unknown) => prev);
-          qc.invalidateQueries({ queryKey: ["contacts"] });
-          qc.invalidateQueries({ queryKey: ["timeline", msg.contactId] });
+        case "presence": {
+          const { accountId, contactId } = msg;
+          qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+          qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
           break;
+        }
         case "picture":
-        case "about":
-          qc.invalidateQueries({ queryKey: ["timeline", msg.contactId] });
-          qc.invalidateQueries({ queryKey: ["contacts"] });
+        case "about": {
+          // accountId not sent on these events (yet), invalidate all timelines for this contact
+          qc.invalidateQueries({ queryKey: ["timeline"] });
           break;
+        }
+        case "message": {
+          const { accountId, contactId } = msg;
+          if (contactId != null) {
+            qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
+            qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
+            qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+          }
+          break;
+        }
       }
     });
     return off;
-  }, [qc, navigate]);
-
-  const linked = status.data?.linked;
+  }, [qc]);
 
   return (
     <div className="container">
       <header className="header">
-        <div className="title">WhatsApp Tracker</div>
-        <div className="row">
-          {status.data?.linked && (
-            <span className="muted">{status.data.ownJID}</span>
-          )}
-          {status.data?.linked ? (
-            <button
-              className="btn btn-danger"
-              onClick={async () => {
-                await api.logout();
-                qc.invalidateQueries({ queryKey: ["status"] });
-                navigate("/login");
-              }}
-            >
-              Logout
-            </button>
-          ) : null}
-        </div>
+        <Link to="/" className="title" style={{ textDecoration: "none", color: "var(--fg)" }}>
+          WhatsApp Tracker
+        </Link>
       </header>
       <Routes>
-        <Route
-          path="/"
-          element={linked ? <Dashboard /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/login"
-          element={linked ? <Navigate to="/" replace /> : <Login />}
-        />
-        <Route
-          path="/contacts/:id"
-          element={
-            linked ? <ContactDetail /> : <Navigate to="/login" replace />
-          }
-        />
+        <Route path="/" element={<Accounts />} />
+        <Route path="/accounts/:id" element={<Dashboard />} />
+        <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />
+        <Route path="/accounts/:id/contacts/:cid/messages" element={<Messages />} />
       </Routes>
     </div>
   );

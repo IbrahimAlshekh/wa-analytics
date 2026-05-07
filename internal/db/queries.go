@@ -7,76 +7,147 @@ import (
 	"time"
 )
 
+// --- Account ----------------------------------------------------------------
+
+type Account struct {
+	ID             int64  `json:"id"`
+	JID            string `json:"jid"`
+	Label          string `json:"label"`
+	TrackingActive bool   `json:"trackingActive"`
+	CreatedAt      int64  `json:"createdAt"`
+	// Computed at call-site, not stored:
+	Connected bool `json:"connected"`
+}
+
+func (db *DB) InsertAccount(ctx context.Context, jid, label string) (Account, error) {
+	now := time.Now().Unix()
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO accounts (jid, label, tracking_active, created_at) VALUES (?, ?, 1, ?)
+		 ON CONFLICT(jid) DO UPDATE SET label=excluded.label`,
+		jid, label, now)
+	if err != nil {
+		return Account{}, err
+	}
+	id, _ := res.LastInsertId()
+	if id == 0 {
+		// ON CONFLICT path: fetch by JID
+		return db.GetAccountByJID(ctx, jid)
+	}
+	return db.GetAccount(ctx, id)
+}
+
+func (db *DB) GetAccount(ctx context.Context, id int64) (Account, error) {
+	var a Account
+	var active int
+	err := db.QueryRowContext(ctx,
+		`SELECT id, jid, COALESCE(label,''), tracking_active, created_at FROM accounts WHERE id=?`, id).
+		Scan(&a.ID, &a.JID, &a.Label, &active, &a.CreatedAt)
+	if err != nil {
+		return Account{}, err
+	}
+	a.TrackingActive = active == 1
+	return a, nil
+}
+
+func (db *DB) GetAccountByJID(ctx context.Context, jid string) (Account, error) {
+	var a Account
+	var active int
+	err := db.QueryRowContext(ctx,
+		`SELECT id, jid, COALESCE(label,''), tracking_active, created_at FROM accounts WHERE jid=?`, jid).
+		Scan(&a.ID, &a.JID, &a.Label, &active, &a.CreatedAt)
+	if err != nil {
+		return Account{}, err
+	}
+	a.TrackingActive = active == 1
+	return a, nil
+}
+
+func (db *DB) ListAccounts(ctx context.Context) ([]Account, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, jid, COALESCE(label,''), tracking_active, created_at FROM accounts ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Account
+	for rows.Next() {
+		var a Account
+		var active int
+		if err := rows.Scan(&a.ID, &a.JID, &a.Label, &active, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		a.TrackingActive = active == 1
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (db *DB) UpdateAccount(ctx context.Context, id int64, label *string, trackingActive *bool) error {
+	if label == nil && trackingActive == nil {
+		return nil
+	}
+	q := "UPDATE accounts SET "
+	args := []any{}
+	first := true
+	if label != nil {
+		q += "label=?"
+		args = append(args, *label)
+		first = false
+	}
+	if trackingActive != nil {
+		if !first {
+			q += ", "
+		}
+		q += "tracking_active=?"
+		args = append(args, boolToInt(*trackingActive))
+	}
+	q += " WHERE id=?"
+	args = append(args, id)
+	_, err := db.ExecContext(ctx, q, args...)
+	return err
+}
+
+func (db *DB) DeleteAccount(ctx context.Context, id int64) error {
+	_, err := db.ExecContext(ctx, `DELETE FROM accounts WHERE id=?`, id)
+	return err
+}
+
+// BackfillAccountID sets account_id on contacts that have NULL account_id.
+// Called on startup to migrate existing single-account installs.
+func (db *DB) BackfillAccountID(ctx context.Context, accountID int64) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE contacts SET account_id=? WHERE account_id IS NULL`, accountID)
+	return err
+}
+
+// --- Contact ----------------------------------------------------------------
+
 type Contact struct {
 	ID              int64  `json:"id"`
+	AccountID       int64  `json:"-"`
 	JID             string `json:"jid"`
-	LID             string `json:"-"` // WhatsApp anonymous LID (not exposed in API)
+	LID             string `json:"-"`
 	Phone           string `json:"phone"`
 	DisplayName     string `json:"displayName"`
 	AddedAt         int64  `json:"addedAt"`
 	TrackingEnabled bool   `json:"trackingEnabled"`
 }
 
-type PresenceEvent struct {
-	ID         int64  `json:"id"`
-	ContactID  int64  `json:"contactId"`
-	State      string `json:"state"`
-	LastSeen   *int64 `json:"lastSeen,omitempty"`
-	ObservedAt int64  `json:"observedAt"`
-}
-
-type PictureRecord struct {
-	ID         int64  `json:"id"`
-	ContactID  int64  `json:"contactId"`
-	PictureID  string `json:"pictureId,omitempty"`
-	URL        string `json:"url,omitempty"`
-	SHA256     string `json:"sha256,omitempty"`
-	CapturedAt int64  `json:"capturedAt"`
-}
-
-type AboutRecord struct {
-	ID         int64  `json:"id"`
-	ContactID  int64  `json:"contactId"`
-	Text       string `json:"text"`
-	SetAt      *int64 `json:"setAt,omitempty"`
-	CapturedAt int64  `json:"capturedAt"`
-}
-
-type TimelineKind string
-
-const (
-	KindPresence TimelineKind = "presence"
-	KindPicture  TimelineKind = "picture"
-	KindAbout    TimelineKind = "about"
-)
-
-type TimelineEntry struct {
-	Kind      TimelineKind `json:"kind"`
-	At        int64        `json:"at"`
-	State     string       `json:"state,omitempty"`
-	LastSeen  *int64       `json:"lastSeen,omitempty"`
-	Text      string       `json:"text,omitempty"`
-	PictureID string       `json:"pictureId,omitempty"`
-	URL       string       `json:"url,omitempty"`
-}
-
-// --- contacts -----------------------------------------------------------
-
-const contactCols = `id, jid, COALESCE(lid,''), phone, COALESCE(display_name,''), added_at, tracking_enabled`
+const contactCols = `id, COALESCE(account_id,0), jid, COALESCE(lid,''), phone, COALESCE(display_name,''), added_at, tracking_enabled`
 
 func scanContact(row interface{ Scan(...any) error }) (Contact, error) {
 	var c Contact
 	var enabled int
-	if err := row.Scan(&c.ID, &c.JID, &c.LID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
+	if err := row.Scan(&c.ID, &c.AccountID, &c.JID, &c.LID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
 		return Contact{}, err
 	}
 	c.TrackingEnabled = enabled == 1
 	return c, nil
 }
 
-func (db *DB) ListContacts(ctx context.Context) ([]Contact, error) {
+func (db *DB) ListContacts(ctx context.Context, accountID int64) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT `+contactCols+` FROM contacts ORDER BY added_at DESC`)
+		`SELECT `+contactCols+` FROM contacts WHERE account_id=? ORDER BY added_at DESC`, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +163,9 @@ func (db *DB) ListContacts(ctx context.Context) ([]Contact, error) {
 	return out, rows.Err()
 }
 
-func (db *DB) ListTrackedContacts(ctx context.Context) ([]Contact, error) {
+func (db *DB) ListTrackedContacts(ctx context.Context, accountID int64) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE tracking_enabled=1`)
+		`SELECT `+contactCols+` FROM contacts WHERE account_id=? AND tracking_enabled=1`, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,19 +181,19 @@ func (db *DB) ListTrackedContacts(ctx context.Context) ([]Contact, error) {
 	return out, rows.Err()
 }
 
-func (db *DB) GetContact(ctx context.Context, id int64) (Contact, error) {
+func (db *DB) GetContact(ctx context.Context, accountID, id int64) (Contact, error) {
 	return scanContact(db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE id=?`, id))
+		`SELECT `+contactCols+` FROM contacts WHERE id=? AND account_id=?`, id, accountID))
 }
 
-func (db *DB) GetContactByJID(ctx context.Context, jid string) (Contact, error) {
+func (db *DB) GetContactByJID(ctx context.Context, accountID int64, jid string) (Contact, error) {
 	return scanContact(db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE jid=?`, jid))
+		`SELECT `+contactCols+` FROM contacts WHERE jid=? AND account_id=?`, jid, accountID))
 }
 
-func (db *DB) GetContactByLID(ctx context.Context, lid string) (Contact, error) {
+func (db *DB) GetContactByLID(ctx context.Context, accountID int64, lid string) (Contact, error) {
 	return scanContact(db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE lid=?`, lid))
+		`SELECT `+contactCols+` FROM contacts WHERE lid=? AND account_id=?`, lid, accountID))
 }
 
 func (db *DB) UpdateContactLID(ctx context.Context, id int64, lid string) error {
@@ -130,16 +201,16 @@ func (db *DB) UpdateContactLID(ctx context.Context, id int64, lid string) error 
 	return err
 }
 
-func (db *DB) InsertContact(ctx context.Context, jid, phone, name string) (Contact, error) {
+func (db *DB) InsertContact(ctx context.Context, accountID int64, jid, phone, name string) (Contact, error) {
 	now := time.Now().Unix()
 	res, err := db.ExecContext(ctx,
-		`INSERT INTO contacts (jid, phone, display_name, added_at, tracking_enabled)
-		 VALUES (?, ?, ?, ?, 1)`, jid, phone, name, now)
+		`INSERT INTO contacts (account_id, jid, phone, display_name, added_at, tracking_enabled)
+		 VALUES (?, ?, ?, ?, ?, 1)`, accountID, jid, phone, name, now)
 	if err != nil {
 		return Contact{}, err
 	}
 	id, _ := res.LastInsertId()
-	return db.GetContact(ctx, id)
+	return db.GetContact(ctx, accountID, id)
 }
 
 func (db *DB) UpdateContact(ctx context.Context, id int64, name *string, tracking *bool) error {
@@ -172,7 +243,15 @@ func (db *DB) DeleteContact(ctx context.Context, id int64) error {
 	return err
 }
 
-// --- presence -----------------------------------------------------------
+// --- Presence ---------------------------------------------------------------
+
+type PresenceEvent struct {
+	ID         int64  `json:"id"`
+	ContactID  int64  `json:"contactId"`
+	State      string `json:"state"`
+	LastSeen   *int64 `json:"lastSeen,omitempty"`
+	ObservedAt int64  `json:"observedAt"`
+}
 
 func (db *DB) InsertPresence(ctx context.Context, contactID int64, state string, lastSeen *int64, observedAt int64) (PresenceEvent, error) {
 	res, err := db.ExecContext(ctx,
@@ -206,7 +285,24 @@ func (db *DB) LatestPresence(ctx context.Context, contactID int64) (PresenceEven
 	return e, nil
 }
 
-// --- picture / about ----------------------------------------------------
+// --- Picture / About --------------------------------------------------------
+
+type PictureRecord struct {
+	ID         int64  `json:"id"`
+	ContactID  int64  `json:"contactId"`
+	PictureID  string `json:"pictureId,omitempty"`
+	URL        string `json:"url,omitempty"`
+	SHA256     string `json:"sha256,omitempty"`
+	CapturedAt int64  `json:"capturedAt"`
+}
+
+type AboutRecord struct {
+	ID         int64  `json:"id"`
+	ContactID  int64  `json:"contactId"`
+	Text       string `json:"text"`
+	SetAt      *int64 `json:"setAt,omitempty"`
+	CapturedAt int64  `json:"capturedAt"`
+}
 
 func (db *DB) LatestPicture(ctx context.Context, contactID int64) (PictureRecord, error) {
 	var p PictureRecord
@@ -273,7 +369,101 @@ func (db *DB) InsertAbout(ctx context.Context, contactID int64, text string, set
 	return AboutRecord{ID: id, ContactID: contactID, Text: text, SetAt: setAt, CapturedAt: capturedAt}, nil
 }
 
-// --- timeline -----------------------------------------------------------
+// --- Messages ---------------------------------------------------------------
+
+type Message struct {
+	ID         int64  `json:"id"`
+	AccountID  int64  `json:"accountId"`
+	ContactID  *int64 `json:"contactId,omitempty"`
+	ChatJID    string `json:"chatJid"`
+	MessageID  string `json:"messageId"`
+	SenderJID  string `json:"senderJid"`
+	IsFromMe   bool   `json:"isFromMe"`
+	Timestamp  int64  `json:"timestamp"`
+	Text       string `json:"text,omitempty"`
+	MediaType  string `json:"mediaType,omitempty"`
+	ReceivedAt int64  `json:"receivedAt"`
+}
+
+func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
+	res, err := db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO messages
+		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, received_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.AccountID, nullInt64Ptr(m.ContactID), m.ChatJID, m.MessageID,
+		m.SenderJID, boolToInt(m.IsFromMe), m.Timestamp,
+		nullStr(m.Text), nullStr(m.MediaType), m.ReceivedAt)
+	if err != nil {
+		return Message{}, err
+	}
+	id, _ := res.LastInsertId()
+	if id == 0 {
+		return Message{}, nil // duplicate, already inserted
+	}
+	m.ID = id
+	return m, nil
+}
+
+func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit int) ([]Message, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), received_at
+		   FROM messages WHERE contact_id=?`
+	args := []any{contactID}
+	if before > 0 {
+		q += ` AND timestamp < ?`
+		args = append(args, before)
+	}
+	q += ` ORDER BY timestamp DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Message
+	for rows.Next() {
+		var m Message
+		var cid sql.NullInt64
+		var fromMe int
+		if err := rows.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
+			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.ReceivedAt); err != nil {
+			return nil, err
+		}
+		if cid.Valid {
+			v := cid.Int64
+			m.ContactID = &v
+		}
+		m.IsFromMe = fromMe == 1
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// --- Timeline ---------------------------------------------------------------
+
+type TimelineKind string
+
+const (
+	KindPresence TimelineKind = "presence"
+	KindPicture  TimelineKind = "picture"
+	KindAbout    TimelineKind = "about"
+	KindMessage  TimelineKind = "message"
+)
+
+type TimelineEntry struct {
+	Kind      TimelineKind `json:"kind"`
+	At        int64        `json:"at"`
+	State     string       `json:"state,omitempty"`
+	LastSeen  *int64       `json:"lastSeen,omitempty"`
+	Text      string       `json:"text,omitempty"`
+	PictureID string       `json:"pictureId,omitempty"`
+	URL       string       `json:"url,omitempty"`
+	IsFromMe  bool         `json:"isFromMe,omitempty"`
+	MediaType string       `json:"mediaType,omitempty"`
+}
 
 func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineEntry, error) {
 	out := make([]TimelineEntry, 0, 64)
@@ -342,12 +532,35 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	}
 	abouts.Close()
 
-	// merge sort by At ascending
+	msgs, err := db.QueryContext(ctx,
+		`SELECT text, media_type, is_from_me, timestamp FROM messages
+		   WHERE contact_id=? AND timestamp>=?
+		   ORDER BY timestamp`, contactID, since)
+	if err != nil {
+		return nil, err
+	}
+	for msgs.Next() {
+		var e TimelineEntry
+		e.Kind = KindMessage
+		var txt, media sql.NullString
+		var fromMe int
+		if err := msgs.Scan(&txt, &media, &fromMe, &e.At); err != nil {
+			msgs.Close()
+			return nil, err
+		}
+		e.Text = txt.String
+		e.MediaType = media.String
+		e.IsFromMe = fromMe == 1
+		out = append(out, e)
+	}
+	msgs.Close()
+
 	sortByAt(out)
 	return out, nil
 }
 
-// PresenceRange returns presence events for a contact in [start,end), ordered ascending.
+// --- Stats ------------------------------------------------------------------
+
 func (db *DB) PresenceRange(ctx context.Context, contactID, start, end int64) ([]PresenceEvent, error) {
 	rows, err := db.QueryContext(ctx,
 		`SELECT id, contact_id, state, last_seen, observed_at
@@ -374,7 +587,6 @@ func (db *DB) PresenceRange(ctx context.Context, contactID, start, end int64) ([
 	return out, rows.Err()
 }
 
-// LastPresenceBefore returns the most recent presence event before t (or zero PresenceEvent).
 func (db *DB) LastPresenceBefore(ctx context.Context, contactID, t int64) (PresenceEvent, error) {
 	var e PresenceEvent
 	var ls sql.NullInt64
@@ -415,7 +627,7 @@ func (db *DB) CountAboutChanges(ctx context.Context, contactID, start, end int64
 	return n, err
 }
 
-// --- helpers ------------------------------------------------------------
+// --- Helpers ----------------------------------------------------------------
 
 func nullStr(s string) any {
 	if s == "" {
@@ -431,6 +643,13 @@ func nullInt(p *int64) any {
 	return *p
 }
 
+func nullInt64Ptr(p *int64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 func boolToInt(b bool) int {
 	if b {
 		return 1
@@ -439,7 +658,6 @@ func boolToInt(b bool) int {
 }
 
 func sortByAt(es []TimelineEntry) {
-	// in-place insertion sort — fine for typical sizes (<10k)
 	for i := 1; i < len(es); i++ {
 		j := i
 		for j > 0 && es[j-1].At > es[j].At {

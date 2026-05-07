@@ -12,14 +12,15 @@ import {
 import { api } from "../lib/api";
 
 interface Props {
+  accountId: number;
   contactId: number;
 }
 
-export default function StatsStrip({ contactId }: Props) {
+export default function StatsStrip({ accountId, contactId }: Props) {
   const [range, setRange] = useState<"today" | "week" | "month">("week");
   const stats = useQuery({
-    queryKey: ["stats", contactId, range],
-    queryFn: () => api.stats(contactId, range),
+    queryKey: ["stats", accountId, contactId, range],
+    queryFn: () => api.stats(accountId, contactId, range),
     refetchInterval: 60_000,
   });
 

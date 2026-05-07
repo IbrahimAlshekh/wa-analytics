@@ -52,9 +52,9 @@ func (t *Tracker) pollLoop(ctx context.Context, name string, scan func(context.C
 }
 
 func (t *Tracker) scanPictures(ctx context.Context) {
-	contacts, err := t.db.ListTrackedContacts(ctx)
+	contacts, err := t.db.ListTrackedContacts(ctx, t.accountID)
 	if err != nil {
-		slog.Error("tracker: picture scan — list contacts failed", "err", err)
+		slog.Error("tracker: picture scan — list contacts failed", "accountID", t.accountID, "err", err)
 		return
 	}
 	if len(contacts) == 0 {
@@ -77,9 +77,9 @@ func (t *Tracker) scanPictures(ctx context.Context) {
 }
 
 func (t *Tracker) scanAbout(ctx context.Context) {
-	contacts, err := t.db.ListTrackedContacts(ctx)
+	contacts, err := t.db.ListTrackedContacts(ctx, t.accountID)
 	if err != nil {
-		slog.Error("tracker: about scan — list contacts failed", "err", err)
+		slog.Error("tracker: about scan — list contacts failed", "accountID", t.accountID, "err", err)
 		return
 	}
 	if len(contacts) == 0 {

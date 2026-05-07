@@ -12,12 +12,21 @@ import (
 	"syscall"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/api"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/tracker"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
+	waStore "go.mau.fi/whatsmeow/store"
 )
+
+func init() {
+	// Override the default "whatsmeow" device name that WhatsApp shows in the
+	// linked-devices list. Must be set before any Client is created.
+	waStore.DeviceProps.Os = proto.String("Whatsapp web")
+}
 
 func main() {
 	// Early stderr-only logger until we have the data dir.
@@ -44,7 +53,6 @@ func main() {
 	}
 	defer logFile.Close()
 
-	// Write to both stderr and the log file.
 	w := io.MultiWriter(os.Stderr, logFile)
 	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -63,33 +71,73 @@ func main() {
 
 	hub := api.NewHub()
 
-	waClient, err := wa.New(ctx, wa.Options{
-		DBPath:   cfg.WhatsmeowDBPath(),
-		LogLevel: cfg.WALogLevel,
-	})
+	manager, err := wa.NewClientManager(ctx, cfg.WhatsmeowDBPath(), cfg.WALogLevel)
 	if err != nil {
 		slog.Error("whatsmeow init", "err", err)
 		os.Exit(1)
 	}
+	defer manager.Close()
 
-	trk := tracker.New(tracker.Deps{
-		WA:       waClient,
-		DB:       store,
-		Hub:      hub,
-		Interval: cfg.PollInterval,
-	})
-	waClient.AttachHandler(trk.HandleEvent)
+	trackerMgr := tracker.NewTrackerManager()
 
-	if waClient.IsLoggedIn() {
-		if err := waClient.Connect(ctx); err != nil {
-			slog.Warn("auto-connect failed", "err", err)
+	// Wire up the OnPaired callback: when a new account finishes QR/phone pairing,
+	// insert it in DB, register with the manager, then start tracking.
+	manager.OnPaired = func(client *wa.Client) {
+		jid := client.OwnJID()
+		slog.Info("main: new account paired", "jid", jid)
+		acc, err := store.InsertAccount(ctx, jid, "")
+		if err != nil {
+			slog.Error("main: insert account failed", "jid", jid, "err", err)
+			return
+		}
+		manager.RegisterPaired(acc.ID)
+		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval)
+	}
+
+	// Load all already-paired accounts from the whatsmeow store.
+	accounts, err := store.ListAccounts(ctx)
+	if err != nil {
+		slog.Error("main: list accounts failed", "err", err)
+		os.Exit(1)
+	}
+
+	if len(accounts) == 0 {
+		// Check if whatsmeow has a device that was paired before the multi-account migration.
+		// If so, create a default account record and backfill contacts.
+		devices, err := manager.Container().GetAllDevices(ctx)
+		if err == nil && len(devices) > 0 {
+			d := devices[0]
+			jidStr := d.ID.String()
+			acc, err := store.InsertAccount(ctx, jidStr, "Default")
+			if err != nil {
+				slog.Error("main: backfill insert account failed", "jid", jidStr, "err", err)
+			} else {
+				if err := store.BackfillAccountID(ctx, acc.ID); err != nil {
+					slog.Error("main: backfill contacts failed", "accountID", acc.ID, "err", err)
+				} else {
+					slog.Info("main: backfilled legacy contacts", "accountID", acc.ID)
+				}
+				accounts = []db.Account{acc}
+			}
 		}
 	}
+
+	// Register each account with the manager and start its tracker.
+	for _, acc := range accounts {
+		client, err := manager.Register(ctx, acc.ID, acc.JID)
+		if err != nil {
+			slog.Warn("main: register account failed", "accountID", acc.ID, "jid", acc.JID, "err", err)
+			continue
+		}
+		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval)
+	}
+
+	manager.ConnectAll(ctx)
 
 	srv := api.NewServer(api.Config{
 		Bearer: cfg.Bearer,
 		Dev:    cfg.Dev,
-	}, store, waClient, trk, hub)
+	}, store, manager, trackerMgr, hub)
 
 	httpSrv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -111,6 +159,16 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	_ = httpSrv.Shutdown(shutdownCtx)
-	trk.Stop()
-	waClient.Close()
+	trackerMgr.StopAll()
+}
+
+func startTracker(ctx context.Context, mgr *tracker.TrackerManager, client *wa.Client, store *db.DB, hub *api.Hub, accountID int64, interval time.Duration) {
+	trk := mgr.Add(accountID, tracker.Deps{
+		WA:       client,
+		DB:       store,
+		Hub:      hub,
+		Interval: interval,
+	})
+	client.AttachHandler(trk.HandleEvent)
+	slog.Info("main: tracker started", "accountID", accountID)
 }

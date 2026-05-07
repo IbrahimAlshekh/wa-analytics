@@ -3,11 +3,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, } from "recharts";
 import { api } from "../lib/api";
-export default function StatsStrip({ contactId }) {
+export default function StatsStrip({ accountId, contactId }) {
     const [range, setRange] = useState("week");
     const stats = useQuery({
-        queryKey: ["stats", contactId, range],
-        queryFn: () => api.stats(contactId, range),
+        queryKey: ["stats", accountId, contactId, range],
+        queryFn: () => api.stats(accountId, contactId, range),
         refetchInterval: 60_000,
     });
     const data = stats.data?.days.map((d) => ({

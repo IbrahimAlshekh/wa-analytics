@@ -1,6 +1,7 @@
 import type {
-  AuthStatus,
+  Account,
   Contact,
+  Message,
   StatsSummary,
   TimelineResponse,
 } from "./types";
@@ -31,23 +32,44 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
-  status: () => request<AuthStatus>("GET", "/auth/status"),
-  startQR: () => request<{ started: boolean }>("POST", "/auth/qr"),
+  // Accounts
+  listAccounts: () => request<Account[]>("GET", "/accounts"),
+  startQR: () => request<{ started: boolean }>("POST", "/accounts/pair/qr"),
   pairPhone: (phone: string) =>
-    request<{ code: string }>("POST", "/auth/phone", { phone }),
-  logout: () => request<{ ok: boolean }>("POST", "/auth/logout"),
+    request<{ code: string }>("POST", "/accounts/pair/phone", { phone }),
+  updateAccount: (id: number, body: { label?: string; trackingActive?: boolean }) =>
+    request<Account>("PATCH", `/accounts/${id}`, body),
+  deleteAccount: (id: number) => request<void>("DELETE", `/accounts/${id}`),
 
-  listContacts: () => request<Contact[]>("GET", "/contacts"),
-  createContact: (phone: string, displayName: string) =>
-    request<Contact>("POST", "/contacts", { phone, displayName }),
+  // Contacts (per-account)
+  listContacts: (accountId: number) =>
+    request<Contact[]>("GET", `/accounts/${accountId}/contacts`),
+  createContact: (accountId: number, phone: string, displayName: string) =>
+    request<Contact>("POST", `/accounts/${accountId}/contacts`, { phone, displayName }),
   updateContact: (
+    accountId: number,
     id: number,
     body: { displayName?: string; trackingEnabled?: boolean },
-  ) => request<Contact>("PATCH", `/contacts/${id}`, body),
-  deleteContact: (id: number) => request<void>("DELETE", `/contacts/${id}`),
+  ) => request<Contact>("PATCH", `/accounts/${accountId}/contacts/${id}`, body),
+  deleteContact: (accountId: number, id: number) =>
+    request<void>("DELETE", `/accounts/${accountId}/contacts/${id}`),
 
-  timeline: (id: number, since = 0) =>
-    request<TimelineResponse>("GET", `/contacts/${id}/timeline?since=${since}`),
-  stats: (id: number, range: "today" | "week" | "month") =>
-    request<StatsSummary>("GET", `/contacts/${id}/stats?range=${range}`),
+  // Timeline / Stats / Messages (per-contact)
+  timeline: (accountId: number, contactId: number, since = 0) =>
+    request<TimelineResponse>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/timeline?since=${since}`,
+    ),
+  stats: (accountId: number, contactId: number, range: "today" | "week" | "month") =>
+    request<StatsSummary>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/stats?range=${range}`,
+    ),
+  messages: (accountId: number, contactId: number, before = 0, limit = 50) => {
+    const q = before ? `before=${before}&limit=${limit}` : `limit=${limit}`;
+    return request<Message[]>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/messages?${q}`,
+    );
+  },
 };
