@@ -13,6 +13,18 @@ DATA_DIR="$HOME/.local/share/whatsapp-tracker"
 
 cd "$PROJECT_ROOT"
 
+echo "--- Checking Dependencies ---"
+if ! command -v node &> /dev/null; then
+    echo "Node.js not found. Installing..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+fi
+
+if ! command -v pnpm &> /dev/null; then
+    echo "pnpm not found. Installing..."
+    sudo npm install -g pnpm
+fi
+
 echo "--- Building WhatsApp Tracker ---"
 make build
 

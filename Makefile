@@ -15,7 +15,7 @@ web-install:
 	cd web && pnpm install
 
 web-build:
-	cd web && (pnpm approve-builds esbuild || true) && pnpm install && pnpm build
+	cd web && (pnpm approve-builds esbuild || true) && pnpm install --no-frozen-lockfile && pnpm build
 
 build: web-build
 	mkdir -p bin
