@@ -44,12 +44,25 @@ func (t *Tracker) pollLoop(ctx context.Context, name string, scan func(context.C
 			slog.Info("tracker: poll loop stopped", "name", name)
 			return
 		case <-tick.C:
-			if !t.isRunning() || !t.wa.IsConnected() {
+			if !t.isRunning() || !t.wa.IsConnected() || t.checkBackoff() {
 				continue
 			}
 			scan(ctx)
 		}
 	}
+}
+
+func (t *Tracker) checkBackoff() bool {
+	t.backoffMu.RLock()
+	defer t.backoffMu.RUnlock()
+	return time.Now().Before(t.backoffUntil)
+}
+
+func (t *Tracker) setBackoff(d time.Duration) {
+	t.backoffMu.Lock()
+	t.backoffUntil = time.Now().Add(d)
+	t.backoffMu.Unlock()
+	slog.Log(t.ctx, config.LevelAudit, "tracker: entered rate-limit backoff", "duration", d, "until", t.backoffUntil)
 }
 
 func (t *Tracker) scanPictures(ctx context.Context) {
@@ -63,14 +76,17 @@ func (t *Tracker) scanPictures(ctx context.Context) {
 	}
 	slog.Debug("tracker: scanning pictures", "contacts", len(contacts))
 	gap := t.interval / time.Duration(len(contacts)+1)
-	if gap < 100*time.Millisecond {
-		gap = 100 * time.Millisecond
+	if gap < 200*time.Millisecond {
+		gap = 200 * time.Millisecond
 	}
 	for _, c := range contacts {
 		select {
 		case <-ctx.Done():
 			return
 		default:
+		}
+		if t.checkBackoff() {
+			return
 		}
 		t.checkPicture(ctx, c)
 		time.Sleep(gap)
@@ -86,19 +102,31 @@ func (t *Tracker) scanAbout(ctx context.Context) {
 	if len(contacts) == 0 {
 		return
 	}
-	slog.Debug("tracker: scanning about", "contacts", len(contacts))
-	gap := t.interval / time.Duration(len(contacts)+1)
-	if gap < 100*time.Millisecond {
-		gap = 100 * time.Millisecond
-	}
+	slog.Debug("tracker: scanning about (batch)", "contacts", len(contacts))
+
+	jids := make([]types.JID, 0, len(contacts))
 	for _, c := range contacts {
-		select {
-		case <-ctx.Done():
-			return
-		default:
+		if jid, err := types.ParseJID(c.JID); err == nil {
+			jids = append(jids, jid)
 		}
-		t.checkAbout(ctx, c)
-		time.Sleep(gap)
+	}
+
+	info, err := t.wa.GetUserInfo(ctx, jids)
+	if err != nil {
+		if isRateLimit(err) {
+			slog.Log(ctx, config.LevelAudit, "tracker: rate limited on batch user info", "accountID", t.accountID, "err", err)
+			t.setBackoff(5 * time.Minute)
+		} else if !isExpectedErr(err) {
+			slog.Warn("tracker: batch get user info failed", "accountID", t.accountID, "err", err)
+		}
+		return
+	}
+
+	for _, c := range contacts {
+		jid, _ := types.ParseJID(c.JID)
+		if u, ok := info[jid]; ok {
+			t.processAbout(ctx, c, u.Status)
+		}
 	}
 }
 
@@ -111,6 +139,7 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 	if err != nil {
 		if isRateLimit(err) {
 			slog.Log(ctx, config.LevelAudit, "tracker: rate limited on profile picture", "jid", c.JID, "err", err)
+			t.setBackoff(5 * time.Minute)
 		} else if !isExpectedErr(err) {
 			slog.Warn("tracker: get profile picture failed", "jid", c.JID, "err", err)
 		}
@@ -139,25 +168,7 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 	})
 }
 
-func (t *Tracker) checkAbout(ctx context.Context, c db.Contact) {
-	jid, err := types.ParseJID(c.JID)
-	if err != nil {
-		return
-	}
-	info, err := t.wa.GetUserInfo(ctx, []types.JID{jid})
-	if err != nil {
-		if isRateLimit(err) {
-			slog.Log(ctx, config.LevelAudit, "tracker: rate limited on user info", "jid", c.JID, "err", err)
-		} else if !isExpectedErr(err) {
-			slog.Warn("tracker: get user info failed", "jid", c.JID, "err", err)
-		}
-		return
-	}
-	u, ok := info[jid]
-	if !ok {
-		return
-	}
-	text := u.Status
+func (t *Tracker) processAbout(ctx context.Context, c db.Contact, text string) {
 	prev, _ := t.db.LatestAbout(ctx, c.ID)
 	if prev.ID != 0 && prev.Text == text {
 		return

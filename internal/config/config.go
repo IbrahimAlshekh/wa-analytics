@@ -30,7 +30,7 @@ func Load() (Config, error) {
 
 	dataDir := flag.String("data", envOr("WT_DATA_DIR", defaultDataDir), "directory for SQLite databases")
 	listen := flag.String("listen", envOr("WT_LISTEN", ":8080"), "HTTP listen address")
-	poll := flag.Duration("poll", envDuration("WT_POLL_INTERVAL", 15*time.Second), "polling interval for picture/about")
+	poll := flag.Duration("poll", envDuration("WT_POLL_INTERVAL", 1*time.Minute), "polling interval for picture/about")
 	bearer := flag.String("bearer", os.Getenv("WT_BEARER"), "optional bearer token for /api access")
 	dev := flag.Bool("dev", envBool("WT_DEV", false), "enable dev CORS for Vite proxy")
 	waLog := flag.String("walog", envOr("WT_WA_LOG", "INFO"), "whatsmeow log level (DEBUG|INFO|WARN|ERROR)")

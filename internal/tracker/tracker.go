@@ -108,6 +108,9 @@ type Tracker struct {
 
 	mu      sync.Mutex
 	running bool
+
+	backoffMu    sync.RWMutex
+	backoffUntil time.Time
 }
 
 func newTracker(accountID int64, d Deps) *Tracker {
