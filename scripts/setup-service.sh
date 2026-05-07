@@ -14,12 +14,28 @@ DATA_DIR="$HOME/.local/share/whatsapp-tracker"
 cd "$PROJECT_ROOT"
 
 echo "--- Checking Dependencies ---"
+sudo apt-get update
+
+# Install build tools (make, gcc for CGO)
+echo "Ensuring build tools (make, gcc, curl) are installed..."
+sudo apt-get install -y build-essential curl git software-properties-common
+
+# Install Go
+if ! command -v go &> /dev/null; then
+    echo "Go not found. Installing..."
+    sudo add-apt-repository -y ppa:longsleep/golang-backports
+    sudo apt-get update
+    sudo apt-get install -y golang-go
+fi
+
+# Install Node.js
 if ! command -v node &> /dev/null; then
     echo "Node.js not found. Installing..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs
 fi
 
+# Install pnpm
 if ! command -v pnpm &> /dev/null; then
     echo "pnpm not found. Installing..."
     sudo npm install -g pnpm
