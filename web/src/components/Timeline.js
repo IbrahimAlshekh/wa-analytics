@@ -87,13 +87,18 @@ function buildBlocks(entries) {
         lastOfflineAt = null;
     }
     // Merge sessions whose gap is under MERGE_GAP_SEC into a single session.
+    // This removes noise from rapid WhatsApp presence flapping.
     const MERGE_GAP_SEC = 120;
     const merged = [];
     for (const s of sessions) {
         const prev = merged[merged.length - 1];
-        if (prev && prev.endAt != null && s.startAt - prev.endAt <= MERGE_GAP_SEC) {
+        if (prev &&
+            prev.endAt != null &&
+            s.startAt - prev.endAt <= MERGE_GAP_SEC) {
+            // Extend previous session to cover this one.
             prev.endAt = s.endAt;
-            prev.durationSec = prev.endAt != null ? prev.endAt - prev.startAt : null;
+            prev.durationSec =
+                prev.endAt != null ? prev.endAt - prev.startAt : null;
             prev.lastSeen = s.lastSeen ?? prev.lastSeen;
         }
         else {
