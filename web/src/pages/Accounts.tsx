@@ -26,52 +26,65 @@ export default function Accounts() {
   const list: Account[] = accounts.data ?? [];
 
   return (
-    <div className="col" style={{ gap: 16 }}>
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Linked accounts</h2>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowPair((v) => !v)}
-          >
-            {showPair ? "Cancel" : "+ Add account"}
-          </button>
-        </div>
+    <div className="col" style={{ gap: 20 }}>
 
-        {showPair && (
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-            <div className="tabs">
-              <button
-                className="btn"
-                aria-current={pairTab === "qr"}
-                onClick={() => setPairTab("qr")}
-              >
-                QR code
-              </button>
-              <button
-                className="btn"
-                aria-current={pairTab === "phone"}
-                onClick={() => setPairTab("phone")}
-              >
-                Phone code
-              </button>
-            </div>
-            {pairTab === "qr" ? <QRView /> : <PhoneCodeView />}
+      {/* Page header */}
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
+          Linked accounts
+        </h2>
+        <button
+          className={showPair ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
+          onClick={() => setShowPair((v) => !v)}
+        >
+          {showPair ? "Cancel" : "+ Add account"}
+        </button>
+      </div>
+
+      {/* Pairing panel */}
+      {showPair && (
+        <div className="card">
+          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>Link a WhatsApp account</div>
+          <div className="tabs" style={{ marginBottom: 20, width: "fit-content" }}>
+            <button
+              className="btn"
+              aria-current={pairTab === "qr"}
+              onClick={() => setPairTab("qr")}
+            >
+              QR code
+            </button>
+            <button
+              className="btn"
+              aria-current={pairTab === "phone"}
+              onClick={() => setPairTab("phone")}
+            >
+              Phone code
+            </button>
           </div>
-        )}
+          {pairTab === "qr" ? <QRView /> : <PhoneCodeView />}
+        </div>
+      )}
 
-        {list.length === 0 && !showPair && (
-          <p className="muted">No accounts linked yet. Click "Add account" to get started.</p>
-        )}
+      {/* Account list */}
+      {list.length === 0 && !showPair && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-state-icon">📱</div>
+            <div style={{ fontWeight: 500 }}>No accounts linked yet</div>
+            <div className="muted">Click "+ Add account" to link your WhatsApp</div>
+          </div>
+        </div>
+      )}
 
-        {list.length > 0 && (
-          <table className="contact-table" style={{ marginTop: showPair ? 16 : 0 }}>
+      {list.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <table className="contact-table">
             <thead>
               <tr>
-                <th></th>
-                <th>Number / Label</th>
-                <th>Tracking</th>
-                <th></th>
+                <th style={{ width: 40 }}></th>
+                <th>Account</th>
+                <th style={{ width: 100 }}>Tracking</th>
+                <th style={{ width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -88,8 +101,8 @@ export default function Accounts() {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -115,77 +128,79 @@ function AccountRow({
     },
   });
 
+  const initials = (account.label || account.jid || "?").slice(0, 2).toUpperCase();
+
   return (
     <tr>
-      <td>
-        <span
-          className="dot"
+      <td style={{ paddingLeft: 16 }}>
+        <div
+          className="avatar avatar-sm"
           style={{
-            background: account.connected
-              ? "var(--accent)"
-              : "var(--offline)",
+            background: account.connected ? "var(--accent-dim)" : "rgba(148,163,184,0.15)",
+            color: account.connected ? "var(--accent)" : "var(--fg-muted)",
+            position: "relative",
           }}
-          title={account.connected ? "Connected" : "Disconnected"}
-        />
+        >
+          {initials}
+          <span
+            className={`dot ${account.connected ? "online" : ""}`}
+            style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, border: "2px solid var(--card)" }}
+          />
+        </div>
       </td>
       <td>
-        <div>
-          <Link to={`/accounts/${account.id}`} style={{ fontWeight: 500 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Link to={`/accounts/${account.id}`} style={{ fontWeight: 600, color: "var(--fg)", fontSize: 13 }}>
             {account.label || account.jid}
           </Link>
+          {editing ? (
+            <div className="row" style={{ gap: 6, marginTop: 4 }}>
+              <input
+                className="input"
+                style={{ width: 160, padding: "4px 8px", fontSize: 12 }}
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                autoFocus
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => saveLabel.mutate()}
+              >
+                Save
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setLabel(account.label); setEditing(false); }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <span className="muted" style={{ fontSize: 11 }}>
+              {account.jid}
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: 11, padding: "1px 6px", marginLeft: 4, height: "auto" }}
+                onClick={() => setEditing(true)}
+              >
+                rename
+              </button>
+            </span>
+          )}
         </div>
-        {editing ? (
-          <div className="row" style={{ gap: 6, marginTop: 4 }}>
-            <input
-              className="input"
-              style={{ width: 160 }}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              autoFocus
-            />
-            <button
-              className="btn btn-primary"
-              style={{ padding: "4px 10px" }}
-              onClick={() => saveLabel.mutate()}
-            >
-              Save
-            </button>
-            <button
-              className="btn"
-              style={{ padding: "4px 10px" }}
-              onClick={() => {
-                setLabel(account.label);
-                setEditing(false);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="muted" style={{ fontSize: 11 }}>
-            {account.jid}
-            <button
-              className="btn"
-              style={{ fontSize: 11, padding: "1px 6px", marginLeft: 6 }}
-              onClick={() => setEditing(true)}
-            >
-              rename
-            </button>
-          </div>
-        )}
       </td>
       <td>
-        <label className="row" style={{ gap: 6 }}>
+        <label className="toggle" title={account.trackingActive ? "Tracking on" : "Tracking off"}>
           <input
             type="checkbox"
             checked={account.trackingActive}
             onChange={(e) => onToggle(e.target.checked)}
           />
-          <span className="muted">{account.trackingActive ? "On" : "Off"}</span>
+          <span className="toggle-track" />
         </label>
       </td>
-      <td>
-        <button className="btn btn-danger" onClick={onDelete}>
+      <td style={{ paddingRight: 16 }}>
+        <button className="btn btn-danger btn-sm" onClick={onDelete}>
           Remove
         </button>
       </td>

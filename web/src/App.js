@@ -34,7 +34,6 @@ export default function App() {
                 }
                 case "picture":
                 case "about": {
-                    // accountId not sent on these events (yet), invalidate all timelines for this contact
                     qc.invalidateQueries({ queryKey: ["timeline"] });
                     break;
                 }
@@ -51,8 +50,10 @@ export default function App() {
         });
         return off;
     }, [qc]);
-    return (_jsxs("div", { className: "container", children: [_jsxs("header", { className: "header", children: [_jsx(Link, { to: "/", className: "title", style: { textDecoration: "none", color: "var(--fg)" }, children: location.pathname === "/login" ? "App" : "WhatsApp Tracker" }), localStorage.getItem("wt_bearer") && (_jsx("button", { className: "btn btn-danger", onClick: () => {
+    const isLogin = location.pathname === "/login";
+    const authed = Boolean(localStorage.getItem("wt_bearer"));
+    return (_jsxs("div", { children: [_jsxs("header", { className: "app-bar", children: [_jsxs(Link, { to: "/", className: "app-logo", children: [_jsx("div", { className: "app-logo-mark", children: "W" }), !isLogin && _jsx("span", { children: "WA Tracker" })] }), _jsx("div", { className: "app-bar-fill" }), authed && (_jsx("button", { className: "btn btn-ghost btn-sm", onClick: () => {
                             localStorage.removeItem("wt_bearer");
                             navigate("/login");
-                        }, children: "Logout" }))] }), _jsxs(Routes, { children: [_jsx(Route, { path: "/login", element: _jsx(Login, {}) }), _jsx(Route, { path: "/", element: _jsx(Accounts, {}) }), _jsx(Route, { path: "/accounts/:id", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid", element: _jsx(ContactDetail, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid/messages", element: _jsx(Messages, {}) })] })] }));
+                        }, children: "Logout" }))] }), _jsx("div", { className: "container", children: _jsxs(Routes, { children: [_jsx(Route, { path: "/login", element: _jsx(Login, {}) }), _jsx(Route, { path: "/", element: _jsx(Accounts, {}) }), _jsx(Route, { path: "/accounts/:id", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid", element: _jsx(ContactDetail, {}) }), _jsx(Route, { path: "/accounts/:id/contacts/:cid/messages", element: _jsx(Messages, {}) })] }) })] }));
 }

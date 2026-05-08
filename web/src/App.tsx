@@ -36,7 +36,6 @@ export default function App() {
         }
         case "picture":
         case "about": {
-          // accountId not sent on these events (yet), invalidate all timelines for this contact
           qc.invalidateQueries({ queryKey: ["timeline"] });
           break;
         }
@@ -54,15 +53,20 @@ export default function App() {
     return off;
   }, [qc]);
 
+  const isLogin = location.pathname === "/login";
+  const authed  = Boolean(localStorage.getItem("wt_bearer"));
+
   return (
-    <div className="container">
-      <header className="header">
-        <Link to="/" className="title" style={{ textDecoration: "none", color: "var(--fg)" }}>
-          {location.pathname === "/login" ? "App" : "WhatsApp Tracker"}
+    <div>
+      <header className="app-bar">
+        <Link to="/" className="app-logo">
+          <div className="app-logo-mark">W</div>
+          {!isLogin && <span>WA Tracker</span>}
         </Link>
-        {localStorage.getItem("wt_bearer") && (
+        <div className="app-bar-fill" />
+        {authed && (
           <button
-            className="btn btn-danger"
+            className="btn btn-ghost btn-sm"
             onClick={() => {
               localStorage.removeItem("wt_bearer");
               navigate("/login");
@@ -72,13 +76,15 @@ export default function App() {
           </button>
         )}
       </header>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Accounts />} />
-        <Route path="/accounts/:id" element={<Dashboard />} />
-        <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />
-        <Route path="/accounts/:id/contacts/:cid/messages" element={<Messages />} />
-      </Routes>
+      <div className="container">
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Accounts />} />
+          <Route path="/accounts/:id" element={<Dashboard />} />
+          <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />
+          <Route path="/accounts/:id/contacts/:cid/messages" element={<Messages />} />
+        </Routes>
+      </div>
     </div>
   );
 }

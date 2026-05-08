@@ -8,6 +8,13 @@ interface Props {
   accountId: number;
 }
 
+function getInitials(name: string): string {
+  if (name.startsWith("+")) return name.slice(1, 3);
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
 export default function ContactList({ accountId }: Props) {
   const qc = useQueryClient();
   const contacts = useQuery({
@@ -17,6 +24,7 @@ export default function ContactList({ accountId }: Props) {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const addMutation = useMutation({
     mutationFn: () => api.createContact(accountId, phone, name),
@@ -24,6 +32,7 @@ export default function ContactList({ accountId }: Props) {
       setPhone("");
       setName("");
       setError(null);
+      setShowForm(false);
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -41,46 +50,61 @@ export default function ContactList({ accountId }: Props) {
   });
 
   return (
-    <div className="col" style={{ gap: 16 }}>
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Add contact</h3>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            addMutation.mutate();
-          }}
-          className="row"
-          style={{ gap: 8 }}
+    <div className="col" style={{ gap: 20 }}>
+
+      {/* Page header */}
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
+          Contacts
+        </h2>
+        <button
+          className={showForm ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
+          onClick={() => { setShowForm((v) => !v); setError(null); }}
         >
-          <input
-            className="input"
-            placeholder="+14155551234"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-          <input
-            className="input"
-            placeholder="Display name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <button className="btn btn-primary" type="submit" disabled={!phone}>
-            Add
-          </button>
-        </form>
-        {error && <div className="error" style={{ marginTop: 8 }}>{error}</div>}
+          {showForm ? "Cancel" : "+ Add contact"}
+        </button>
       </div>
 
+      {/* Add form */}
+      {showForm && (
+        <div className="card">
+          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>Add a contact to track</div>
+          <form
+            onSubmit={(e) => { e.preventDefault(); addMutation.mutate(); }}
+            style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+          >
+            <input
+              className="input"
+              placeholder="+14155551234"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              style={{ flex: "1 1 160px" }}
+            />
+            <input
+              className="input"
+              placeholder="Display name (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{ flex: "2 1 200px" }}
+            />
+            <button className="btn btn-primary" type="submit" disabled={!phone || addMutation.isPending}>
+              {addMutation.isPending ? "Adding…" : "Add"}
+            </button>
+          </form>
+          {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
+        </div>
+      )}
+
+      {/* Contact table */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <table className="contact-table">
           <thead>
             <tr>
-              <th></th>
-              <th>Name</th>
-              <th>Phone</th>
+              <th style={{ width: 40 }}></th>
+              <th>Contact</th>
               <th>About</th>
-              <th>Tracking</th>
-              <th></th>
+              <th style={{ width: 80 }}>Tracking</th>
+              <th style={{ width: 80 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -99,8 +123,12 @@ export default function ContactList({ accountId }: Props) {
             ))}
             {contacts.data && contacts.data.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted" style={{ padding: 24 }}>
-                  No contacts yet — add one above.
+                <td colSpan={5}>
+                  <div className="empty-state">
+                    <div className="empty-state-icon">👤</div>
+                    <div style={{ fontWeight: 500 }}>No contacts yet</div>
+                    <div className="muted">Add a contact above to start tracking</div>
+                  </div>
                 </td>
               </tr>
             )}
@@ -130,52 +158,63 @@ function ContactRow({
   const entries = timeline.data?.entries ?? [];
   const lastPresence = [...entries].reverse().find((e) => e.kind === "presence");
   const lastAbout = [...entries].reverse().find((e) => e.kind === "about");
-  const lastPic = [...entries].reverse().find((e) => e.kind === "picture");
 
   const online = lastPresence?.state === "available";
+  const displayName = contact.displayName || contact.phone;
 
   return (
     <tr>
-      <td>
-        <span className={`dot ${online ? "online" : ""}`} />
+      <td style={{ paddingLeft: 16 }}>
+        <div className="avatar avatar-sm" style={{ position: "relative" }}>
+          {getInitials(displayName)}
+          <span
+            className={`dot ${online ? "online" : ""}`}
+            style={{
+              position: "absolute",
+              bottom: -1,
+              right: -1,
+              width: 9,
+              height: 9,
+              border: "2px solid var(--card)",
+            }}
+          />
+        </div>
       </td>
       <td>
-        <Link to={`/accounts/${accountId}/contacts/${contact.id}`}>
-          {contact.displayName || contact.phone}
-        </Link>
-        {lastPresence && (
-          <div className="muted" style={{ fontSize: 11 }}>
-            {online
-              ? "Online now"
-              : lastPresence.lastSeen
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Link
+            to={`/accounts/${accountId}/contacts/${contact.id}`}
+            style={{ fontWeight: 600, color: "var(--fg)", fontSize: 13 }}
+          >
+            {displayName}
+          </Link>
+          <span className="muted" style={{ fontSize: 11 }}>
+            {contact.phone}
+            {lastPresence && (
+              <> · {online ? "Online now" : lastPresence.lastSeen
                 ? `Last seen ${formatRelative(lastPresence.lastSeen)}`
-                : `Offline since ${formatRelative(lastPresence.at)}`}
-          </div>
-        )}
+                : `Offline ${formatRelative(lastPresence.at)}`}</>
+            )}
+          </span>
+        </div>
       </td>
-      <td className="muted">{contact.phone}</td>
       <td>
-        <div style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, color: "var(--fg-muted)" }}>
           {lastAbout?.text || <span className="muted">—</span>}
         </div>
-        {lastPic?.url && (
-          <span className="muted" style={{ fontSize: 11 }}>
-            pic updated {formatRelative(lastPic.at)}
-          </span>
-        )}
       </td>
       <td>
-        <label className="row" style={{ gap: 6 }}>
+        <label className="toggle" title={contact.trackingEnabled ? "Tracking on" : "Tracking off"}>
           <input
             type="checkbox"
             checked={contact.trackingEnabled}
             onChange={(e) => onToggle(e.target.checked)}
           />
-          <span className="muted">{contact.trackingEnabled ? "On" : "Off"}</span>
+          <span className="toggle-track" />
         </label>
       </td>
-      <td>
-        <button className="btn btn-danger" onClick={onDelete}>
+      <td style={{ paddingRight: 16 }}>
+        <button className="btn btn-danger btn-sm" onClick={onDelete}>
           Remove
         </button>
       </td>

@@ -24,22 +24,28 @@ export default function Messages() {
 
   return (
     <div className="col" style={{ gap: 16 }}>
+
+      {/* Header */}
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <Link to={`/accounts/${accountId}/contacts/${cid}`} className="muted">
-          ← back to contact
-        </Link>
-        <span className="muted" style={{ fontSize: 13 }}>
-          {msgs.length} messages loaded
+        <div className="breadcrumb">
+          <Link to={`/accounts/${accountId}/contacts/${cid}`}>Contact</Link>
+          <span className="breadcrumb-sep">/</span>
+          <span>Messages</span>
+        </div>
+        <span className="muted" style={{ fontSize: 12 }}>
+          {msgs.length} loaded
         </span>
       </div>
 
-      {isLoading && <div className="muted">Loading…</div>}
+      {isLoading && <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>Loading…</div>}
       {error && <div className="error">{(error as Error).message}</div>}
 
       <div className="messages-list">
         {msgs.length === 0 && !isLoading && (
-          <div className="muted" style={{ padding: 24, textAlign: "center" }}>
-            No messages recorded yet.
+          <div className="empty-state">
+            <div className="empty-state-icon">💬</div>
+            <div style={{ fontWeight: 500 }}>No messages yet</div>
+            <div className="muted">Messages will appear here as they're recorded</div>
           </div>
         )}
         {msgs.map((m) => (
@@ -48,7 +54,7 @@ export default function Messages() {
       </div>
 
       {hasNextPage && (
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", paddingBottom: 16 }}>
           <button
             className="btn"
             onClick={() => fetchNextPage()}

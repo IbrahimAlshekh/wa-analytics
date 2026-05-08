@@ -25,41 +25,56 @@ export default function Login() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "70vh",
-      }}
-    >
-      <div className="card" style={{ width: 320 }}>
-        <h2 style={{ marginTop: 0 }}>Login</h2>
-        <form onSubmit={handleSubmit} className="col" style={{ gap: 12 }}>
-          <input
-            className="input"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <input
-            className="input"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={loading}
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
-        {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+    <div className="login-wrap">
+      <div className="login-box">
+        <div className="login-brand">
+          <div className="login-brand-mark">W</div>
+          <div className="login-brand-title">WA Tracker</div>
+          <div className="login-brand-sub">Sign in to your account</div>
+        </div>
+        <div className="card">
+          <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
+            <div className="form-field">
+              <label className="form-label" htmlFor="login-user">Username</label>
+              <input
+                id="login-user"
+                className="input"
+                placeholder="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoFocus
+                autoComplete="username"
+              />
+            </div>
+            <div className="form-field">
+              <label className="form-label" htmlFor="login-pass">Password</label>
+              <input
+                id="login-pass"
+                className="input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={loading}
+              style={{ marginTop: 4 }}
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+          {error && (
+            <div className="error" style={{ marginTop: 12 }}>
+              {error}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
