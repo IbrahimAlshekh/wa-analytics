@@ -25,9 +25,10 @@ type Tracker interface {
 
 // Config holds runtime configuration for the API server.
 type Config struct {
-	Bearer string
-	Dev    bool
-	JWTKey []byte // signing key for JWT tokens, derived from the app key
+	Bearer   string
+	Dev      bool
+	JWTKey   []byte // signing key for JWT tokens, derived from the app key
+	MediaDir string
 }
 
 // Server handles all HTTP API and WebSocket requests.
@@ -136,6 +137,13 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stats", apiAuth(s.handleStats))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))
 
+	// Media (protected)
+	if s.cfg.MediaDir != "" {
+		s.mux.Handle("GET /media/", apiAuth(func(w http.ResponseWriter, r *http.Request) {
+			http.StripPrefix("/media/", http.FileServer(http.Dir(s.cfg.MediaDir))).ServeHTTP(w, r)
+		}))
+	}
+
 	// WebSocket (auth handled inside handleWS via first-message handshake)
 	s.mux.HandleFunc("GET /api/ws", s.handleWS)
 
@@ -149,10 +157,18 @@ func (s *Server) routes() {
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
+		tokenStr := ""
+
+		if strings.HasPrefix(auth, "Bearer ") {
+			tokenStr = auth[len("Bearer "):]
+		} else {
+			// Fallback to ?token= for media tags (<img>, <video>)
+			tokenStr = r.URL.Query().Get("token")
+		}
 
 		// 1. Check static bearer token (legacy/system access).
-		if s.cfg.Bearer != "" && strings.HasPrefix(auth, "Bearer ") {
-			provided := []byte(auth[len("Bearer "):])
+		if s.cfg.Bearer != "" && tokenStr != "" {
+			provided := []byte(tokenStr)
 			expected := []byte(s.cfg.Bearer)
 			if subtle.ConstantTimeCompare(provided, expected) == 1 {
 				next.ServeHTTP(w, r)
@@ -160,9 +176,8 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			}
 		}
 
-		// 2. Check JWT token (Authorization header only — never query params).
-		if strings.HasPrefix(auth, "Bearer ") {
-			tokenStr := auth[len("Bearer "):]
+		// 2. Check JWT token.
+		if tokenStr != "" {
 			if username, err := ValidateToken(tokenStr, s.cfg.JWTKey); err == nil && username != "" {
 				next.ServeHTTP(w, r)
 				return

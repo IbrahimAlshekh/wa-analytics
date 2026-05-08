@@ -1,7 +1,14 @@
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Message } from "../lib/types";
+
+function getMediaUrl(path: string) {
+  const token = localStorage.getItem("wt_bearer");
+  if (!token) return `/media/${path}`;
+  return `/media/${path}?token=${encodeURIComponent(token)}`;
+}
 
 export default function Messages() {
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
@@ -79,7 +86,12 @@ function MessageBubble({ msg }: { msg: Message }) {
   return (
     <div className={`message-bubble ${msg.isFromMe ? "message-me" : "message-them"}`}>
       <div className="message-body">
-        {msg.text ? (
+        {msg.mediaPath ? (
+          <div className="col" style={{ gap: 8 }}>
+            <MediaPreview type={msg.mediaType} path={msg.mediaPath} />
+            {msg.text && <span>{msg.text}</span>}
+          </div>
+        ) : msg.text ? (
           <span>{msg.text}</span>
         ) : msg.mediaType ? (
           <span className="muted">[{msg.mediaType}]</span>
@@ -88,6 +100,46 @@ function MessageBubble({ msg }: { msg: Message }) {
         )}
       </div>
       <time className="message-time">{ts}</time>
+    </div>
+  );
+}
+
+function MediaPreview({ type, path }: { type?: string; path: string }) {
+  const url = useMemo(() => getMediaUrl(path), [path]);
+
+  if (type === "image") {
+    return (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img
+          src={url}
+          alt="WhatsApp Media"
+          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }}
+        />
+      </a>
+    );
+  }
+
+  if (type === "video") {
+    return (
+      <video
+        src={url}
+        controls
+        style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }}
+      />
+    );
+  }
+
+  if (type === "audio") {
+    return <audio src={url} controls style={{ maxWidth: "100%" }} />;
+  }
+
+  return (
+    <div className="row" style={{ gap: 8, alignItems: "center", padding: "8px 12px", background: "rgba(0,0,0,0.05)", borderRadius: 4 }}>
+      <span style={{ fontSize: 20 }}>📄</span>
+      <div className="col">
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{type || "File"}</span>
+        <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Download</a>
+      </div>
     </div>
   );
 }

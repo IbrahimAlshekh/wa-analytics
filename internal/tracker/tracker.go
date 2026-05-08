@@ -3,7 +3,10 @@ package tracker
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -93,6 +96,7 @@ type Deps struct {
 	DB       *db.DB
 	Hub      Hub
 	Interval time.Duration
+	MediaDir string
 }
 
 type Tracker struct {
@@ -101,6 +105,7 @@ type Tracker struct {
 	db        *db.DB
 	hub       Hub
 	interval  time.Duration
+	mediaDir  string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -121,6 +126,7 @@ func newTracker(accountID int64, d Deps) *Tracker {
 		db:        d.DB,
 		hub:       d.Hub,
 		interval:  d.Interval,
+		mediaDir:  d.MediaDir,
 		ctx:       ctx,
 		cancel:    cancel,
 	}
@@ -162,6 +168,14 @@ func (t *Tracker) HandleEvent(evt any) {
 
 	case *events.Message:
 		t.onMessage(v)
+
+	case *events.Receipt:
+		// Receipts are used to track outgoing messages from this account sent on other devices.
+		if v.Type == types.ReceiptTypeRead || v.Type == types.ReceiptTypeReadSelf {
+			// We only care about message content, which is in events.Message.
+			// However, some whatsmeow versions might deliver outgoing messages as receipts.
+			// For now, onMessage handles info.IsFromMe correctly.
+		}
 	}
 }
 
@@ -331,6 +345,28 @@ func (t *Tracker) onMessage(msg *events.Message) {
 	// Determine text and media type.
 	text := extractText(msg.Message)
 	mediaType := extractMediaType(msg.Message)
+	var mediaPath string
+
+	// Download media if available.
+	if mediaType != "" && t.mediaDir != "" {
+		if downloadable := getDownloadable(msg.Message); downloadable != nil {
+			data, err := t.wa.DownloadMedia(t.ctx, downloadable)
+			if err != nil {
+				slog.Warn("tracker: download media failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
+			} else {
+				ext := getExtension(mediaType, msg.Message)
+				filename := fmt.Sprintf("%d_%s%s", t.accountID, info.ID, ext)
+				mediaPath = filename // store just the filename in DB
+				fullPath := filepath.Join(t.mediaDir, filename)
+				if err := os.WriteFile(fullPath, data, 0o644); err != nil {
+					slog.Error("tracker: save media failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
+					mediaPath = ""
+				} else {
+					slog.Debug("tracker: media saved", "accountID", t.accountID, "messageID", info.ID, "path", fullPath)
+				}
+			}
+		}
+	}
 
 	// Try to resolve the contact by sender JID.
 	senderJID := info.Sender.ToNonAD()
@@ -377,6 +413,7 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		Timestamp:  info.Timestamp.Unix(),
 		Text:       text,
 		MediaType:  mediaType,
+		MediaPath:  mediaPath,
 		ReceivedAt: now,
 	}
 	saved, err := t.db.InsertMessage(t.ctx, m)
@@ -384,10 +421,9 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		slog.Error("tracker: insert message failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
 		return
 	}
-	if saved.ID == 0 {
-		return // duplicate
+	if saved.ID != 0 {
+		slog.Debug("tracker: message stored", "accountID", t.accountID, "messageID", info.ID, "chat", chatStr, "from", senderStr)
 	}
-	slog.Debug("tracker: message stored", "accountID", t.accountID, "messageID", info.ID, "chat", chatStr, "from", senderStr)
 
 	// If we found a contact, also record a presence event to mark them active/online.
 	if contactID != nil && !info.IsFromMe {
@@ -409,6 +445,8 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		"from":      senderStr,
 		"isFromMe":  info.IsFromMe,
 		"text":      text,
+		"mediaType": mediaType,
+		"mediaPath": mediaPath,
 		"timestamp": info.Timestamp.Unix(),
 	})
 }
@@ -432,6 +470,9 @@ func extractText(msg *waE2E.Message) string {
 	if doc := msg.GetDocumentMessage(); doc != nil {
 		return doc.GetCaption()
 	}
+	if dwc := msg.GetDocumentWithCaptionMessage(); dwc != nil && dwc.Message != nil {
+		return dwc.Message.GetDocumentMessage().GetCaption()
+	}
 	return ""
 }
 
@@ -448,7 +489,7 @@ func extractMediaType(msg *waE2E.Message) string {
 	if msg.AudioMessage != nil {
 		return "audio"
 	}
-	if msg.DocumentMessage != nil {
+	if msg.DocumentMessage != nil || msg.DocumentWithCaptionMessage != nil {
 		return "document"
 	}
 	if msg.StickerMessage != nil {
@@ -496,4 +537,51 @@ func bytesHex(b []byte) string {
 		return ""
 	}
 	return hex.EncodeToString(b)
+}
+
+func getDownloadable(msg *waE2E.Message) any {
+	if msg == nil {
+		return nil
+	}
+	if msg.ImageMessage != nil {
+		return msg.ImageMessage
+	}
+	if msg.VideoMessage != nil {
+		return msg.VideoMessage
+	}
+	if msg.AudioMessage != nil {
+		return msg.AudioMessage
+	}
+	if msg.DocumentMessage != nil {
+		return msg.DocumentMessage
+	}
+	if msg.DocumentWithCaptionMessage != nil && msg.DocumentWithCaptionMessage.Message != nil {
+		return msg.DocumentWithCaptionMessage.Message.DocumentMessage
+	}
+	if msg.StickerMessage != nil {
+		return msg.StickerMessage
+	}
+	return nil
+}
+
+func getExtension(mediaType string, msg *waE2E.Message) string {
+	switch mediaType {
+	case "image":
+		return ".jpg"
+	case "video":
+		return ".mp4"
+	case "audio":
+		return ".ogg"
+	case "sticker":
+		return ".webp"
+	case "document":
+		if msg.DocumentMessage != nil && msg.DocumentMessage.FileName != nil {
+			if ext := filepath.Ext(*msg.DocumentMessage.FileName); ext != "" {
+				return ext
+			}
+		}
+		return ".bin"
+	default:
+		return ".bin"
+	}
 }

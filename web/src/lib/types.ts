@@ -26,6 +26,7 @@ export interface TimelineEntry {
   text?: string;
   pictureId?: string;
   url?: string;
+  mediaPath?: string;
   isFromMe?: boolean;
   mediaType?: string;
 }
@@ -61,6 +62,7 @@ export interface Message {
   timestamp: number;
   text?: string;
   mediaType?: string;
+  mediaPath?: string;
   receivedAt: number;
 }
 
@@ -101,5 +103,7 @@ export type WSEnvelope =
       from: string;
       isFromMe: boolean;
       text?: string;
+      mediaType?: string;
+      mediaPath?: string;
       timestamp: number;
     };

@@ -205,6 +205,14 @@ func (c *Client) SubscribePresence(ctx context.Context, jid types.JID) error {
 	return c.cli.SubscribePresence(ctx, jid)
 }
 
+func (c *Client) DownloadMedia(ctx context.Context, msg any) ([]byte, error) {
+	downloader, ok := msg.(whatsmeow.DownloadableMessage)
+	if !ok {
+		return nil, errors.New("message is not downloadable")
+	}
+	return c.cli.Download(ctx, downloader)
+}
+
 func (c *Client) SendAvailable(ctx context.Context) error {
 	return c.cli.SendPresence(ctx, types.PresenceAvailable)
 }

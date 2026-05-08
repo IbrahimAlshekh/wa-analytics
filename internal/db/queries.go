@@ -405,17 +405,18 @@ type Message struct {
 	Timestamp  int64  `json:"timestamp"`
 	Text       string `json:"text,omitempty"`
 	MediaType  string `json:"mediaType,omitempty"`
+	MediaPath  string `json:"mediaPath,omitempty"`
 	ReceivedAt int64  `json:"receivedAt"`
 }
 
 func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
 	res, err := db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO messages
-		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, received_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, media_path, received_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
 		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
-		nullStr(m.Text), nullStr(m.MediaType), m.ReceivedAt)
+		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt)
 	if err != nil {
 		return Message{}, err
 	}
@@ -431,7 +432,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), received_at
+	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at
 		   FROM messages WHERE contact_id=?`
 	args := []any{contactID}
 	if before > 0 {
@@ -452,7 +453,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 		var cid sql.NullInt64
 		var fromMe int
 		if err := rows.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
-			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.ReceivedAt); err != nil {
+			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt); err != nil {
 			return nil, err
 		}
 		if cid.Valid {
@@ -486,6 +487,7 @@ type TimelineEntry struct {
 	Text      string       `json:"text,omitempty"`
 	PictureID string       `json:"pictureId,omitempty"`
 	URL       string       `json:"url,omitempty"`
+	MediaPath string       `json:"mediaPath,omitempty"`
 	IsFromMe  bool         `json:"isFromMe,omitempty"`
 	MediaType string       `json:"mediaType,omitempty"`
 }
@@ -558,7 +560,7 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	abouts.Close()
 
 	msgs, err := db.QueryContext(ctx,
-		`SELECT text, media_type, is_from_me, timestamp FROM messages
+		`SELECT text, media_type, media_path, is_from_me, timestamp FROM messages
 		   WHERE contact_id=? AND timestamp>=?
 		   ORDER BY timestamp`, contactID, since)
 	if err != nil {
@@ -567,14 +569,15 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	for msgs.Next() {
 		var e TimelineEntry
 		e.Kind = KindMessage
-		var txt, media sql.NullString
+		var txt, media, mpath sql.NullString
 		var fromMe int
-		if err := msgs.Scan(&txt, &media, &fromMe, &e.At); err != nil {
+		if err := msgs.Scan(&txt, &media, &mpath, &fromMe, &e.At); err != nil {
 			msgs.Close()
 			return nil, err
 		}
 		e.Text = txt.String
 		e.MediaType = media.String
+		e.MediaPath = mpath.String
 		e.IsFromMe = fromMe == 1
 		out = append(out, e)
 	}

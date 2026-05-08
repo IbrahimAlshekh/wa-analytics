@@ -115,6 +115,11 @@ func main() {
 	defer manager.Close()
 
 	trackerMgr := tracker.NewTrackerManager()
+	mediaDir := filepath.Join(cfg.DataDir, "media")
+	if err := os.MkdirAll(mediaDir, 0o755); err != nil {
+		slog.Error("create media dir failed", "err", err)
+		os.Exit(1)
+	}
 
 	// Wire up the OnPaired callback: when a new account finishes QR/phone pairing,
 	// insert it in DB, register with the manager, then start tracking.
@@ -127,7 +132,7 @@ func main() {
 			return
 		}
 		manager.RegisterPaired(acc.ID)
-		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval)
+		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval, mediaDir)
 	}
 
 	// Load all already-paired accounts from the whatsmeow store.
@@ -165,15 +170,16 @@ func main() {
 			slog.Warn("main: register account failed", "accountID", acc.ID, "jid", acc.JID, "err", err)
 			continue
 		}
-		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval)
+		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval, mediaDir)
 	}
 
 	manager.ConnectAll(ctx)
 
 	srv := api.NewServer(api.Config{
-		Bearer: cfg.Bearer,
-		Dev:    cfg.Dev,
-		JWTKey: cfg.JWTKey,
+		Bearer:   cfg.Bearer,
+		Dev:      cfg.Dev,
+		JWTKey:   cfg.JWTKey,
+		MediaDir: mediaDir,
 	}, store, manager, trackerMgr, hub)
 
 	httpSrv := &http.Server{
@@ -199,12 +205,13 @@ func main() {
 	trackerMgr.StopAll()
 }
 
-func startTracker(ctx context.Context, mgr *tracker.TrackerManager, client *wa.Client, store *db.DB, hub *api.Hub, accountID int64, interval time.Duration) {
+func startTracker(ctx context.Context, mgr *tracker.TrackerManager, client *wa.Client, store *db.DB, hub *api.Hub, accountID int64, interval time.Duration, mediaDir string) {
 	trk := mgr.Add(accountID, tracker.Deps{
 		WA:       client,
 		DB:       store,
 		Hub:      hub,
 		Interval: interval,
+		MediaDir: mediaDir,
 	})
 	client.AttachHandler(trk.HandleEvent)
 	slog.Info("main: tracker started", "accountID", accountID)

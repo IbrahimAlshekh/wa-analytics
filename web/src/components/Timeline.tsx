@@ -1,7 +1,36 @@
+import { useMemo } from "react";
 import type { TimelineEntry } from "../lib/types";
 
 interface Props {
   entries: TimelineEntry[];
+}
+
+function getMediaUrl(path: string) {
+  const token = localStorage.getItem("wt_bearer");
+  if (!token) return `/media/${path}`;
+  return `/media/${path}?token=${encodeURIComponent(token)}`;
+}
+
+function MediaPreview({ type, path }: { type?: string; path: string }) {
+  const url = useMemo(() => getMediaUrl(path), [path]);
+
+  if (type === "image") {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 4 }}>
+        <img
+          src={url}
+          alt="WhatsApp Media"
+          style={{ maxWidth: 200, maxHeight: 150, borderRadius: 4, display: "block" }}
+        />
+      </a>
+    );
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: "inline-block", marginTop: 4 }}>
+      View {type || "media"}
+    </a>
+  );
 }
 
 // A session is one online period.
@@ -49,12 +78,15 @@ export default function SessionTimeline({ entries }: Props) {
             {messages.map((e, i) => (
               <div key={i} className="session-event">
                 <time className="session-time">{formatTime(e.at)}</time>
-                <span>
-                  {e.isFromMe ? "Sent" : "Received"}:{" "}
-                  <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
-                    {e.text || <span className="muted">[media]</span>}
-                  </em>
-                </span>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span>
+                    {e.isFromMe ? "Sent" : "Received"}:{" "}
+                    <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
+                      {e.text || (e.mediaPath ? "" : <span className="muted">[{e.mediaType || "media"}]</span>)}
+                    </em>
+                  </span>
+                  {e.mediaPath && <MediaPreview type={e.mediaType} path={e.mediaPath} />}
+                </div>
               </div>
             ))}
           </div>
