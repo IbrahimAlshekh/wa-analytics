@@ -2,8 +2,9 @@ SHELL := /bin/bash
 
 GO_PKG := ./...
 BIN := bin/tracker
+MIGRATE_BIN := bin/migrate-encryption
 
-.PHONY: dev build run test tidy web-install web-build clean
+.PHONY: dev build build-migrate run test tidy web-install web-build clean
 
 dev:
 	@( cd web && (test -d node_modules || pnpm install) && pnpm dev ) & \
@@ -20,6 +21,12 @@ web-build:
 build: web-build
 	mkdir -p bin
 	CGO_ENABLED=1 go build -o $(BIN) ./cmd/tracker
+
+# Build the one-time encryption migration tool.
+# Run ./bin/migrate-encryption once after the first deployment with encryption support.
+build-migrate:
+	mkdir -p bin
+	CGO_ENABLED=1 go build -o $(MIGRATE_BIN) ./cmd/migrate-encryption
 
 run: build
 	./$(BIN)
