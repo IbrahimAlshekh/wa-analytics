@@ -116,4 +116,45 @@ export const api = {
       `/accounts/${accountId}/contacts/${contactId}/messages?${q}`,
     );
   },
+  sendMessage: (accountId: number, contactId: number, text: string, file?: File) => {
+    if (!file) {
+      return request<{ id: string; timestamp: number }>(
+        "POST",
+        `/accounts/${accountId}/contacts/${contactId}/messages`,
+        { text },
+      );
+    }
+    const fd = new FormData();
+    fd.append("text", text);
+    fd.append("file", file);
+    return requestRaw<{ id: string; timestamp: number }>(
+      "POST",
+      `/accounts/${accountId}/contacts/${contactId}/messages`,
+      fd,
+    );
+  },
 };
+
+async function requestRaw<T>(method: string, path: string, body: FormData): Promise<T> {
+  await maybeRefresh();
+  const headers: Record<string, string> = {};
+  const t = token();
+  if (t) headers["Authorization"] = `Bearer ${t}`;
+
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body,
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("wt_bearer");
+    window.location.href = "/login";
+    throw new Error("unauthorized");
+  }
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : undefined;
+  if (!res.ok) {
+    throw new Error(data?.error ?? res.statusText);
+  }
+  return data as T;
+}

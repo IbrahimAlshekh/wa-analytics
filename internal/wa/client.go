@@ -11,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -215,6 +216,14 @@ func (c *Client) DownloadMedia(ctx context.Context, msg any) ([]byte, error) {
 
 func (c *Client) SendAvailable(ctx context.Context) error {
 	return c.cli.SendPresence(ctx, types.PresenceAvailable)
+}
+
+func (c *Client) SendMessage(ctx context.Context, to types.JID, msg *waE2E.Message) (whatsmeow.SendResponse, error) {
+	return c.cli.SendMessage(ctx, to, msg)
+}
+
+func (c *Client) UploadMedia(ctx context.Context, data []byte, appMessageType whatsmeow.MediaType) (whatsmeow.UploadResponse, error) {
+	return c.cli.Upload(ctx, data, appMessageType)
 }
 
 func (c *Client) GetProfilePicture(ctx context.Context, jid types.JID) (*types.ProfilePictureInfo, error) {

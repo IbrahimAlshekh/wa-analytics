@@ -136,6 +136,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/timeline", apiAuth(s.handleTimeline))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stats", apiAuth(s.handleStats))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))
+	s.mux.Handle("POST /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleSendMessage))
 
 	// Media (protected)
 	if s.cfg.MediaDir != "" {
