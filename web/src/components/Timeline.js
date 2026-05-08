@@ -86,11 +86,25 @@ function buildBlocks(entries) {
         // Clear offline marker — currently online
         lastOfflineAt = null;
     }
+    // Merge sessions whose gap is under MERGE_GAP_SEC into a single session.
+    const MERGE_GAP_SEC = 120;
+    const merged = [];
+    for (const s of sessions) {
+        const prev = merged[merged.length - 1];
+        if (prev && prev.endAt != null && s.startAt - prev.endAt <= MERGE_GAP_SEC) {
+            prev.endAt = s.endAt;
+            prev.durationSec = prev.endAt != null ? prev.endAt - prev.startAt : null;
+            prev.lastSeen = s.lastSeen ?? prev.lastSeen;
+        }
+        else {
+            merged.push({ ...s });
+        }
+    }
     // Build alternating blocks: offline-gap then session.
     const blocks = [];
-    for (let i = 0; i < sessions.length; i++) {
-        const prev = sessions[i - 1];
-        const cur = sessions[i];
+    for (let i = 0; i < merged.length; i++) {
+        const prev = merged[i - 1];
+        const cur = merged[i];
         if (prev && prev.endAt != null) {
             const gapSec = cur.startAt - prev.endAt;
             if (gapSec > 30) {
