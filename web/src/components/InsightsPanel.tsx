@@ -40,43 +40,45 @@ export default function InsightsPanel({ entries }: Props) {
   const hasPresence = hourlyData.some((d) => d.minutes > 0);
   if (!hasPresence) return null;
 
-  return (
-    <div className="col" style={{ gap: 16 }}>
+  const hasMsgCharts = msgHourData.some((d) => d.count > 0) || msgFreqData.length > 0;
 
-      {/* ── Presence metrics ── */}
-      <div className="card" style={{ padding: "12px 16px" }}>
-        <div className="muted" style={{ fontSize: 11, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Presence</div>
+  return (
+    <div className="col" style={{ gap: 20 }}>
+
+      {/* ── Presence stat cards ── */}
+      <div className="card" style={{ padding: "14px 16px" }}>
+        <div className="muted" style={{ fontSize: 10, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.07em" }}>Presence</div>
         <div className="stats" style={{ marginBottom: 0 }}>
-          {avgSession    != null && <StatCard label="Avg session"     value={formatDuration(avgSession)} />}
-          {longestSess   != null && <StatCard label="Longest session" value={formatDuration(longestSess)} />}
-          {avgOnlineSec  != null && <StatCard label="Daily avg online" value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")} />}
+          {avgSession    != null && <StatCard label="Avg session"          value={formatDuration(avgSession)} />}
+          {longestSess   != null && <StatCard label="Longest session"      value={formatDuration(longestSess)} />}
+          {avgOnlineSec  != null && <StatCard label="Daily avg online"     value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")} />}
           {streak        != null && <StatCard label={streak.online ? "Online streak" : "Offline for"} value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)} />}
-          {longestOffline!= null && <StatCard label="Longest offline streak" value={`${longestOffline}d`} />}
-          {nightOwlPct   != null && <StatCard label="Night owl"       value={`${nightOwlPct}%`} />}
-          {consistency   != null && <StatCard label="Consistency"     value={`${consistency}/100`} />}
+          {longestOffline!= null && <StatCard label="Longest offline"      value={`${longestOffline}d`} />}
+          {nightOwlPct   != null && <StatCard label="Night owl"            value={`${nightOwlPct}%`} />}
+          {consistency   != null && <StatCard label="Consistency"          value={`${consistency}/100`} />}
         </div>
       </div>
 
-      {/* ── Conversation metrics ── */}
+      {/* ── Conversation stat cards ── */}
       {(avgResponse != null || sentPerDay != null || ghostRate != null) && (
-        <div className="card" style={{ padding: "12px 16px" }}>
-          <div className="muted" style={{ fontSize: 11, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Conversation</div>
+        <div className="card" style={{ padding: "14px 16px" }}>
+          <div className="muted" style={{ fontSize: 10, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.07em" }}>Conversation</div>
           <div className="stats" style={{ marginBottom: 0 }}>
-            {avgResponse    != null && <StatCard label="Avg response time"  value={formatDuration(avgResponse)} />}
-            {sentPerDay     != null && <StatCard label="Msgs sent / day"    value={sentPerDay.toFixed(1)} />}
-            {receivedPerDay != null && <StatCard label="Msgs recv / day"    value={receivedPerDay.toFixed(1)} />}
-            {ghostRate      != null && <StatCard label="Ghost rate"         value={`${ghostRate}%`} />}
-            {initiatorPct   != null && <StatCard label="You initiated"      value={`${initiatorPct}%`} />}
-            {avgConvLen     != null && <StatCard label="Avg conv length"    value={`${avgConvLen} msgs`} />}
-            {doubleTextPct  != null && <StatCard label="They double-text"   value={`${doubleTextPct}%`} />}
-            {mediaRatio     != null && <StatCard label="Media ratio"        value={`${mediaRatio}%`} />}
-            {picFreqDays    != null && <StatCard label="Pic changes"        value={`every ${picFreqDays}d`} />}
+            {avgResponse    != null && <StatCard label="Avg response time" value={formatDuration(avgResponse)} />}
+            {sentPerDay     != null && <StatCard label="Msgs sent / day"   value={sentPerDay.toFixed(1)} />}
+            {receivedPerDay != null && <StatCard label="Msgs recv / day"   value={receivedPerDay.toFixed(1)} />}
+            {ghostRate      != null && <StatCard label="Ghost rate"        value={`${ghostRate}%`} />}
+            {initiatorPct   != null && <StatCard label="You initiated"     value={`${initiatorPct}%`} />}
+            {avgConvLen     != null && <StatCard label="Avg conv length"   value={`${avgConvLen} msgs`} />}
+            {doubleTextPct  != null && <StatCard label="They double-text"  value={`${doubleTextPct}%`} />}
+            {mediaRatio     != null && <StatCard label="Media ratio"       value={`${mediaRatio}%`} />}
+            {picFreqDays    != null && <StatCard label="Pic changes"       value={`every ${picFreqDays}d`} />}
           </div>
         </div>
       )}
 
-      {/* ── Banners ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      {/* ── Info banners ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         {patternSummary && (
           <div className="card" style={{ padding: "12px 16px" }}>
             <div className="muted" style={{ fontSize: 11 }}>Peak hours</div>
@@ -101,144 +103,175 @@ export default function InsightsPanel({ entries }: Props) {
         )}
       </div>
 
-      {/* ── Activity Heatmap ── */}
-      {heatmapData.length > 0 && (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Activity Heatmap</h3>
-          <div className="muted" style={{ marginBottom: 12 }}>Daily online time — last 16 weeks</div>
-          <Heatmap data={heatmapData} />
-        </div>
-      )}
+      {/* ══════════════════════════════════════════════════════════
+          Section: Presence & Activity
+          — hourly pattern, weekday pattern, heatmap, 30-day trend
+      ══════════════════════════════════════════════════════════ */}
+      <div className="col" style={{ gap: 12 }}>
+        <div className="section-label">Presence &amp; Activity</div>
 
-      {/* ── 4-chart grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Peak Activity Hours</h3>
-          <div className="muted" style={{ marginBottom: 8 }}>Online minutes by hour</div>
-          <div style={{ width: "100%", height: 180 }}>
-            <ResponsiveContainer>
-              <BarChart data={hourlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-                <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="minutes" fill="var(--accent)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Most Active Days</h3>
-          <div className="muted" style={{ marginBottom: 8 }}>Online minutes by weekday</div>
-          <div style={{ width: "100%", height: 180 }}>
-            <ResponsiveContainer>
-              <BarChart data={weekdayData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="minutes">
-                  {weekdayData.map((d, i) => (
-                    <Cell key={i} fill={d.weekend ? "var(--offline)" : "var(--accent)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {trend30.length > 1 && (
+        {/* Hourly + Weekday patterns side-by-side */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div className="card">
-            <h3 style={{ marginTop: 0 }}>30-Day Online Trend</h3>
-            <div className="muted" style={{ marginBottom: 8 }}>Online minutes per day</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Peak Activity Hours</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes by hour of day</div>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
+                <BarChart data={hourlyData} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                  <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} />
+                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
+                  <Bar dataKey="minutes" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Most Active Days</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes by day of week</div>
+            <div style={{ width: "100%", height: 180 }}>
+              <ResponsiveContainer>
+                <BarChart data={weekdayData} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
+                  <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
+                    {weekdayData.map((d, i) => (
+                      <Cell key={i} fill={d.weekend ? "var(--offline)" : "var(--accent)"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Heatmap — full width */}
+        {heatmapData.length > 0 && (
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Activity Heatmap</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>Daily online time — last 16 weeks</div>
+            <Heatmap data={heatmapData} />
+          </div>
+        )}
+
+        {/* 30-Day Trend — full width */}
+        {trend30.length > 1 && (
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>30-Day Online Trend</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes per day</div>
+            <div style={{ width: "100%", height: 190 }}>
+              <ResponsiveContainer>
                 <LineChart data={trend30}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={4} />
+                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
                   <Line type="monotone" dataKey="minutes" stroke="var(--accent)" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
-
-        {msgHourData.some((d) => d.count > 0) && (
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Peak Messaging Hours</h3>
-            <div className="muted" style={{ marginBottom: 8 }}>Messages sent by hour</div>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer>
-                <BarChart data={msgHourData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-                  <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="var(--accent)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Message Frequency ── */}
-      {msgFreqData.length > 0 && (
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Message Frequency</h3>
-          <div className="muted" style={{ marginBottom: 8 }}>Messages per day — sent vs received</div>
-          <div style={{ width: "100%", height: 180 }}>
-            <ResponsiveContainer>
-              <BarChart data={msgFreqData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="sent"     fill="var(--accent)"  name="Sent" />
-                <Bar dataKey="received" fill="var(--offline)" name="Received" />
-              </BarChart>
-            </ResponsiveContainer>
+      {/* ══════════════════════════════════════════════════════════
+          Section: Messaging
+          — peak messaging hours, daily sent vs received frequency
+      ══════════════════════════════════════════════════════════ */}
+      {hasMsgCharts && (
+        <div className="col" style={{ gap: 12 }}>
+          <div className="section-label">Messaging</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {msgHourData.some((d) => d.count > 0) && (
+              <div className="card">
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Peak Messaging Hours</div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Messages sent by hour of day</div>
+                <div style={{ width: "100%", height: 180 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={msgHourData} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                      <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} />
+                      <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
+                      <Bar dataKey="count" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {msgFreqData.length > 0 && (
+              <div className="card">
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Message Frequency</div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                  Sent <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--accent)", verticalAlign: "middle", margin: "0 3px" }} />
+                  vs Received <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: "var(--offline)", verticalAlign: "middle", margin: "0 3px" }} />
+                  per day
+                </div>
+                <div style={{ width: "100%", height: 180 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={msgFreqData} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={Math.floor(msgFreqData.length / 6)} />
+                      <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                      <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
+                      <Bar dataKey="sent"     fill="var(--accent)"  name="Sent"     radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="received" fill="var(--offline)" name="Received" radius={[3, 3, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── History + Export ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>About History</h3>
-          {aboutHistory.length === 0 ? (
-            <div className="muted">No about changes recorded.</div>
-          ) : (
-            <div className="col" style={{ gap: 8, maxHeight: 220, overflowY: "auto" }}>
-              {aboutHistory.map((e, i) => (
-                <div key={i} style={{ borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
-                  <div className="muted" style={{ fontSize: 11, marginBottom: 2 }}>{formatDatetime(e.at)}</div>
-                  <div style={{ fontSize: 13 }}>{e.text || <em className="muted">(empty)</em>}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* ══════════════════════════════════════════════════════════
+          Section: History
+          — about text changes, profile picture changes
+      ══════════════════════════════════════════════════════════ */}
+      <div className="col" style={{ gap: 12 }}>
+        <div className="section-label">History</div>
 
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Profile Picture History</h3>
-          {pictureHistory.length === 0 ? (
-            <div className="muted">No profile pictures recorded.</div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-              {pictureHistory.map((e, i) => (
-                <a key={i} href={e.url} target="_blank" rel="noreferrer"
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <img src={e.url} alt={formatDatetime(e.at)}
-                    style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} />
-                  <span className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</span>
-                </a>
-              ))}
-            </div>
-          )}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>About History</div>
+            {aboutHistory.length === 0 ? (
+              <div className="muted">No about changes recorded.</div>
+            ) : (
+              <div className="col" style={{ gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                {aboutHistory.map((e, i) => (
+                  <div key={i} style={{ borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
+                    <div className="muted" style={{ fontSize: 11, marginBottom: 2 }}>{formatDatetime(e.at)}</div>
+                    <div style={{ fontSize: 13 }}>{e.text || <em className="muted">(empty)</em>}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Profile Picture History</div>
+            {pictureHistory.length === 0 ? (
+              <div className="muted">No profile pictures recorded.</div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                {pictureHistory.map((e, i) => (
+                  <a key={i} href={e.url} target="_blank" rel="noreferrer"
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    <img src={e.url} alt={formatDatetime(e.at)}
+                      style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} />
+                    <span className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
