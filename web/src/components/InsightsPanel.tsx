@@ -305,9 +305,8 @@ function Heatmap({ data }: { data: { date: string; minutes: number }[] }) {
 
   for (const d of data) {
     const dow = new Date(d.date + "T00:00:00").getDay(); // 0=Sun
-    const monDow = dow === 0 ? 6 : dow - 1; // 0=Mon
+    const monDow = dow === 0 ? 6 : dow - 1;             // 0=Mon
     if (week.length === 0 && monDow !== 0) {
-      // Pad first week
       for (let i = 0; i < monDow; i++) week.push({ date: "", minutes: -1, dow: i });
     }
     week.push({ ...d, dow: monDow });
@@ -323,26 +322,75 @@ function Heatmap({ data }: { data: { date: string; minutes: number }[] }) {
     return `rgba(22,163,74,${0.15 + intensity * 0.85})`;
   };
 
-  const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  // Month label: show on the first week column whose earliest date is in the first 7 days of a month
+  const monthLabels = weeks.map((w) => {
+    const first = w.find((c) => c.date);
+    if (!first) return "";
+    const d = new Date(first.date + "T00:00:00");
+    return d.getDate() <= 7
+      ? d.toLocaleString("default", { month: "short" })
+      : "";
+  });
+
+  const CELL_H = 14;
+  const GAP    = 3;
+  const DAY_LABELS = ["M", "", "W", "", "F", "", "S"];
 
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
-      <div style={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        {/* Day labels */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginRight: 2 }}>
-          {dayLabels.map((l, i) => (
-            <div key={i} className="muted" style={{ width: 10, height: 12, fontSize: 9, lineHeight: "12px", textAlign: "right" }}>{l}</div>
+    <div style={{ position: "relative", width: "100%" }}>
+      {/* Month labels */}
+      <div style={{ display: "flex", marginBottom: 6, paddingLeft: 18 }}>
+        {weeks.map((_, wi) => (
+          <div
+            key={wi}
+            style={{
+              flex: 1,
+              fontSize: 10,
+              fontWeight: 600,
+              color: "var(--fg-muted)",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {monthLabels[wi]}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div style={{ display: "flex", gap: GAP, alignItems: "flex-start", width: "100%" }}>
+        {/* Day-of-week labels */}
+        <div style={{ display: "flex", flexDirection: "column", gap: GAP, flexShrink: 0, width: 14 }}>
+          {DAY_LABELS.map((l, i) => (
+            <div
+              key={i}
+              style={{
+                height: CELL_H,
+                fontSize: 9,
+                lineHeight: `${CELL_H}px`,
+                color: "var(--fg-muted)",
+                textAlign: "right",
+              }}
+            >
+              {l}
+            </div>
           ))}
         </div>
-        {/* Week columns */}
+
+        {/* Week columns — flex:1 stretches to fill full width */}
         {weeks.map((w, wi) => (
-          <div key={wi} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div key={wi} style={{ flex: 1, display: "flex", flexDirection: "column", gap: GAP }}>
             {Array.from({ length: 7 }, (_, di) => {
               const cell = w[di];
               return (
                 <div
                   key={di}
-                  style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: cell ? cellColor(cell.minutes) : "transparent", cursor: cell && cell.minutes >= 0 ? "default" : undefined }}
+                  style={{
+                    height: CELL_H,
+                    borderRadius: 3,
+                    backgroundColor: cell ? cellColor(cell.minutes) : "transparent",
+                    cursor: cell && cell.date ? "default" : undefined,
+                  }}
                   onMouseEnter={cell && cell.date ? (e) => {
                     const r = (e.target as HTMLElement).getBoundingClientRect();
                     setTooltip({ text: `${cell.date}: ${cell.minutes}m`, x: r.left, y: r.top - 28 });
@@ -354,6 +402,7 @@ function Heatmap({ data }: { data: { date: string; minutes: number }[] }) {
           </div>
         ))}
       </div>
+
       {tooltip && (
         <div style={{
           position: "fixed", left: tooltip.x, top: tooltip.y,
