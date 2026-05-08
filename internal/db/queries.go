@@ -24,7 +24,7 @@ func (db *DB) InsertAccount(ctx context.Context, jid, label string) (Account, er
 	res, err := db.ExecContext(ctx,
 		`INSERT INTO accounts (jid, label, tracking_active, created_at) VALUES (?, ?, 1, ?)
 		 ON CONFLICT(jid) DO UPDATE SET label=excluded.label`,
-		jid, label, now)
+		db.enc(jid), label, now)
 	if err != nil {
 		return Account{}, err
 	}
@@ -45,6 +45,7 @@ func (db *DB) GetAccount(ctx context.Context, id int64) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
+	a.JID = db.dec(a.JID)
 	a.TrackingActive = active == 1
 	return a, nil
 }
@@ -53,11 +54,12 @@ func (db *DB) GetAccountByJID(ctx context.Context, jid string) (Account, error) 
 	var a Account
 	var active int
 	err := db.QueryRowContext(ctx,
-		`SELECT id, jid, COALESCE(label,''), tracking_active, created_at FROM accounts WHERE jid=?`, jid).
+		`SELECT id, jid, COALESCE(label,''), tracking_active, created_at FROM accounts WHERE jid=?`, db.enc(jid)).
 		Scan(&a.ID, &a.JID, &a.Label, &active, &a.CreatedAt)
 	if err != nil {
 		return Account{}, err
 	}
+	a.JID = db.dec(a.JID)
 	a.TrackingActive = active == 1
 	return a, nil
 }
@@ -76,6 +78,7 @@ func (db *DB) ListAccounts(ctx context.Context) ([]Account, error) {
 		if err := rows.Scan(&a.ID, &a.JID, &a.Label, &active, &a.CreatedAt); err != nil {
 			return nil, err
 		}
+		a.JID = db.dec(a.JID)
 		a.TrackingActive = active == 1
 		out = append(out, a)
 	}
@@ -145,6 +148,14 @@ func scanContact(row interface{ Scan(...any) error }) (Contact, error) {
 	return c, nil
 }
 
+// decryptContact decrypts the encrypted fields of a contact.
+func (db *DB) decryptContact(c Contact) Contact {
+	c.JID = db.dec(c.JID)
+	c.LID = db.dec(c.LID)
+	c.Phone = db.dec(c.Phone)
+	return c
+}
+
 func (db *DB) ListContacts(ctx context.Context, accountID int64) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
 		`SELECT `+contactCols+` FROM contacts WHERE account_id=? ORDER BY added_at DESC`, accountID)
@@ -158,7 +169,7 @@ func (db *DB) ListContacts(ctx context.Context, accountID int64) ([]Contact, err
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, c)
+		out = append(out, db.decryptContact(c))
 	}
 	return out, rows.Err()
 }
@@ -176,28 +187,40 @@ func (db *DB) ListTrackedContacts(ctx context.Context, accountID int64) ([]Conta
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, c)
+		out = append(out, db.decryptContact(c))
 	}
 	return out, rows.Err()
 }
 
 func (db *DB) GetContact(ctx context.Context, accountID, id int64) (Contact, error) {
-	return scanContact(db.QueryRowContext(ctx,
+	c, err := scanContact(db.QueryRowContext(ctx,
 		`SELECT `+contactCols+` FROM contacts WHERE id=? AND account_id=?`, id, accountID))
+	if err != nil {
+		return Contact{}, err
+	}
+	return db.decryptContact(c), nil
 }
 
 func (db *DB) GetContactByJID(ctx context.Context, accountID int64, jid string) (Contact, error) {
-	return scanContact(db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE jid=? AND account_id=?`, jid, accountID))
+	c, err := scanContact(db.QueryRowContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE jid=? AND account_id=?`, db.enc(jid), accountID))
+	if err != nil {
+		return Contact{}, err
+	}
+	return db.decryptContact(c), nil
 }
 
 func (db *DB) GetContactByLID(ctx context.Context, accountID int64, lid string) (Contact, error) {
-	return scanContact(db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE lid=? AND account_id=?`, lid, accountID))
+	c, err := scanContact(db.QueryRowContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE lid=? AND account_id=?`, db.enc(lid), accountID))
+	if err != nil {
+		return Contact{}, err
+	}
+	return db.decryptContact(c), nil
 }
 
 func (db *DB) UpdateContactLID(ctx context.Context, id int64, lid string) error {
-	_, err := db.ExecContext(ctx, `UPDATE contacts SET lid=? WHERE id=?`, lid, id)
+	_, err := db.ExecContext(ctx, `UPDATE contacts SET lid=? WHERE id=?`, db.enc(lid), id)
 	return err
 }
 
@@ -205,7 +228,7 @@ func (db *DB) InsertContact(ctx context.Context, accountID int64, jid, phone, na
 	now := time.Now().Unix()
 	res, err := db.ExecContext(ctx,
 		`INSERT INTO contacts (account_id, jid, phone, display_name, added_at, tracking_enabled)
-		 VALUES (?, ?, ?, ?, ?, 1)`, accountID, jid, phone, name, now)
+		 VALUES (?, ?, ?, ?, ?, 1)`, accountID, db.enc(jid), db.enc(phone), name, now)
 	if err != nil {
 		return Contact{}, err
 	}
@@ -390,8 +413,8 @@ func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
 		`INSERT OR IGNORE INTO messages
 		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, received_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.AccountID, nullInt64Ptr(m.ContactID), m.ChatJID, m.MessageID,
-		m.SenderJID, boolToInt(m.IsFromMe), m.Timestamp,
+		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
+		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
 		nullStr(m.Text), nullStr(m.MediaType), m.ReceivedAt)
 	if err != nil {
 		return Message{}, err
@@ -436,6 +459,8 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 			v := cid.Int64
 			m.ContactID = &v
 		}
+		m.ChatJID = db.dec(m.ChatJID)
+		m.SenderJID = db.dec(m.SenderJID)
 		m.IsFromMe = fromMe == 1
 		out = append(out, m)
 	}

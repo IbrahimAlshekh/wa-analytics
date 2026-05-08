@@ -15,6 +15,7 @@ const (
 	wsWriteTimeout = 10 * time.Second
 	wsPingPeriod   = 30 * time.Second
 	wsClientBuffer = 64
+	wsAuthTimeout  = 10 * time.Second
 )
 
 type Hub struct {
@@ -91,12 +92,14 @@ var defaultUpgrader = websocket.Upgrader{
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	upgrader := defaultUpgrader
 	upgrader.CheckOrigin = func(req *http.Request) bool {
+		origin := req.Header.Get("Origin")
 		if s.cfg.Dev {
 			return true
 		}
-		origin := req.Header.Get("Origin")
+		// Reject empty origin in production — prevents requests from non-browser scripts
+		// that omit the header, and simplifies the security model.
 		if origin == "" {
-			return true
+			return false
 		}
 		u, err := url.Parse(origin)
 		if err != nil {
@@ -110,6 +113,33 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("ws: upgrade failed", "remote", r.RemoteAddr, "err", err)
 		return
 	}
+
+	// Auth handshake: the client must send {"token":"<jwt>"} as the very first message.
+	conn.SetReadDeadline(time.Now().Add(wsAuthTimeout)) //nolint:errcheck
+	_, raw, err := conn.ReadMessage()
+	if err != nil {
+		slog.Warn("ws: auth read failed", "remote", conn.RemoteAddr(), "err", err)
+		conn.Close()
+		return
+	}
+	var authMsg struct {
+		Token string `json:"token"`
+	}
+	if json.Unmarshal(raw, &authMsg) != nil || authMsg.Token == "" {
+		_ = conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(4001, "auth required"))
+		conn.Close()
+		return
+	}
+	if _, err := ValidateToken(authMsg.Token, s.cfg.JWTKey); err != nil {
+		slog.Warn("ws: invalid token", "remote", conn.RemoteAddr())
+		_ = conn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(4001, "invalid token"))
+		conn.Close()
+		return
+	}
+	conn.SetReadDeadline(time.Time{}) //nolint:errcheck — clear deadline after auth
+
 	c := &wsClient{conn: conn, send: make(chan []byte, wsClientBuffer)}
 	s.hub.add(c)
 
@@ -154,7 +184,7 @@ func (c *wsClient) readPump(h *Hub) {
 		return nil
 	})
 	for {
-		// We don't expect client→server messages; just block until close.
+		// We don't expect client→server messages after auth; just block until close.
 		if _, _, err := c.conn.ReadMessage(); err != nil {
 			return
 		}

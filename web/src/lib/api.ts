@@ -12,7 +12,42 @@ function token(): string | null {
   return localStorage.getItem("wt_bearer");
 }
 
+/** Parse the expiry (exp) claim from a JWT without verifying the signature. */
+function tokenExpiry(t: string): number | null {
+  try {
+    const payload = JSON.parse(atob(t.split(".")[1]));
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Silently refresh the token if it expires within the next 30 minutes. */
+async function maybeRefresh(): Promise<void> {
+  const t = token();
+  if (!t) return;
+  const exp = tokenExpiry(t);
+  if (!exp) return;
+  const secsLeft = exp - Date.now() / 1000;
+  if (secsLeft > 30 * 60) return; // plenty of time left
+
+  try {
+    const res = await fetch(`${BASE}/refresh`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}` },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { token: string };
+      localStorage.setItem("wt_bearer", data.token);
+    }
+  } catch {
+    // Refresh failed silently — the next API call will handle the 401.
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  await maybeRefresh();
+
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const t = token();

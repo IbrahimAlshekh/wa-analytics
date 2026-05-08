@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/term"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/api"
@@ -44,12 +45,11 @@ func (h *AuditHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		// Use a basic logger just for the config error
 		slog.Error("load config", "err", err)
 		os.Exit(1)
 	}
 
-	// Handle subcommands
+	// Handle subcommands before starting the server.
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "user":
@@ -98,7 +98,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	store, err := db.Open(ctx, cfg.TrackerDBPath())
+	store, err := db.Open(ctx, cfg.TrackerDBPath(), cfg.DBKey)
 	if err != nil {
 		slog.Error("open tracker db", "path", cfg.TrackerDBPath(), "err", err)
 		os.Exit(1)
@@ -173,6 +173,7 @@ func main() {
 	srv := api.NewServer(api.Config{
 		Bearer: cfg.Bearer,
 		Dev:    cfg.Dev,
+		JWTKey: cfg.JWTKey,
 	}, store, manager, trackerMgr, hub)
 
 	httpSrv := &http.Server{
@@ -216,7 +217,7 @@ func handleUserCommand(cfg config.Config) {
 	}
 
 	ctx := context.Background()
-	store, err := db.Open(ctx, cfg.TrackerDBPath())
+	store, err := db.Open(ctx, cfg.TrackerDBPath(), cfg.DBKey)
 	if err != nil {
 		fmt.Printf("Failed to open database: %v\n", err)
 		os.Exit(1)
@@ -225,12 +226,30 @@ func handleUserCommand(cfg config.Config) {
 
 	switch os.Args[2] {
 	case "add":
-		if len(os.Args) < 5 {
-			fmt.Println("Usage: tracker user add <username> <password>")
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: tracker user add <username> [password]")
 			os.Exit(1)
 		}
 		username := os.Args[3]
-		password := os.Args[4]
+		var password string
+		if len(os.Args) >= 5 {
+			password = os.Args[4]
+			fmt.Fprintln(os.Stderr, "Warning: password passed as argument is visible in process list and shell history.")
+			fmt.Fprintln(os.Stderr, "Prefer: tracker user add <username>  (prompts securely)")
+		} else {
+			fmt.Print("Password: ")
+			raw, err := term.ReadPassword(int(os.Stdin.Fd()))
+			if err != nil {
+				fmt.Printf("\nFailed to read password: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println()
+			if len(raw) == 0 {
+				fmt.Println("Password cannot be empty.")
+				os.Exit(1)
+			}
+			password = string(raw)
+		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			fmt.Printf("Failed to hash password: %v\n", err)
@@ -264,6 +283,7 @@ func handleUserCommand(cfg config.Config) {
 		for _, u := range users {
 			fmt.Printf("- %s\n", u)
 		}
+
 	default:
 		fmt.Printf("Unknown user subcommand: %s\n", os.Args[2])
 		os.Exit(1)

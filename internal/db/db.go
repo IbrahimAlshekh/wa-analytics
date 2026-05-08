@@ -11,6 +11,8 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/crypto"
 )
 
 //go:embed migrations/*.sql
@@ -18,10 +20,14 @@ var migrationsFS embed.FS
 
 type DB struct {
 	*sql.DB
+	key []byte // 32-byte key for encrypting sensitive fields
 }
 
-// Open opens the SQLite database at path and applies any unapplied migrations.
-func Open(ctx context.Context, path string) (*DB, error) {
+// Open opens the SQLite database at path and applies SQL migrations.
+// key is the 32-byte encryption key used to encrypt/decrypt sensitive fields on read/write.
+// Run cmd/migrate-encryption once after the first deployment with encryption enabled to
+// convert any pre-existing plaintext rows — Open itself does not do that migration.
+func Open(ctx context.Context, path string, key []byte) (*DB, error) {
 	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", path)
 	sqlDB, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -36,7 +42,25 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		_ = sqlDB.Close()
 		return nil, err
 	}
-	return &DB{DB: sqlDB}, nil
+	return &DB{DB: sqlDB, key: key}, nil
+}
+
+// enc encrypts s using the DB's key. Already-encrypted values are returned unchanged.
+func (db *DB) enc(s string) string {
+	if crypto.IsEncrypted(s) {
+		return s // already encrypted (e.g. if called twice)
+	}
+	return crypto.Encrypt(s, db.key)
+}
+
+// dec decrypts s using the DB's key. Plaintext values (legacy) are returned unchanged.
+func (db *DB) dec(s string) string {
+	v, err := crypto.Decrypt(s, db.key)
+	if err != nil {
+		slog.Warn("db: decrypt failed", "err", err)
+		return s
+	}
+	return v
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {

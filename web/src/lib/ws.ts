@@ -10,13 +10,21 @@ class WSHub {
   start() {
     if (this.socket && this.socket.readyState <= 1) return;
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const tokenParam = (() => {
-      const t = localStorage.getItem("wt_bearer");
-      return t ? `?token=${encodeURIComponent(t)}` : "";
-    })();
-    const url = `${proto}://${location.host}/api/ws${tokenParam}`;
+    const url = `${proto}://${location.host}/api/ws`;
     const sock = new WebSocket(url);
     this.socket = sock;
+
+    sock.onopen = () => {
+      // Auth handshake: send token as first message after connection opens.
+      const t = localStorage.getItem("wt_bearer");
+      if (t) {
+        sock.send(JSON.stringify({ token: t }));
+      } else {
+        // No token — server will close with 4001.
+        sock.close();
+      }
+    };
+
     sock.onmessage = (evt) => {
       try {
         const msg = JSON.parse(evt.data) as WSEnvelope;
@@ -25,14 +33,22 @@ class WSHub {
         console.warn("ws parse error", e);
       }
     };
-    sock.onclose = () => {
+
+    sock.onclose = (evt) => {
       this.socket = null;
+      // Code 4001 = auth failed, don't reconnect.
+      if (evt.code === 4001) {
+        localStorage.removeItem("wt_bearer");
+        window.location.href = "/login";
+        return;
+      }
       if (this.reconnectTimer != null) return;
       this.reconnectTimer = window.setTimeout(() => {
         this.reconnectTimer = null;
         this.start();
       }, 2000);
     };
+
     sock.onerror = () => {
       sock.close();
     };

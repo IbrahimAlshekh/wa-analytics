@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
@@ -21,11 +23,14 @@ type Tracker interface {
 	SubscribeContact(ctx context.Context, c db.Contact)
 }
 
+// Config holds runtime configuration for the API server.
 type Config struct {
 	Bearer string
 	Dev    bool
+	JWTKey []byte // signing key for JWT tokens, derived from the app key
 }
 
+// Server handles all HTTP API and WebSocket requests.
 type Server struct {
 	cfg     Config
 	db      *db.DB
@@ -33,10 +38,18 @@ type Server struct {
 	tracker Tracker
 	hub     *Hub
 	mux     *http.ServeMux
+	limiter *rateLimiter
 }
 
 func NewServer(cfg Config, store *db.DB, manager *wa.ClientManager, trk Tracker, hub *Hub) *Server {
-	s := &Server{cfg: cfg, db: store, manager: manager, tracker: trk, hub: hub}
+	s := &Server{
+		cfg:     cfg,
+		db:      store,
+		manager: manager,
+		tracker: trk,
+		hub:     hub,
+		limiter: newRateLimiter(),
+	}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
@@ -63,6 +76,12 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Security headers on every response.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("X-XSS-Protection", "0")
+
 	if s.cfg.Dev {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
@@ -117,35 +136,34 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stats", apiAuth(s.handleStats))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))
 
-	// WebSocket
-	s.mux.Handle("GET /api/ws", apiAuth(s.handleWS))
+	// WebSocket (auth handled inside handleWS via first-message handshake)
+	s.mux.HandleFunc("GET /api/ws", s.handleWS)
 
 	// Auth
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
+	s.mux.Handle("POST /api/refresh", apiAuth(s.handleRefresh))
 
 	s.mux.Handle("/", staticHandler())
 }
 
 func (s *Server) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 1. Check for Bearer token (Legacy/System)
 		auth := r.Header.Get("Authorization")
-		if s.cfg.Bearer != "" && strings.HasPrefix(auth, "Bearer ") && auth[len("Bearer "):] == s.cfg.Bearer {
-			next.ServeHTTP(w, r)
-			return
+
+		// 1. Check static bearer token (legacy/system access).
+		if s.cfg.Bearer != "" && strings.HasPrefix(auth, "Bearer ") {
+			provided := []byte(auth[len("Bearer "):])
+			expected := []byte(s.cfg.Bearer)
+			if subtle.ConstantTimeCompare(provided, expected) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 
-		// 2. Check for JWT token
-		var tokenStr string
+		// 2. Check JWT token (Authorization header only — never query params).
 		if strings.HasPrefix(auth, "Bearer ") {
-			tokenStr = auth[len("Bearer "):]
-		} else {
-			tokenStr = r.URL.Query().Get("token")
-		}
-
-		if tokenStr != "" {
-			username, err := ValidateToken(tokenStr)
-			if err == nil && username != "" {
+			tokenStr := auth[len("Bearer "):]
+			if username, err := ValidateToken(tokenStr, s.cfg.JWTKey); err == nil && username != "" {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -154,6 +172,31 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		slog.Warn("unauthorized request", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
+}
+
+// handleRefresh issues a fresh token for an already-authenticated user.
+func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	username, err := ValidateToken(auth[len("Bearer "):], s.cfg.JWTKey)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, err)
+		return
+	}
+	token, err := GenerateToken(username, s.cfg.JWTKey)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"token": token})
+}
+
+// clientIP extracts the remote IP from a request, stripping the port.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -172,6 +215,7 @@ func writeErr(w http.ResponseWriter, status int, err error) {
 }
 
 func readJSON(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20) // 1 MB max
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	return dec.Decode(dst)
@@ -191,4 +235,67 @@ func parseCID(r *http.Request) (int64, error) {
 		return 0, errors.New("missing cid")
 	}
 	return strconv.ParseInt(v, 10, 64)
+}
+
+// --- Rate limiter -----------------------------------------------------------
+
+const (
+	rateLimitWindow   = 15 * time.Minute
+	rateLimitMaxFails = 5
+	rateLimitCleanup  = 5 * time.Minute
+)
+
+type rateLimiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+}
+
+func newRateLimiter() *rateLimiter {
+	rl := &rateLimiter{attempts: make(map[string][]time.Time)}
+	go rl.cleanupLoop()
+	return rl
+}
+
+// allow returns true if the IP has not exceeded the failure limit.
+// It prunes stale entries as a side effect.
+func (rl *rateLimiter) allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.prune(ip)
+	return len(rl.attempts[ip]) < rateLimitMaxFails
+}
+
+// record registers a failed attempt for ip.
+func (rl *rateLimiter) record(ip string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.attempts[ip] = append(rl.attempts[ip], time.Now())
+}
+
+func (rl *rateLimiter) prune(ip string) {
+	cutoff := time.Now().Add(-rateLimitWindow)
+	ts := rl.attempts[ip]
+	j := 0
+	for _, t := range ts {
+		if t.After(cutoff) {
+			ts[j] = t
+			j++
+		}
+	}
+	if j == 0 {
+		delete(rl.attempts, ip)
+	} else {
+		rl.attempts[ip] = ts[:j]
+	}
+}
+
+func (rl *rateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(rateLimitCleanup)
+	for range ticker.C {
+		rl.mu.Lock()
+		for ip := range rl.attempts {
+			rl.prune(ip)
+		}
+		rl.mu.Unlock()
+	}
 }
