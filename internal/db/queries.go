@@ -702,6 +702,12 @@ func (db *DB) ListUsers(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
+func (db *DB) HasUsers(ctx context.Context) (bool, error) {
+	var n int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
+	return n > 0, err
+}
+
 // --- Helpers ----------------------------------------------------------------
 
 func nullStr(s string) any {

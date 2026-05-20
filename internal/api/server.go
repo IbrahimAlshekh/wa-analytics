@@ -153,6 +153,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
 	s.mux.Handle("POST /api/refresh", apiAuth(s.handleRefresh))
 
+	// Setup (unauthenticated — only active before any user exists)
+	s.mux.HandleFunc("GET /api/setup/status", s.handleSetupStatus)
+	s.mux.HandleFunc("POST /api/setup/register", s.handleSetupRegister)
+
 	s.mux.Handle("/", staticHandler())
 }
 

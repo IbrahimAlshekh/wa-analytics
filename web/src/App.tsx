@@ -7,15 +7,18 @@ import Dashboard from "./pages/Dashboard";
 import ContactDetail from "./pages/ContactDetail";
 import Messages from "./pages/Messages";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const publicPaths = ["/login", "/register"];
+
   useEffect(() => {
     const token = localStorage.getItem("wt_bearer");
-    if (!token && location.pathname !== "/login") {
+    if (!token && !publicPaths.includes(location.pathname)) {
       navigate("/login");
     }
   }, [location, navigate]);
@@ -54,7 +57,7 @@ export default function App() {
     return off;
   }, [qc]);
 
-  const isLogin = location.pathname === "/login";
+  const isLogin = publicPaths.includes(location.pathname);
   const authed  = Boolean(localStorage.getItem("wt_bearer"));
 
   return (
@@ -80,6 +83,7 @@ export default function App() {
       <div className="container">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/" element={<Accounts />} />
           <Route path="/accounts/:id" element={<Dashboard />} />
           <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />
