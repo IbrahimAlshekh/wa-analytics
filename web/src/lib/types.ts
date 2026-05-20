@@ -16,6 +16,13 @@ export interface Contact {
   trackingEnabled: boolean;
 }
 
+export interface ContactsPage {
+  contacts: Contact[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export type TimelineKind = "presence" | "picture" | "about" | "message";
 
 export interface TimelineEntry {

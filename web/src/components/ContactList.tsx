@@ -15,11 +15,14 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+const PAGE_SIZE = 20;
+
 export default function ContactList({ accountId }: Props) {
   const qc = useQueryClient();
+  const [page, setPage] = useState(1);
   const contacts = useQuery({
-    queryKey: ["contacts", accountId],
-    queryFn: () => api.listContacts(accountId),
+    queryKey: ["contacts", accountId, page],
+    queryFn: () => api.listContacts(accountId, page, PAGE_SIZE),
   });
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -32,6 +35,7 @@ export default function ContactList({ accountId }: Props) {
     onSuccess: (data) => {
       setSyncMsg(`Synced ${data.synced} contacts from WhatsApp`);
       setTimeout(() => setSyncMsg(null), 4000);
+      setPage(1);
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) => setSyncMsg(`Sync failed: ${e instanceof Error ? e.message : String(e)}`),
@@ -44,6 +48,7 @@ export default function ContactList({ accountId }: Props) {
       setName("");
       setError(null);
       setShowForm(false);
+      setPage(1);
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) => setError(e instanceof Error ? e.message : String(e)),
@@ -57,8 +62,16 @@ export default function ContactList({ accountId }: Props) {
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteContact(accountId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
+    onSuccess: () => {
+      const remaining = (contacts.data?.contacts.length ?? 1) - 1;
+      if (remaining === 0 && page > 1) setPage((p) => p - 1);
+      qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+    },
   });
+
+  const total = contacts.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const list = contacts.data?.contacts ?? [];
 
   return (
     <div className="col" style={{ gap: 20 }}>
@@ -133,7 +146,7 @@ export default function ContactList({ accountId }: Props) {
             </tr>
           </thead>
           <tbody>
-            {(contacts.data ?? []).map((c: Contact) => (
+            {list.map((c: Contact) => (
               <ContactRow
                 key={c.id}
                 accountId={accountId}
@@ -146,7 +159,7 @@ export default function ContactList({ accountId }: Props) {
                 }}
               />
             ))}
-            {contacts.data && contacts.data.length === 0 && (
+            {contacts.data && list.length === 0 && (
               <tr>
                 <td colSpan={5}>
                   <div className="empty-state">
@@ -159,6 +172,55 @@ export default function ContactList({ accountId }: Props) {
             )}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        {total > 0 && (
+          <div
+            className="row"
+            style={{
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "10px 16px",
+              borderTop: "1px solid var(--border)",
+              fontSize: 13,
+            }}
+          >
+            <span className="muted">
+              {total === 0 ? "No contacts" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`}
+            </span>
+            <div className="row" style={{ gap: 4 }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 1}
+              >
+                ‹ Prev
+              </button>
+              {pageRange(page, totalPages).map((p, i) =>
+                p === null ? (
+                  <span key={`ellipsis-${i}`} className="muted" style={{ padding: "0 4px" }}>…</span>
+                ) : (
+                  <button
+                    key={p}
+                    className="btn btn-sm"
+                    aria-current={p === page ? "page" : undefined}
+                    onClick={() => setPage(p)}
+                    style={p === page ? { fontWeight: 700 } : undefined}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page === totalPages}
+              >
+                Next ›
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -245,6 +307,19 @@ function ContactRow({
       </td>
     </tr>
   );
+}
+
+// Returns page numbers with null representing ellipsis gaps.
+function pageRange(current: number, total: number): (number | null)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | null)[] = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+  if (left > 2) pages.push(null);
+  for (let p = left; p <= right; p++) pages.push(p);
+  if (right < total - 1) pages.push(null);
+  pages.push(total);
+  return pages;
 }
 
 function formatRelative(unix: number): string {

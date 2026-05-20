@@ -5,12 +5,15 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 	"go.mau.fi/whatsmeow/types"
 )
+
+const defaultPageLimit = 20
 
 type createContactReq struct {
 	Phone       string `json:"phone"`
@@ -22,24 +25,57 @@ type patchContactReq struct {
 	TrackingEnabled *bool   `json:"trackingEnabled,omitempty"`
 }
 
+type contactsPageResp struct {
+	Contacts []db.Contact `json:"contacts"`
+	Total    int          `json:"total"`
+	Page     int          `json:"page"`
+	Limit    int          `json:"limit"`
+}
+
 func (s *Server) handleListContacts(w http.ResponseWriter, r *http.Request) {
 	accountID, err := parseID(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	contacts, err := s.db.ListContacts(r.Context(), accountID)
+
+	page := 1
+	limit := defaultPageLimit
+	if v := r.URL.Query().Get("page"); v != "" {
+		if n, e := strconv.Atoi(v); e == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, e := strconv.Atoi(v); e == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+
+	total, err := s.db.CountContacts(r.Context(), accountID)
+	if err != nil {
+		slog.Error("contacts: count failed", "accountID", accountID, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	offset := (page - 1) * limit
+	contacts, err := s.db.ListContacts(r.Context(), accountID, limit, offset)
 	if err != nil {
 		slog.Error("contacts: list failed", "accountID", accountID, "err", err)
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	slog.Debug("contacts: listed", "accountID", accountID, "count", len(contacts))
 	if contacts == nil {
-		writeJSON(w, http.StatusOK, []any{})
-		return
+		contacts = []db.Contact{}
 	}
-	writeJSON(w, http.StatusOK, contacts)
+	slog.Debug("contacts: listed", "accountID", accountID, "page", page, "count", len(contacts), "total", total)
+	writeJSON(w, http.StatusOK, contactsPageResp{
+		Contacts: contacts,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+	})
 }
 
 func (s *Server) handleCreateContact(w http.ResponseWriter, r *http.Request) {

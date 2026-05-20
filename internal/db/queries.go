@@ -156,9 +156,17 @@ func (db *DB) decryptContact(c Contact) Contact {
 	return c
 }
 
-func (db *DB) ListContacts(ctx context.Context, accountID int64) ([]Contact, error) {
+func (db *DB) CountContacts(ctx context.Context, accountID int64) (int, error) {
+	var n int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM contacts WHERE account_id=?`, accountID).Scan(&n)
+	return n, err
+}
+
+func (db *DB) ListContacts(ctx context.Context, accountID int64, limit, offset int) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE account_id=? ORDER BY added_at DESC`, accountID)
+		`SELECT `+contactCols+` FROM contacts WHERE account_id=?
+		 ORDER BY tracking_enabled DESC, added_at DESC
+		 LIMIT ? OFFSET ?`, accountID, limit, offset)
 	if err != nil {
 		return nil, err
 	}

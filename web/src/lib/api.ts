@@ -3,6 +3,7 @@ import type {
   AnalyticsRange,
   AnalyticsReport,
   Contact,
+  ContactsPage,
   Message,
   StatsSummary,
   TimelineResponse,
@@ -93,8 +94,8 @@ export const api = {
   deleteAccount: (id: number) => request<void>("DELETE", `/accounts/${id}`),
 
   // Contacts (per-account)
-  listContacts: (accountId: number) =>
-    request<Contact[]>("GET", `/accounts/${accountId}/contacts`),
+  listContacts: (accountId: number, page = 1, limit = 20) =>
+    request<ContactsPage>("GET", `/accounts/${accountId}/contacts?page=${page}&limit=${limit}`),
   syncContacts: (accountId: number) =>
     request<{ synced: number }>("POST", `/accounts/${accountId}/contacts/sync`),
   createContact: (accountId: number, phone: string, displayName: string) =>
