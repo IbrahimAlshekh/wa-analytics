@@ -323,16 +323,34 @@
         state: started
         daemon_reload: yes
 
-    # ── nginx ─────────────────────────────────────────────────────────────────
+    # ── nginx + TLS ───────────────────────────────────────────────────────────
+    # Strategy:
+    #   1. Check cert existence up front.
+    #   2. First run: deploy HTTP-only config → issue cert via webroot → deploy HTTPS config.
+    #   3. Re-runs: cert exists → skip HTTP config + certbot → deploy HTTPS config (idempotent).
+    # certbot certonly --webroot never modifies nginx config, so re-running
+    # the playbook never clobbers the live HTTPS config.
 
-    - name: Deploy nginx vhost config
+    - name: Check if TLS certificate already exists
+      stat:
+        path: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+      register: cert_stat
+
+    - name: Create certbot webroot directory
+      file:
+        path: /var/www/certbot
+        state: directory
+        owner: root
+        mode: "0755"
+
+    - name: Deploy HTTP nginx config (cert not yet issued)
       template:
-        src: templates/nginx.conf.j2
+        src: templates/nginx-http.conf.j2
         dest: "/etc/nginx/sites-available/{{ service_name }}"
         owner: root
         group: root
         mode: "0644"
-      notify: Reload nginx
+      when: not cert_stat.stat.exists
 
     - name: Enable vhost
       file:
@@ -344,11 +362,6 @@
       file:
         path: /etc/nginx/sites-enabled/default
         state: absent
-      notify: Reload nginx
-
-    - name: Validate nginx configuration
-      command: nginx -t
-      changed_when: false
 
     - name: Enable and start nginx
       systemd:
@@ -356,28 +369,39 @@
         enabled: yes
         state: started
 
-    - name: Reload nginx to pick up new vhost
+    - name: Reload nginx before cert issuance
       systemd:
         name: nginx
         state: reloaded
+      when: not cert_stat.stat.exists
 
-    # ── TLS certificate ───────────────────────────────────────────────────────
-
-    - name: Check if TLS certificate already exists
-      stat:
-        path: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
-      register: cert_stat
-
-    - name: Issue Let's Encrypt certificate
+    - name: Issue Let's Encrypt certificate (webroot — never modifies nginx config)
       command: >
-        certbot --nginx
+        certbot certonly --webroot
+        -w /var/www/certbot
         -d {{ domain }}
         --non-interactive
         --agree-tos
         --email {{ email }}
-        --redirect
       when: not cert_stat.stat.exists
+
+    - name: Deploy HTTPS nginx config
+      template:
+        src: templates/nginx-https.conf.j2
+        dest: "/etc/nginx/sites-available/{{ service_name }}"
+        owner: root
+        group: root
+        mode: "0644"
       notify: Reload nginx
+
+    - name: Validate nginx configuration
+      command: nginx -t
+      changed_when: false
+
+    - name: Reload nginx to activate HTTPS config
+      systemd:
+        name: nginx
+        state: reloaded
 
     # ── Lock down service home after cert (no changes expected at runtime) ────
 
