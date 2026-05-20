@@ -40,5 +40,11 @@ sudo chmod +x "$BIN_DEST"
 echo "--- Starting service ---"
 sudo systemctl start "$SERVICE_NAME"
 
+# Reload nginx if it's running (picks up any config changes)
+if systemctl is-active --quiet nginx; then
+    echo "--- Reloading nginx ---"
+    sudo nginx -t && sudo systemctl reload nginx
+fi
+
 echo "--- Done ---"
 sudo systemctl status "$SERVICE_NAME" --no-pager

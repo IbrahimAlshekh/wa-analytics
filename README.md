@@ -41,6 +41,60 @@ make build           # builds web/ → internal/api/dist, then go build → bin/
 
 The Go binary contains the entire SPA via `//go:embed all:dist` in `internal/api/static.go`. No `web/dist` directory needs to be present at runtime.
 
+## Deployment
+
+Two scripts handle server setup and ongoing deploys.
+
+### First-time setup
+
+```bash
+bash scripts/setup-service.sh <domain> [email]
+```
+
+**Example:**
+```bash
+bash scripts/setup-service.sh my-app.com admin@my-app.com
+```
+
+If you omit the email you will be prompted for one (required for Let's Encrypt registration).
+
+What it does:
+
+1. Installs system dependencies (Go, Node, pnpm, nginx, build tools) if missing.
+2. Builds the binary and installs it to `/usr/local/bin/whatsapp-tracker`.
+3. Creates and enables a systemd service that runs the app on port `8888`.
+4. Writes an nginx reverse-proxy config for the domain and enables it.
+5. Runs `certbot --nginx` to issue a TLS certificate and configure HTTPS with an automatic HTTP → HTTPS redirect. Certificate auto-renewal is handled by certbot's built-in systemd timer.
+
+**Pre-requisite:** the domain's DNS `A` record must point to the server's IP before running — certbot's HTTP-01 challenge will fail otherwise.
+
+After the service starts for the first time it generates `~/.local/share/whatsapp-tracker/.env` with a random encryption key. **Back this file up immediately** — losing it makes all stored data unrecoverable.
+
+```bash
+# Add your first user after first start
+whatsapp-tracker user add <username>
+
+# Back up the key
+cat ~/.local/share/whatsapp-tracker/.env
+```
+
+### Deploying updates
+
+```bash
+bash scripts/deploy.sh
+```
+
+Stops the service, pulls `origin/main`, rebuilds, reinstalls the binary, restarts the service, and reloads nginx. Warns and prompts if the `.env` key file is missing before touching anything.
+
+### Useful commands after setup
+
+```bash
+systemctl status whatsapp-tracker        # app health
+journalctl -u whatsapp-tracker -f        # live app logs
+systemctl status nginx                   # nginx health
+certbot renew --dry-run                  # test cert renewal
+```
+
 ## Configuration
 
 All settings can be passed by flag or env var:

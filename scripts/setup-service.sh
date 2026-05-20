@@ -1,6 +1,23 @@
 #!/bin/bash
 set -e
 
+# --- Arguments ---
+DOMAIN="${1:-}"
+if [ -z "$DOMAIN" ]; then
+    echo "Usage: $0 <domain> [email]"
+    echo "  Example: $0 my-app.com admin@my-app.com"
+    exit 1
+fi
+
+EMAIL="${2:-}"
+if [ -z "$EMAIL" ]; then
+    read -rp "Email for Let's Encrypt certificate notifications: " EMAIL
+    if [ -z "$EMAIL" ]; then
+        echo "Email is required for certbot registration."
+        exit 1
+    fi
+fi
+
 # Configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -11,13 +28,13 @@ USER=$(whoami)
 WORKDIR="$PROJECT_ROOT"
 DATA_DIR="${WT_DATA_DIR:-$HOME/.local/share/whatsapp-tracker}"
 ENV_FILE="$DATA_DIR/.env"
+NGINX_CONF="/etc/nginx/sites-available/$SERVICE_NAME"
 
 cd "$PROJECT_ROOT"
 
 echo "--- Checking Dependencies ---"
 sudo apt-get update
 
-# Install build tools (make, gcc for CGO)
 echo "Ensuring build tools (make, gcc, curl) are installed..."
 sudo apt-get install -y build-essential curl git software-properties-common
 
@@ -42,6 +59,12 @@ if ! command -v pnpm &> /dev/null; then
     sudo npm install -g pnpm
 fi
 
+# Install nginx
+if ! command -v nginx &> /dev/null; then
+    echo "nginx not found. Installing..."
+    sudo apt-get install -y nginx
+fi
+
 echo "--- Building WhatsApp Tracker ---"
 make build
 
@@ -53,8 +76,6 @@ echo "--- Ensuring data directory exists ---"
 mkdir -p "$DATA_DIR"
 chmod 700 "$DATA_DIR"
 
-# The app generates .env with a random app key on first run.
-# If it already exists, leave it alone (never overwrite — key loss = data loss).
 if [ ! -f "$ENV_FILE" ]; then
     echo ""
     echo "NOTE: $ENV_FILE does not exist yet."
@@ -73,8 +94,6 @@ After=network.target
 Type=simple
 User=$USER
 WorkingDirectory=$WORKDIR
-# Load .env from the data directory. The '-' prefix means missing file is not an error
-# (the app will generate it on first run and systemd will pick it up on restart).
 EnvironmentFile=-$ENV_FILE
 Environment=WT_DATA_DIR=$DATA_DIR
 ExecStart=$BIN_DEST --listen :$PORT --enable-logs
@@ -90,11 +109,58 @@ sudo systemctl daemon-reload
 sudo systemctl enable $SERVICE_NAME
 sudo systemctl restart $SERVICE_NAME
 
+echo "--- Configuring nginx for $DOMAIN ---"
+cat <<EOF | sudo tee "$NGINX_CONF"
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location / {
+        proxy_pass http://127.0.0.1:$PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Enable the site and disable the default placeholder
+sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/$SERVICE_NAME
+sudo rm -f /etc/nginx/sites-enabled/default
+
+echo "--- Testing nginx configuration ---"
+sudo nginx -t
+
+echo "--- Starting nginx ---"
+sudo systemctl enable nginx
+sudo systemctl reload nginx || sudo systemctl start nginx
+
+echo "--- Issuing SSL certificate for $DOMAIN ---"
+echo "    Make sure $DOMAIN DNS A record points to this server's IP before continuing."
+sudo certbot --nginx \
+    -d "$DOMAIN" \
+    --non-interactive \
+    --agree-tos \
+    --email "$EMAIL" \
+    --redirect
+
+echo "--- Reloading nginx after SSL ---"
+sudo systemctl reload nginx
+
 echo ""
 echo "--- Setup Complete ---"
-echo "Service is running on port $PORT"
-echo "Check status with:  systemctl status $SERVICE_NAME"
-echo "View logs with:     journalctl -u $SERVICE_NAME -f"
+echo "Service is running on port $PORT (internal)"
+echo "nginx is proxying https://$DOMAIN -> localhost:$PORT"
+echo "SSL certificate auto-renewal is managed by certbot's systemd timer."
+echo ""
+echo "Check app status:   systemctl status $SERVICE_NAME"
+echo "View app logs:      journalctl -u $SERVICE_NAME -f"
+echo "Check nginx status: systemctl status nginx"
 echo ""
 echo "IMPORTANT — First run checklist:"
 echo "  1. Add your first user:  $BIN_DEST user add <username>"
