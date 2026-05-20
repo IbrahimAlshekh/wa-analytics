@@ -79,6 +79,12 @@ repo_url=git@github.com:ibrahimalshekh/whatsapp-tracker.git
 ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
 ```
 
+Or with the Makefile shortcut:
+
+```bash
+make setup
+```
+
 Or pass everything on the command line:
 
 ```bash

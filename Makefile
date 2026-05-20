@@ -5,7 +5,7 @@ BIN := bin/tracker
 MIGRATE_BIN := bin/migrate-encryption
 BACKFILL_BIN := bin/analytics-backfill
 
-.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build clean deploy
+.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build clean setup deploy
 
 dev:
 	@( cd web && (test -d node_modules || pnpm install) && pnpm dev ) & \
@@ -46,6 +46,9 @@ test:
 
 tidy:
 	go mod tidy
+
+setup:
+	ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
 
 deploy:
 	ansible-playbook ansible/deploy.yml -i ansible/inventory.ini
