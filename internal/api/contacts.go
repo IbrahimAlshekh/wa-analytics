@@ -6,6 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
+	"go.mau.fi/whatsmeow/types"
 )
 
 type createContactReq struct {
@@ -102,6 +106,59 @@ func (s *Server) handlePatchContact(w http.ResponseWriter, r *http.Request) {
 		go s.tracker.SubscribeContact(context.Background(), contact)
 	}
 	writeJSON(w, http.StatusOK, contact)
+}
+
+func (s *Server) handleSyncContacts(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	client := s.manager.GetByAccountID(accountID)
+	if client == nil {
+		writeErr(w, http.StatusNotFound, errors.New("account not found or not connected"))
+		return
+	}
+	n, err := SyncWAContacts(r.Context(), client, s.db, accountID)
+	if err != nil {
+		slog.Error("contacts: sync failed", "accountID", accountID, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	slog.Info("contacts: synced from WA store", "accountID", accountID, "total", n)
+	writeJSON(w, http.StatusOK, map[string]int{"synced": n})
+}
+
+// SyncWAContacts reads all contacts from the whatsmeow local store and inserts
+// any individual contacts not yet in tracker.db as untracked.
+// Returns the total number of contacts found in the WA store.
+func SyncWAContacts(ctx context.Context, client *wa.Client, store *db.DB, accountID int64) (int, error) {
+	contacts, err := client.GetAllContacts(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for jid, info := range contacts {
+		if jid.Server != types.DefaultUserServer {
+			continue // skip groups and other server types
+		}
+		if jid.User == "" {
+			continue
+		}
+		name := info.FullName
+		if name == "" {
+			name = info.PushName
+		}
+		if name == "" {
+			name = info.FirstName
+		}
+		if err := store.UpsertContactUntracked(ctx, accountID, jid.String(), jid.User, name); err != nil {
+			slog.Warn("contacts: upsert untracked failed", "jid", jid, "err", err)
+			continue
+		}
+		n++
+	}
+	return n, nil
 }
 
 func (s *Server) handleDeleteContact(w http.ResponseWriter, r *http.Request) {

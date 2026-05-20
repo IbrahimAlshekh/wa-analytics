@@ -224,6 +224,17 @@ func (db *DB) UpdateContactLID(ctx context.Context, id int64, lid string) error 
 	return err
 }
 
+// UpsertContactUntracked inserts a contact with tracking disabled if no contact
+// with that JID already exists for this account. Existing contacts are untouched.
+func (db *DB) UpsertContactUntracked(ctx context.Context, accountID int64, jid, phone, name string) error {
+	now := time.Now().Unix()
+	_, err := db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO contacts (account_id, jid, phone, display_name, added_at, tracking_enabled)
+		 VALUES (?, ?, ?, ?, ?, 0)`,
+		accountID, db.enc(jid), db.enc(phone), name, now)
+	return err
+}
+
 func (db *DB) InsertContact(ctx context.Context, accountID int64, jid, phone, name string) (Contact, error) {
 	now := time.Now().Unix()
 	res, err := db.ExecContext(ctx,

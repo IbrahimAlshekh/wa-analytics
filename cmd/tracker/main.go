@@ -133,6 +133,14 @@ func main() {
 		}
 		manager.RegisterPaired(acc.ID)
 		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval, mediaDir)
+		go func() {
+			n, err := api.SyncWAContacts(ctx, client, store, acc.ID)
+			if err != nil {
+				slog.Warn("main: contact sync failed after pairing", "accountID", acc.ID, "err", err)
+				return
+			}
+			slog.Info("main: synced contacts after pairing", "accountID", acc.ID, "count", n)
+		}()
 	}
 
 	// Load all already-paired accounts from the whatsmeow store.
@@ -171,6 +179,15 @@ func main() {
 			continue
 		}
 		startTracker(ctx, trackerMgr, client, store, hub, acc.ID, cfg.PollInterval, mediaDir)
+		accID := acc.ID
+		go func() {
+			n, err := api.SyncWAContacts(ctx, client, store, accID)
+			if err != nil {
+				slog.Warn("main: contact sync failed on startup", "accountID", accID, "err", err)
+				return
+			}
+			slog.Info("main: synced contacts on startup", "accountID", accID, "count", n)
+		}()
 	}
 
 	manager.ConnectAll(ctx)

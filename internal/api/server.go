@@ -129,6 +129,7 @@ func (s *Server) routes() {
 	// Contacts (per-account)
 	s.mux.Handle("GET /api/accounts/{id}/contacts", apiAuth(s.handleListContacts))
 	s.mux.Handle("POST /api/accounts/{id}/contacts", apiAuth(s.handleCreateContact))
+	s.mux.Handle("POST /api/accounts/{id}/contacts/sync", apiAuth(s.handleSyncContacts))
 	s.mux.Handle("PATCH /api/accounts/{id}/contacts/{cid}", apiAuth(s.handlePatchContact))
 	s.mux.Handle("DELETE /api/accounts/{id}/contacts/{cid}", apiAuth(s.handleDeleteContact))
 

@@ -247,6 +247,11 @@ func (c *Client) GetLIDForJID(ctx context.Context, jid types.JID) (types.JID, er
 	return u.LID, nil
 }
 
+// GetAllContacts returns all contacts from the local whatsmeow contact store.
+func (c *Client) GetAllContacts(ctx context.Context) (map[types.JID]types.ContactInfo, error) {
+	return c.device.Contacts.GetAllContacts(ctx)
+}
+
 // JIDFromPhone converts +1-415-555-1234 → 14155551234@s.whatsapp.net
 func JIDFromPhone(phone string) (types.JID, error) {
 	digits := normalizePhone(phone)

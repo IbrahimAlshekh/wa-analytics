@@ -95,6 +95,8 @@ export const api = {
   // Contacts (per-account)
   listContacts: (accountId: number) =>
     request<Contact[]>("GET", `/accounts/${accountId}/contacts`),
+  syncContacts: (accountId: number) =>
+    request<{ synced: number }>("POST", `/accounts/${accountId}/contacts/sync`),
   createContact: (accountId: number, phone: string, displayName: string) =>
     request<Contact>("POST", `/accounts/${accountId}/contacts`, { phone, displayName }),
   updateContact: (

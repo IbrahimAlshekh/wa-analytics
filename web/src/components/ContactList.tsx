@@ -25,6 +25,17 @@ export default function ContactList({ accountId }: Props) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  const syncMutation = useMutation({
+    mutationFn: () => api.syncContacts(accountId),
+    onSuccess: (data) => {
+      setSyncMsg(`Synced ${data.synced} contacts from WhatsApp`);
+      setTimeout(() => setSyncMsg(null), 4000);
+      qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+    },
+    onError: (e) => setSyncMsg(`Sync failed: ${e instanceof Error ? e.message : String(e)}`),
+  });
 
   const addMutation = useMutation({
     mutationFn: () => api.createContact(accountId, phone, name),
@@ -57,13 +68,27 @@ export default function ContactList({ accountId }: Props) {
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
           Contacts
         </h2>
-        <button
-          className={showForm ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
-          onClick={() => { setShowForm((v) => !v); setError(null); }}
-        >
-          {showForm ? "Cancel" : "+ Add contact"}
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            title="Import all contacts from WhatsApp (untracked)"
+          >
+            {syncMutation.isPending ? "Syncing…" : "Sync contacts"}
+          </button>
+          <button
+            className={showForm ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
+            onClick={() => { setShowForm((v) => !v); setError(null); }}
+          >
+            {showForm ? "Cancel" : "+ Add contact"}
+          </button>
+        </div>
       </div>
+
+      {syncMsg && (
+        <div style={{ fontSize: 13, color: "var(--fg-muted)", padding: "6px 0" }}>{syncMsg}</div>
+      )}
 
       {/* Add form */}
       {showForm && (
