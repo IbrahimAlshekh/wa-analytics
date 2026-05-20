@@ -45,7 +45,59 @@ The Go binary contains the entire SPA via `//go:embed all:dist` in `internal/api
 
 Two scripts handle server setup and ongoing deploys.
 
-### First-time setup
+### Ansible (recommended for remote servers)
+
+The `ansible/` directory contains a fully idempotent playbook. It connects as **root**, installs all dependencies, creates a restricted `whatsapptracker` service account, and hands ownership of only what the service needs to that account.
+
+**Security model:**
+
+| Path | Owner | Mode | Notes |
+|---|---|---|---|
+| `/home/whatsapptracker/bin/whatsapp-tracker` | `root` | `0750` | Service can execute, not overwrite |
+| `/home/whatsapptracker/.local/share/whatsapp-tracker/` | `whatsapptracker` | `0700` | App data + `.env` key |
+| `/etc/systemd/system/whatsapp-tracker.service` | `root` | `0644` | System file |
+| `/etc/nginx/sites-available/whatsapp-tracker` | `root` | `0644` | System file |
+
+`whatsapptracker` has no login shell, no password, no sudo — it can only run the binary and write to its data directory. The systemd unit also enables `NoNewPrivileges`, `PrivateTmp`, and `ProtectSystem` hardening flags.
+
+**1. Edit the inventory**
+
+```ini
+# ansible/inventory.ini
+[whatsapp_tracker]
+203.0.113.10 ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[whatsapp_tracker:vars]
+domain=my-app.com
+email=admin@my-app.com
+repo_url=git@github.com:ibrahimalshekh/whatsapp-tracker.git
+```
+
+**2. Run the playbook**
+
+```bash
+ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
+```
+
+Or pass everything on the command line:
+
+```bash
+ansible-playbook ansible/playbook.yml \
+  -i "203.0.113.10," \
+  -e "ansible_user=root" \
+  -e "ansible_ssh_private_key_file=~/.ssh/id_rsa" \
+  -e "domain=my-app.com" \
+  -e "email=admin@my-app.com" \
+  -e "repo_url=git@github.com:ibrahimalshekh/whatsapp-tracker.git"
+```
+
+The playbook is safe to re-run — it pulls latest code, rebuilds, reinstalls the binary (root-owned), and restarts the service. The TLS certificate step is skipped if a cert already exists.
+
+**Pre-requisite:** the domain's DNS `A` record must point to the server before the playbook runs, or the certbot step will fail.
+
+---
+
+### First-time setup (manual shell script)
 
 ```bash
 bash scripts/setup-service.sh <domain> [email]

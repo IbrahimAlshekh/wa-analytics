@@ -1,0 +1,313 @@
+---
+# Connects as root (ansible_user=root). No become required.
+# Creates a restricted 'whatsapptracker' service account that owns only its
+# own data directory. The binary is root-owned so the service cannot overwrite
+# itself if compromised.
+#
+# Usage:
+#   ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
+#
+# Required variables (set in inventory [vars] or via -e):
+#   domain    — public domain name (DNS A record must already point here)
+#   email     — Let's Encrypt registration email
+#   repo_url  — git URL of this repository
+
+- name: Deploy WhatsApp Tracker
+  hosts: whatsapp_tracker
+
+  vars:
+    # ── Service account ───────────────────────────────────────────────────────
+    service_user: whatsapptracker
+    service_home: /home/whatsapptracker
+
+    # ── Paths (all scoped under service_home) ─────────────────────────────────
+    bin_dir: "{{ service_home }}/bin"
+    bin_dest: "{{ bin_dir }}/whatsapp-tracker"
+    data_dir: "{{ service_home }}/.local/share/whatsapp-tracker"
+
+    # ── Build workspace (root-owned, discarded after build) ───────────────────
+    deploy_dir: /opt/whatsapp-tracker
+
+    # ── App ───────────────────────────────────────────────────────────────────
+    service_name: whatsapp-tracker
+    app_port: 8888
+
+    # ── Toolchain ─────────────────────────────────────────────────────────────
+    go_version: "1.25.6"
+    node_major: "20"
+
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart whatsapp-tracker
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted
+
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+  tasks:
+
+    # ── System packages ───────────────────────────────────────────────────────
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - build-essential
+          - curl
+          - git
+          - software-properties-common
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    # ── Go ────────────────────────────────────────────────────────────────────
+
+    - name: Check installed Go version
+      command: /usr/local/go/bin/go version
+      register: go_installed
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install Go {{ go_version }}
+      when: go_installed.failed or go_version not in go_installed.stdout
+      block:
+        - name: Download Go tarball
+          get_url:
+            url: "https://dl.google.com/go/go{{ go_version }}.linux-amd64.tar.gz"
+            dest: "/tmp/go{{ go_version }}.tar.gz"
+
+        - name: Remove previous Go installation
+          file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Extract Go
+          unarchive:
+            src: "/tmp/go{{ go_version }}.tar.gz"
+            dest: /usr/local
+            remote_src: yes
+
+        - name: Clean up tarball
+          file:
+            path: "/tmp/go{{ go_version }}.tar.gz"
+            state: absent
+
+    - name: Add Go to system PATH
+      copy:
+        dest: /etc/profile.d/golang.sh
+        content: 'export PATH=$PATH:/usr/local/go/bin'
+        mode: "0644"
+
+    # ── Node.js & pnpm ────────────────────────────────────────────────────────
+
+    - name: Add NodeSource repository
+      shell: "curl -fsSL https://deb.nodesource.com/setup_{{ node_major }}.x | bash -"
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+
+    - name: Install pnpm globally
+      command: npm install -g pnpm
+      args:
+        creates: /usr/local/bin/pnpm
+
+    # ── Restricted service account ────────────────────────────────────────────
+
+    - name: Create whatsapptracker system user
+      user:
+        name: "{{ service_user }}"
+        comment: "WhatsApp Tracker service account"
+        shell: /usr/sbin/nologin
+        home: "{{ service_home }}"
+        create_home: yes
+        system: yes
+        password: "!"   # locked — no password login possible
+
+    - name: Harden service home directory (no world access)
+      file:
+        path: "{{ service_home }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0750"
+
+    - name: Create binary directory (root-owned, executable by service user)
+      file:
+        path: "{{ bin_dir }}"
+        state: directory
+        owner: root
+        group: "{{ service_user }}"
+        mode: "0750"
+
+    - name: Create data directory (service user only)
+      file:
+        path: "{{ data_dir }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0700"
+
+    # ── Source & build (runs as root in isolated build dir) ───────────────────
+
+    - name: Clone or update repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ deploy_dir }}"
+        version: main
+        force: yes
+
+    - name: Build whatsapp-tracker
+      command: make build
+      args:
+        chdir: "{{ deploy_dir }}"
+      environment:
+        PATH: "/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"
+        CGO_ENABLED: "1"
+        HOME: /root
+      changed_when: true
+
+    # ── Install binary into service user's home (root owns it) ───────────────
+    # Root-owned binary means the service process cannot replace itself even if
+    # the whatsapptracker account is compromised.
+
+    - name: Install binary
+      copy:
+        src: "{{ deploy_dir }}/bin/tracker"
+        dest: "{{ bin_dest }}"
+        owner: root
+        group: "{{ service_user }}"
+        mode: "0750"
+        remote_src: yes
+      notify: Restart whatsapp-tracker
+
+    # ── First-run warning ─────────────────────────────────────────────────────
+
+    - name: Check if .env key file exists
+      stat:
+        path: "{{ data_dir }}/.env"
+      register: env_stat
+
+    - name: Warn about missing .env (first run only)
+      debug:
+        msg:
+          - "{{ data_dir }}/.env does not exist yet."
+          - "The app will generate it with a random encryption key on first start."
+          - "CRITICAL: back it up immediately — losing it makes all data unrecoverable."
+      when: not env_stat.stat.exists
+
+    # ── systemd service ───────────────────────────────────────────────────────
+
+    - name: Deploy systemd service unit
+      template:
+        src: templates/whatsapp-tracker.service.j2
+        dest: "/etc/systemd/system/{{ service_name }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart whatsapp-tracker
+
+    - name: Enable and start service
+      systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    # ── nginx ─────────────────────────────────────────────────────────────────
+
+    - name: Deploy nginx vhost config
+      template:
+        src: templates/nginx.conf.j2
+        dest: "/etc/nginx/sites-available/{{ service_name }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload nginx
+
+    - name: Enable vhost
+      file:
+        src: "/etc/nginx/sites-available/{{ service_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ service_name }}"
+        state: link
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+    - name: Validate nginx configuration
+      command: nginx -t
+      changed_when: false
+
+    - name: Enable and start nginx
+      systemd:
+        name: nginx
+        enabled: yes
+        state: started
+
+    - name: Reload nginx to pick up new vhost
+      systemd:
+        name: nginx
+        state: reloaded
+
+    # ── TLS certificate ───────────────────────────────────────────────────────
+
+    - name: Check if TLS certificate already exists
+      stat:
+        path: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+      register: cert_stat
+
+    - name: Issue Let's Encrypt certificate
+      command: >
+        certbot --nginx
+        -d {{ domain }}
+        --non-interactive
+        --agree-tos
+        --email {{ email }}
+        --redirect
+      when: not cert_stat.stat.exists
+      notify: Reload nginx
+
+    # ── Lock down service home after cert (no changes expected at runtime) ────
+
+    - name: Ensure service user cannot write outside data dir
+      file:
+        path: "{{ service_home }}"
+        state: directory
+        owner: "{{ service_user }}"
+        group: "{{ service_user }}"
+        mode: "0750"
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+
+    - name: Deployment complete
+      debug:
+        msg:
+          - "URL       : https://{{ domain }}"
+          - "Service   : systemctl status {{ service_name }}"
+          - "App logs  : journalctl -u {{ service_name }} -f"
+          - "Binary    : {{ bin_dest }} (root:{{ service_user }} 0750)"
+          - "Data dir  : {{ data_dir }} ({{ service_user }}:{{ service_user }} 0700)"
+          - ""
+          - "IMPORTANT: add your first user —  {{ bin_dest }} user add <username>"
+          - "IMPORTANT: back up the key file — {{ data_dir }}/.env"

@@ -1,0 +1,29 @@
+[Unit]
+Description=WhatsApp Tracker Service
+After=network.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+Group={{ service_user }}
+WorkingDirectory={{ service_home }}
+
+# '-' prefix: a missing .env is not an error — the app generates it on first run
+EnvironmentFile=-{{ data_dir }}/.env
+Environment=WT_DATA_DIR={{ data_dir }}
+ExecStart={{ bin_dest }} --listen :{{ app_port }} --enable-logs
+
+# Hardening: restrict what the service process can reach
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths={{ data_dir }}
+ProtectHome=yes
+# Allow read access to the binary in the service home
+ReadOnlyPaths={{ bin_dir }}
+
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
