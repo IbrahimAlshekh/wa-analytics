@@ -18,8 +18,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ReadWritePaths={{ data_dir }}
-ProtectHome=yes
-# Allow read access to the binary in the service home
+ProtectHome=read-only
 ReadOnlyPaths={{ bin_dir }}
 
 Restart=always
