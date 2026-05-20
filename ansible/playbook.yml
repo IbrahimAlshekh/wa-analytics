@@ -36,6 +36,9 @@
     go_version: "1.25.6"
     node_major: "20"
 
+    # Shorthand to avoid the inject_facts_as_vars deprecation warning
+    distro_release: "{{ ansible_facts['distribution_release'] }}"
+
   handlers:
     - name: Reload systemd
       systemd:
@@ -55,10 +58,47 @@
 
     # ── System packages ───────────────────────────────────────────────────────
 
+    # This server has a broken mixed-release state: sources.list is fully
+    # commented out (cloud-init managed), and sources.list.d had a 'noble'
+    # (24.04) universe entry that pulls gcc/cpp requiring libc6 >= 2.38,
+    # while the installed libc6 is still jammy's 2.35. Fix by:
+    #   1. Replacing the stale noble source with the correct jammy entry.
+    #   2. Writing a full jammy sources file via the Hetzner mirror.
+    #   3. Pinning the release to jammy so apt never auto-selects noble packages.
+
+    - name: Replace stale noble universe source with jammy
+      copy:
+        dest: /etc/apt/sources.list.d/archive_ubuntu_com_ubuntu.list
+        content: "deb http://archive.ubuntu.com/ubuntu {{ distro_release }} universe\n"
+        mode: "0644"
+
+    - name: Write complete Ubuntu apt sources (Hetzner mirror)
+      copy:
+        dest: /etc/apt/sources.list.d/ubuntu-base.list
+        content: |
+          deb https://mirror.hetzner.com/ubuntu/packages {{ distro_release }} main restricted universe multiverse
+          deb https://mirror.hetzner.com/ubuntu/packages {{ distro_release }}-updates main restricted universe multiverse
+          deb https://mirror.hetzner.com/ubuntu/packages {{ distro_release }}-backports main restricted universe multiverse
+          deb https://mirror.hetzner.com/ubuntu/security {{ distro_release }}-security main restricted universe multiverse
+        mode: "0644"
+
+    - name: Pin release to jammy to prevent noble packages
+      copy:
+        dest: /etc/apt/preferences.d/pin-release
+        content: |
+          Package: *
+          Pin: release n={{ distro_release }}
+          Pin-Priority: 900
+
+          Package: *
+          Pin: release n=noble
+          Pin-Priority: -1
+        mode: "0644"
+
     - name: Update apt cache
       apt:
         update_cache: yes
-        cache_valid_time: 3600
+        force_apt_get: yes
 
     - name: Install base packages
       apt:
@@ -123,10 +163,15 @@
         state: present
         update_cache: yes
 
+    - name: Check if pnpm is installed
+      command: pnpm --version
+      register: pnpm_check
+      ignore_errors: yes
+      changed_when: false
+
     - name: Install pnpm globally
       command: npm install -g pnpm
-      args:
-        creates: /usr/local/bin/pnpm
+      when: pnpm_check.failed
 
     # ── Restricted service account ────────────────────────────────────────────
 
@@ -163,6 +208,52 @@
         owner: "{{ service_user }}"
         group: "{{ service_user }}"
         mode: "0700"
+
+    # ── GitHub deploy key ─────────────────────────────────────────────────────
+
+    - name: Generate SSH deploy key (ed25519)
+      openssh_keypair:
+        path: /root/.ssh/github_deploy
+        type: ed25519
+        comment: "whatsapp-tracker deploy key"
+        state: present
+      register: deploy_key
+
+    - name: Add GitHub to known_hosts
+      known_hosts:
+        name: github.com
+        key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 github.com 2>/dev/null') }}"
+        path: /root/.ssh/known_hosts
+        state: present
+
+    - name: Configure SSH to use deploy key for github.com
+      copy:
+        dest: /root/.ssh/config
+        content: |
+          Host github.com
+            IdentityFile /root/.ssh/github_deploy
+            StrictHostKeyChecking yes
+        owner: root
+        mode: "0600"
+
+    - name: Show deploy public key — add this to GitHub before continuing
+      debug:
+        msg:
+          - "======================================================================"
+          - "NEW DEPLOY KEY GENERATED — add it to your GitHub repository:"
+          - "https://github.com/IbrahimAlshekh/wa-insights/settings/keys/new"
+          - ""
+          - "{{ deploy_key.public_key }}"
+          - ""
+          - "Title: whatsapp-tracker deploy key"
+          - "Allow write access: NO (read-only is enough)"
+          - "======================================================================"
+      when: deploy_key.changed
+
+    - name: Pause — press ENTER once the deploy key is added to GitHub
+      pause:
+        prompt: "Add the key shown above to GitHub, then press ENTER to continue"
+      when: deploy_key.changed
 
     # ── Source & build (runs as root in isolated build dir) ───────────────────
 
