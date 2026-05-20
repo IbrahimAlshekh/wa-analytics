@@ -44,7 +44,8 @@ export default function ContactDetail() {
   if (tl.error) return <div className="error">{(tl.error as Error).message}</div>;
   if (!tl.data) return null;
 
-  const { contact, entries } = tl.data;
+  const contact = tl.data.contact;
+  const entries = tl.data.entries ?? [];
   const displayName = contact.displayName || contact.phone;
 
   const lastPresence = [...entries].reverse().find((e) => e.kind === "presence");

@@ -302,9 +302,16 @@ function EmotionRow({
 }
 
 function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
-  const hasEmojis = language.topEmojisMe.length > 0 || language.topEmojisThem.length > 0;
-  const hasWords = language.topWordsMe.length > 0 || language.topWordsThem.length > 0;
-  const hasDomains = language.topDomainsMe.length > 0 || language.topDomainsThem.length > 0;
+  const topEmojisMe = language.topEmojisMe ?? [];
+  const topEmojisThem = language.topEmojisThem ?? [];
+  const topWordsMe = language.topWordsMe ?? [];
+  const topWordsThem = language.topWordsThem ?? [];
+  const topDomainsMe = language.topDomainsMe ?? [];
+  const topDomainsThem = language.topDomainsThem ?? [];
+
+  const hasEmojis = topEmojisMe.length > 0 || topEmojisThem.length > 0;
+  const hasWords = topWordsMe.length > 0 || topWordsThem.length > 0;
+  const hasDomains = topDomainsMe.length > 0 || topDomainsThem.length > 0;
 
   if (!hasEmojis && !hasWords && !hasDomains) return null;
 
@@ -319,7 +326,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
             <div>
               <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>You</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {language.topEmojisMe.map((tc) => (
+                {topEmojisMe.map((tc) => (
                   <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
                 ))}
               </div>
@@ -327,7 +334,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
             <div>
               <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Them</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {language.topEmojisThem.map((tc) => (
+                {topEmojisThem.map((tc) => (
                   <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
                 ))}
               </div>
@@ -340,8 +347,8 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>Top words</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <WordList label="You" tokens={language.topWordsMe} accent="var(--accent)" />
-            <WordList label="Them" tokens={language.topWordsThem} accent="var(--fg-muted)" />
+            <WordList label="You" tokens={topWordsMe} accent="var(--accent)" />
+            <WordList label="Them" tokens={topWordsThem} accent="var(--fg-muted)" />
           </div>
         </div>
       )}
@@ -353,7 +360,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
             <div>
               <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>You</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {language.topDomainsMe.map((tc) => (
+                {topDomainsMe.map((tc) => (
                   <DomainPill key={tc.token} token={tc.token} count={tc.count} />
                 ))}
               </div>
@@ -361,7 +368,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
             <div>
               <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Them</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {language.topDomainsThem.map((tc) => (
+                {topDomainsThem.map((tc) => (
                   <DomainPill key={tc.token} token={tc.token} count={tc.count} />
                 ))}
               </div>

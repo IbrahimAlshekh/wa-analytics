@@ -10,26 +10,27 @@ interface Props {
 }
 
 export default function PresencePanel({ entries }: Props) {
-  const hourlyData    = computePeakHours(entries);
-  const weekdayData   = computeWeekdayActivity(entries);
-  const trend30       = computeTrend30Days(entries);
-  const heatmapData   = computeHeatmap(entries);
+  const safeEntries = entries ?? [];
+  const hourlyData    = computePeakHours(safeEntries);
+  const weekdayData   = computeWeekdayActivity(safeEntries);
+  const trend30       = computeTrend30Days(safeEntries);
+  const heatmapData   = computeHeatmap(safeEntries);
 
-  const avgSession    = computeAvgSessionDuration(entries);
-  const longestSess   = computeLongestSession(entries);
-  const streak        = computeStreak(entries);
-  const { avgOnlineSec, trendPct } = computeDailyAvgOnline(entries);
-  const nightOwlPct   = computeNightOwlScore(entries);
-  const consistency   = computeConsistencyScore(entries);
-  const picFreqDays   = computePicChangeFrequency(entries);
-  const { firstSeen, lastSeen } = computeFirstLastSeen(entries);
-  const sleepWindow   = computeSleepWindow(entries);
-  const longestOffline = computeLongestOfflineStreak(entries);
+  const avgSession    = computeAvgSessionDuration(safeEntries);
+  const longestSess   = computeLongestSession(safeEntries);
+  const streak        = computeStreak(safeEntries);
+  const { avgOnlineSec, trendPct } = computeDailyAvgOnline(safeEntries);
+  const nightOwlPct   = computeNightOwlScore(safeEntries);
+  const consistency   = computeConsistencyScore(safeEntries);
+  const picFreqDays   = computePicChangeFrequency(safeEntries);
+  const { firstSeen, lastSeen } = computeFirstLastSeen(safeEntries);
+  const sleepWindow   = computeSleepWindow(safeEntries);
+  const longestOffline = computeLongestOfflineStreak(safeEntries);
 
   const patternSummary = computeOnlinePatternSummary(hourlyData);
 
-  const aboutHistory   = entries.filter((e) => e.kind === "about").sort((a, b) => b.at - a.at);
-  const pictureHistory = entries.filter((e) => e.kind === "picture" && e.url).sort((a, b) => b.at - a.at);
+  const aboutHistory   = safeEntries.filter((e) => e.kind === "about").sort((a, b) => b.at - a.at);
+  const pictureHistory = safeEntries.filter((e) => e.kind === "picture" && e.url).sort((a, b) => b.at - a.at);
 
   const hasPresence = hourlyData.some((d) => d.minutes > 0);
   if (!hasPresence) return null;
@@ -199,7 +200,7 @@ export default function PresencePanel({ entries }: Props) {
 
       {/* ── Export ── */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn" onClick={() => exportCSV(entries)}>Export CSV</button>
+        <button className="btn" onClick={() => exportCSV(safeEntries)}>Export CSV</button>
       </div>
 
     </div>

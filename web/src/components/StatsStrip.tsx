@@ -24,11 +24,10 @@ export default function StatsStrip({ accountId, contactId }: Props) {
     refetchInterval: 60_000,
   });
 
-  const data =
-    stats.data?.days.map((d) => ({
-      date: d.date.slice(5),
-      minutes: Math.round(d.onlineSeconds / 60),
-    })) ?? [];
+  const data = (stats.data?.days ?? []).map((d) => ({
+    date: d.date.slice(5),
+    minutes: Math.round(d.onlineSeconds / 60),
+  }));
 
   return (
     <div className="col" style={{ gap: 12 }}>

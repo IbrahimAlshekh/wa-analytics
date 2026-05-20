@@ -55,7 +55,7 @@ type Block =
   | { type: "event"; ev: NonPresence };
 
 export default function SessionTimeline({ entries }: Props) {
-  if (!entries.length) {
+  if (!entries?.length) {
     return <div className="muted">No events yet.</div>;
   }
 
