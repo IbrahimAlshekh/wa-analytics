@@ -14,6 +14,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/analytics"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
@@ -416,7 +417,8 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		MediaPath:  mediaPath,
 		ReceivedAt: now,
 	}
-	saved, err := t.db.InsertMessage(t.ctx, m)
+	f := analytics.ExtractFeatures(m.Text, time.Unix(m.Timestamp, 0))
+	saved, err := t.db.InsertMessageWithAnalytics(t.ctx, m, f)
 	if err != nil {
 		slog.Error("tracker: insert message failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
 		return

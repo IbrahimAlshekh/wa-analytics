@@ -1,0 +1,11 @@
+ALTER TABLE messages ADD COLUMN word_count INTEGER;
+ALTER TABLE messages ADD COLUMN char_count INTEGER;
+ALTER TABLE messages ADD COLUMN has_question INTEGER;
+ALTER TABLE messages ADD COLUMN has_laughter INTEGER;
+ALTER TABLE messages ADD COLUMN emoji_json TEXT;
+ALTER TABLE messages ADD COLUMN word_json TEXT;
+ALTER TABLE messages ADD COLUMN url_domain_json TEXT;
+ALTER TABLE messages ADD COLUMN emotion_mask INTEGER;
+ALTER TABLE messages ADD COLUMN emotion_counts_json TEXT;
+ALTER TABLE messages ADD COLUMN hour_local INTEGER;
+ALTER TABLE messages ADD COLUMN dow_local INTEGER;

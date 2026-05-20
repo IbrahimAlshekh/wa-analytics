@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import type { AnalyticsRange } from "../lib/types";
 import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
-import InsightsPanel from "../components/InsightsPanel";
+import PresencePanel from "../components/PresencePanel";
+import AnalyticsPanel from "../components/AnalyticsPanel";
 
 function getInitials(name: string): string {
   if (name.startsWith("+")) return name.slice(1, 3);
@@ -12,15 +15,29 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
+  { value: "day", label: "Daily" },
+  { value: "week", label: "Weekly" },
+  { value: "all", label: "General" },
+];
+
 export default function ContactDetail() {
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
   const cid = Number(cidStr);
 
+  const [range, setRange] = useState<AnalyticsRange>("week");
+
   const tl = useQuery({
     queryKey: ["timeline", accountId, cid],
     queryFn: () => api.timeline(accountId, cid, 0),
     refetchInterval: 30_000,
+  });
+
+  const analyticsQ = useQuery({
+    queryKey: ["analytics", accountId, cid, range],
+    queryFn: () => api.analytics(accountId, cid, range),
+    staleTime: 60_000,
   });
 
   if (tl.isLoading) return <div className="muted" style={{ padding: "48px 0", textAlign: "center" }}>Loading…</div>;
@@ -69,9 +86,37 @@ export default function ContactDetail() {
         </div>
       </div>
 
+      {/* Range tab strip */}
+      <div className="card" style={{ padding: "10px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
+            Analytics
+          </span>
+          <div className="tabs">
+            {RANGE_LABELS.map(({ value, label }) => (
+              <button
+                key={value}
+                className="btn"
+                aria-current={range === value}
+                onClick={() => setRange(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Analytics panel */}
+      {analyticsQ.data ? (
+        <AnalyticsPanel report={analyticsQ.data} />
+      ) : analyticsQ.isLoading ? (
+        <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>Loading analytics…</div>
+      ) : null}
+
       <StatsStrip accountId={accountId} contactId={cid} />
 
-      <InsightsPanel entries={entries} />
+      <PresencePanel entries={entries} />
 
       <div className="card">
         <div style={{ marginBottom: 16 }}>

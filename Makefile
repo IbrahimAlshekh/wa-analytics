@@ -3,8 +3,9 @@ SHELL := /bin/bash
 GO_PKG := ./...
 BIN := bin/tracker
 MIGRATE_BIN := bin/migrate-encryption
+BACKFILL_BIN := bin/analytics-backfill
 
-.PHONY: dev build build-migrate run test tidy web-install web-build clean
+.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build clean
 
 dev:
 	@( cd web && (test -d node_modules || pnpm install) && pnpm dev ) & \
@@ -27,6 +28,12 @@ build: web-build
 build-migrate:
 	mkdir -p bin
 	CGO_ENABLED=1 go build -o $(MIGRATE_BIN) ./cmd/migrate-encryption
+
+# Build the analytics backfill tool.
+# Run ./bin/analytics-backfill once after deploying analytics support.
+build-backfill:
+	mkdir -p bin
+	CGO_ENABLED=1 go build -o $(BACKFILL_BIN) ./cmd/analytics-backfill
 
 run: build
 	./$(BIN)

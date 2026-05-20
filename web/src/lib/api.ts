@@ -1,5 +1,7 @@
 import type {
   Account,
+  AnalyticsRange,
+  AnalyticsReport,
   Contact,
   Message,
   StatsSummary,
@@ -116,6 +118,12 @@ export const api = {
       `/accounts/${accountId}/contacts/${contactId}/messages?${q}`,
     );
   },
+  analytics: (accountId: number, contactId: number, range: AnalyticsRange) =>
+    request<AnalyticsReport>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/analytics?range=${range}`,
+    ),
+
   sendMessage: (accountId: number, contactId: number, text: string, file?: File) => {
     if (!file) {
       return request<{ id: string; timestamp: number }>(

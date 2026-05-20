@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ibrahimalshekh/whatsapp-tracker/internal/analytics"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/stats"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
@@ -311,7 +312,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		MediaPath:  mediaPath,
 		ReceivedAt: now,
 	}
-	_, _ = s.db.InsertMessage(r.Context(), m)
+	f := analytics.ExtractFeatures(m.Text, time.Unix(m.Timestamp, 0))
+	_, _ = s.db.InsertMessageWithAnalytics(r.Context(), m, f)
 
 	// Broadcast the outgoing message over WS so other dashboard instances see it.
 	s.hub.Broadcast("message", map[string]any{

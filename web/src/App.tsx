@@ -44,6 +44,7 @@ export default function App() {
           if (contactId != null) {
             qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
             qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
+            qc.invalidateQueries({ queryKey: ["analytics", accountId, contactId] });
             qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           }
           break;
