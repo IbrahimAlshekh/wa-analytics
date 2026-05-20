@@ -1,0 +1,64 @@
+---
+# Fast re-deploy playbook — assumes the full setup from playbook.yml has
+# already been applied. Only does: pull → build → install → restart.
+#
+# Usage:
+#   ansible-playbook ansible/deploy.yml -i ansible/inventory.ini
+
+- name: Re-deploy WhatsApp Tracker
+  hosts: whatsapp_tracker
+
+  vars:
+    service_user: whatsapptracker
+    service_home: /home/whatsapptracker
+    bin_dir: "{{ service_home }}/bin"
+    bin_dest: "{{ bin_dir }}/whatsapp-tracker"
+    deploy_dir: /opt/whatsapp-tracker
+    service_name: whatsapp-tracker
+
+  handlers:
+    - name: Restart whatsapp-tracker
+      systemd:
+        name: "{{ service_name }}"
+        state: restarted
+
+  tasks:
+
+    - name: Pull latest code
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ deploy_dir }}"
+        version: main
+        force: yes
+
+    - name: Build whatsapp-tracker
+      command: make build
+      args:
+        chdir: "{{ deploy_dir }}"
+      environment:
+        PATH: "/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin"
+        CGO_ENABLED: "1"
+        HOME: /root
+      changed_when: true
+
+    - name: Install binary
+      copy:
+        src: "{{ deploy_dir }}/bin/tracker"
+        dest: "{{ bin_dest }}"
+        owner: root
+        group: "{{ service_user }}"
+        mode: "0750"
+        remote_src: yes
+      notify: Restart whatsapp-tracker
+
+    - name: Ensure service is running
+      systemd:
+        name: "{{ service_name }}"
+        state: started
+        enabled: yes
+
+    - name: Deploy complete
+      debug:
+        msg:
+          - "Service   : systemctl status {{ service_name }}"
+          - "App logs  : journalctl -u {{ service_name }} -f"

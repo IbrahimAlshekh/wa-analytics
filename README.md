@@ -30,7 +30,7 @@ make web-install
 make dev
 ```
 
-Open <http://localhost:5173>. Pick QR or Phone Code on the Login page. Once linked, the dashboard appears.
+Open <http://localhost:5173>. On first run (no users in the DB) you land on the **register** page — create an account, then log in. Once authenticated, pair a WhatsApp account via QR or phone code from the Accounts page.
 
 ## Build & run a single binary
 
@@ -91,54 +91,36 @@ ansible-playbook ansible/playbook.yml \
   -e "repo_url=git@github.com:ibrahimalshekh/whatsapp-tracker.git"
 ```
 
-The playbook is safe to re-run — it pulls latest code, rebuilds, reinstalls the binary (root-owned), and restarts the service. The TLS certificate step is skipped if a cert already exists.
-
 **Pre-requisite:** the domain's DNS `A` record must point to the server before the playbook runs, or the certbot step will fail.
-
----
-
-### First-time setup (manual shell script)
-
-```bash
-bash scripts/setup-service.sh <domain> [email]
-```
-
-**Example:**
-```bash
-bash scripts/setup-service.sh my-app.com admin@my-app.com
-```
-
-If you omit the email you will be prompted for one (required for Let's Encrypt registration).
-
-What it does:
-
-1. Installs system dependencies (Go, Node, pnpm, nginx, build tools) if missing.
-2. Builds the binary and installs it to `/usr/local/bin/whatsapp-tracker`.
-3. Creates and enables a systemd service that runs the app on port `8888`.
-4. Writes an nginx reverse-proxy config for the domain and enables it.
-5. Runs `certbot --nginx` to issue a TLS certificate and configure HTTPS with an automatic HTTP → HTTPS redirect. Certificate auto-renewal is handled by certbot's built-in systemd timer.
-
-**Pre-requisite:** the domain's DNS `A` record must point to the server's IP before running — certbot's HTTP-01 challenge will fail otherwise.
 
 After the service starts for the first time it generates `~/.local/share/whatsapp-tracker/.env` with a random encryption key. **Back this file up immediately** — losing it makes all stored data unrecoverable.
 
 ```bash
-# Add your first user after first start
-whatsapp-tracker user add <username>
-
-# Back up the key
-cat ~/.local/share/whatsapp-tracker/.env
+# Back up the encryption key after first start
+ssh root@<server> "cat /home/whatsapptracker/.local/share/whatsapp-tracker/.env"
 ```
+
+Then open `https://<domain>` — because no user exists yet, the app redirects straight to the **register** page. Create your admin account there. Once an account exists, the register page is permanently closed; any further registration attempts are rejected by the server with `403`.
+
+---
 
 ### Deploying updates
 
+Once the initial setup is complete, use the dedicated deploy playbook instead of re-running the full `playbook.yml`. It skips all the setup steps and only does: **pull → build → install → restart**.
+
 ```bash
-bash scripts/deploy.sh
+ansible-playbook ansible/deploy.yml -i ansible/inventory.ini
 ```
 
-Stops the service, pulls `origin/main`, rebuilds, reinstalls the binary, restarts the service, and reloads nginx. Warns and prompts if the `.env` key file is missing before touching anything.
+Or with the Makefile shortcut:
 
-### Useful commands after setup
+```bash
+make deploy
+```
+
+The binary is only replaced if it actually changed, so `notify: Restart whatsapp-tracker` fires only when needed.
+
+### Useful commands
 
 ```bash
 systemctl status whatsapp-tracker        # app health
