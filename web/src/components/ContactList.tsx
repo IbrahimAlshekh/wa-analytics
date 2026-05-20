@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
@@ -17,12 +17,27 @@ function getInitials(name: string): string {
 
 const PAGE_SIZE = 20;
 
+function useDebounce(value: string, delay: number): string {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function ContactList({ accountId }: Props) {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounce(searchInput, 300);
+
+  // Reset to page 1 whenever the debounced search term changes.
+  useEffect(() => { setPage(1); }, [search]);
+
   const contacts = useQuery({
-    queryKey: ["contacts", accountId, page],
-    queryFn: () => api.listContacts(accountId, page, PAGE_SIZE),
+    queryKey: ["contacts", accountId, page, search],
+    queryFn: () => api.listContacts(accountId, page, PAGE_SIZE, search),
   });
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -102,6 +117,31 @@ export default function ContactList({ accountId }: Props) {
       {syncMsg && (
         <div style={{ fontSize: 13, color: "var(--fg-muted)", padding: "6px 0" }}>{syncMsg}</div>
       )}
+
+      {/* Search */}
+      <div style={{ position: "relative" }}>
+        <span style={{
+          position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+          color: "var(--fg-muted)", pointerEvents: "none", fontSize: 14,
+        }}>⌕</span>
+        <input
+          className="input"
+          style={{ width: "100%", paddingLeft: 30, boxSizing: "border-box" }}
+          placeholder="Search by name or phone…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        {searchInput && (
+          <button
+            style={{
+              position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--fg-muted)", fontSize: 16, lineHeight: 1, padding: "0 2px",
+            }}
+            onClick={() => setSearchInput("")}
+          >×</button>
+        )}
+      </div>
 
       {/* Add form */}
       {showForm && (

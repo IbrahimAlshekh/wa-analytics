@@ -94,8 +94,10 @@ export const api = {
   deleteAccount: (id: number) => request<void>("DELETE", `/accounts/${id}`),
 
   // Contacts (per-account)
-  listContacts: (accountId: number, page = 1, limit = 20) =>
-    request<ContactsPage>("GET", `/accounts/${accountId}/contacts?page=${page}&limit=${limit}`),
+  listContacts: (accountId: number, page = 1, limit = 20, search = "") => {
+    const q = search ? `&q=${encodeURIComponent(search)}` : "";
+    return request<ContactsPage>("GET", `/accounts/${accountId}/contacts?page=${page}&limit=${limit}${q}`);
+  },
   syncContacts: (accountId: number) =>
     request<{ synced: number }>("POST", `/accounts/${accountId}/contacts/sync`),
   createContact: (accountId: number, phone: string, displayName: string) =>

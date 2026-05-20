@@ -15,6 +15,29 @@ import (
 
 const defaultPageLimit = 20
 
+func filterContacts(contacts []db.Contact, q string) []db.Contact {
+	q = strings.ToLower(q)
+	out := contacts[:0:0]
+	for _, c := range contacts {
+		if strings.Contains(strings.ToLower(c.DisplayName), q) ||
+			strings.Contains(c.Phone, q) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func paginateContacts(contacts []db.Contact, offset, limit int) []db.Contact {
+	if offset >= len(contacts) {
+		return []db.Contact{}
+	}
+	end := offset + limit
+	if end > len(contacts) {
+		end = len(contacts)
+	}
+	return contacts[offset:end]
+}
+
 type createContactReq struct {
 	Phone       string `json:"phone"`
 	DisplayName string `json:"displayName"`
@@ -52,24 +75,44 @@ func (s *Server) handleListContacts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	total, err := s.db.CountContacts(r.Context(), accountID)
-	if err != nil {
-		slog.Error("contacts: count failed", "accountID", accountID, "err", err)
-		writeErr(w, http.StatusInternalServerError, err)
-		return
+	search := strings.TrimSpace(r.URL.Query().Get("q"))
+	offset := (page - 1) * limit
+
+	var (
+		contacts []db.Contact
+		total    int
+	)
+
+	if search != "" {
+		all, err := s.db.ListAllContacts(r.Context(), accountID)
+		if err != nil {
+			slog.Error("contacts: list all failed", "accountID", accountID, "err", err)
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		filtered := filterContacts(all, search)
+		total = len(filtered)
+		contacts = paginateContacts(filtered, offset, limit)
+	} else {
+		var err error
+		total, err = s.db.CountContacts(r.Context(), accountID)
+		if err != nil {
+			slog.Error("contacts: count failed", "accountID", accountID, "err", err)
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		contacts, err = s.db.ListContacts(r.Context(), accountID, limit, offset)
+		if err != nil {
+			slog.Error("contacts: list failed", "accountID", accountID, "err", err)
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		if contacts == nil {
+			contacts = []db.Contact{}
+		}
 	}
 
-	offset := (page - 1) * limit
-	contacts, err := s.db.ListContacts(r.Context(), accountID, limit, offset)
-	if err != nil {
-		slog.Error("contacts: list failed", "accountID", accountID, "err", err)
-		writeErr(w, http.StatusInternalServerError, err)
-		return
-	}
-	if contacts == nil {
-		contacts = []db.Contact{}
-	}
-	slog.Debug("contacts: listed", "accountID", accountID, "page", page, "count", len(contacts), "total", total)
+	slog.Debug("contacts: listed", "accountID", accountID, "page", page, "count", len(contacts), "total", total, "search", search)
 	writeJSON(w, http.StatusOK, contactsPageResp{
 		Contacts: contacts,
 		Total:    total,

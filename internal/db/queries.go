@@ -182,6 +182,25 @@ func (db *DB) ListContacts(ctx context.Context, accountID int64, limit, offset i
 	return out, rows.Err()
 }
 
+func (db *DB) ListAllContacts(ctx context.Context, accountID int64) ([]Contact, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE account_id=?
+		 ORDER BY tracking_enabled DESC, added_at DESC`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Contact
+	for rows.Next() {
+		c, err := scanContact(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, db.decryptContact(c))
+	}
+	return out, rows.Err()
+}
+
 func (db *DB) ListTrackedContacts(ctx context.Context, accountID int64) ([]Contact, error) {
 	rows, err := db.QueryContext(ctx,
 		`SELECT `+contactCols+` FROM contacts WHERE account_id=? AND tracking_enabled=1`, accountID)
