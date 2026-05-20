@@ -2,19 +2,19 @@ import { useEffect } from "react";
 import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
+import AccountLayout from "./components/AccountLayout";
 import Accounts from "./pages/Accounts";
-import Dashboard from "./pages/Dashboard";
 import ContactDetail from "./pages/ContactDetail";
 import Messages from "./pages/Messages";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
+const publicPaths = ["/login", "/register"];
+
 export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const publicPaths = ["/login", "/register"];
 
   useEffect(() => {
     const token = localStorage.getItem("wt_bearer");
@@ -33,21 +33,22 @@ export default function App() {
           break;
         case "presence": {
           const { accountId, contactId } = msg;
+          qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
           qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
           break;
         }
         case "picture":
-        case "about": {
+        case "about":
           qc.invalidateQueries({ queryKey: ["timeline"] });
           break;
-        }
         case "message": {
           const { accountId, contactId } = msg;
           if (contactId != null) {
             qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
             qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
             qc.invalidateQueries({ queryKey: ["analytics", accountId, contactId] });
+            qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
             qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           }
           break;
@@ -58,10 +59,10 @@ export default function App() {
   }, [qc]);
 
   const isLogin = publicPaths.includes(location.pathname);
-  const authed  = Boolean(localStorage.getItem("wt_bearer"));
+  const authed = Boolean(localStorage.getItem("wt_bearer"));
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header className="app-bar">
         <Link to="/" className="app-logo">
           <div className="app-logo-mark">W</div>
@@ -80,16 +81,42 @@ export default function App() {
           </button>
         )}
       </header>
-      <div className="container">
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/" element={<Accounts />} />
-          <Route path="/accounts/:id" element={<Dashboard />} />
-          <Route path="/accounts/:id/contacts/:cid" element={<ContactDetail />} />
-          <Route path="/accounts/:id/contacts/:cid/messages" element={<Messages />} />
-        </Routes>
-      </div>
+
+      <Routes>
+        {/* Public */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        {/* Accounts overview — centered container */}
+        <Route
+          path="/"
+          element={
+            <div className="container">
+              <Accounts />
+            </div>
+          }
+        />
+
+        {/* Account area — sidebar layout */}
+        <Route path="/accounts/:id" element={<AccountLayout />}>
+          <Route
+            index
+            element={
+              <div className="main-empty">
+                <div className="main-empty-icon">👤</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>
+                  Select a contact
+                </div>
+                <div className="muted">
+                  Choose a contact from the sidebar to view their details
+                </div>
+              </div>
+            }
+          />
+          <Route path="contacts/:cid" element={<ContactDetail />} />
+          <Route path="contacts/:cid/messages" element={<Messages />} />
+        </Route>
+      </Routes>
     </div>
   );
 }

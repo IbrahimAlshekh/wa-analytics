@@ -42,12 +42,21 @@ export default function Messages() {
   }, [data]);
 
   return (
-    <div className="col" style={{ gap: 16, height: "calc(100vh - 100px)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 
       {/* Header */}
-      <div className="row" style={{ justifyContent: "space-between", flexShrink: 0 }}>
+      <div
+        className="row"
+        style={{
+          justifyContent: "space-between",
+          flexShrink: 0,
+          padding: "12px 20px",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--card)",
+        }}
+      >
         <div className="breadcrumb">
-          <Link to={`/accounts/${accountId}/contacts/${cid}`}>Contact</Link>
+          <Link to={`/accounts/${accountId}/contacts/${cid}`}>← Back</Link>
           <span className="breadcrumb-sep">/</span>
           <span>Messages</span>
         </div>
@@ -56,10 +65,24 @@ export default function Messages() {
         </span>
       </div>
 
-      {isLoading && <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>Loading…</div>}
-      {error && <div className="error">{(error as Error).message}</div>}
+      {isLoading && (
+        <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>
+          Loading…
+        </div>
+      )}
+      {error && <div className="error" style={{ padding: "8px 20px" }}>{(error as Error).message}</div>}
 
-      <div className="messages-list" style={{ flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+      {/* Messages list */}
+      <div
+        className="messages-list"
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          padding: "8px 20px",
+        }}
+      >
         {msgs.length === 0 && !isLoading && (
           <div className="empty-state">
             <div className="empty-state-icon">💬</div>
@@ -84,7 +107,15 @@ export default function Messages() {
         ))}
       </div>
 
-      <div style={{ flexShrink: 0 }}>
+      {/* Input bar */}
+      <div
+        style={{
+          flexShrink: 0,
+          padding: "12px 20px",
+          borderTop: "1px solid var(--border)",
+          background: "var(--card)",
+        }}
+      >
         <MessageInput
           onSend={(text, file) => sendMutation.mutate({ text, file })}
           disabled={sendMutation.isPending}

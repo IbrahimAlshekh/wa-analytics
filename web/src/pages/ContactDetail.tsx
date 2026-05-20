@@ -54,13 +54,6 @@ export default function ContactDetail() {
   return (
     <div className="col" style={{ gap: 20 }}>
 
-      {/* Breadcrumb */}
-      <div className="breadcrumb">
-        <Link to={`/accounts/${accountId}`}>Contacts</Link>
-        <span className="breadcrumb-sep">/</span>
-        <span>{displayName}</span>
-      </div>
-
       {/* Contact hero */}
       <div className="contact-hero">
         <div className="avatar avatar-lg">{getInitials(displayName)}</div>

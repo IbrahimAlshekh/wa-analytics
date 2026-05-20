@@ -633,6 +633,135 @@ h1, h2, h3, h4 {
 /* ── Divider ────────────────────────────────────────────────────────── */
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 
+/* ── Account layout (sidebar + main) ───────────────────────────────── */
+.account-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 264px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-subtle);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  --sidebar-bg: var(--bg-subtle);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 12px 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.sidebar-sync-msg {
+  padding: 2px 12px 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.sidebar-add-form {
+  padding: 0 10px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.sidebar-search {
+  padding: 4px 10px 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-contacts {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.sidebar-contact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  text-decoration: none !important;
+  color: var(--fg);
+  cursor: pointer;
+  transition: background var(--ease);
+  border-left: 2px solid transparent;
+}
+.sidebar-contact:hover { background: var(--card); text-decoration: none; }
+
+.sidebar-contact-active {
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+.sidebar-contact-active:hover { background: var(--accent-dim); }
+
+.sidebar-paused-tag {
+  font-size: 10px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  background: var(--border);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.sidebar-load-more {
+  width: 100%;
+  border-radius: 0;
+  font-size: 12px;
+  padding: 10px;
+  color: var(--fg-muted);
+}
+
+/* Main content area */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  min-width: 0;
+}
+
+/* Messages route needs its own internal scroll */
+.main-content-messages {
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Empty state shown when no contact is selected */
+.main-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  color: var(--fg-muted);
+  text-align: center;
+  padding: 40px;
+}
+.main-empty-icon { font-size: 40px; opacity: 0.25; margin-bottom: 4px; }
+
 /* ── Legacy shims (keep existing references working) ────────────────── */
 .header {
   display: flex;
