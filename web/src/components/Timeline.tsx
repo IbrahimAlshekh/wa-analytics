@@ -192,7 +192,9 @@ function buildBlocks(entries: TimelineEntry[]): Block[] {
 
   for (const p of presence) {
     if (p.state === "available") {
-      sessionStart = p.at;
+      // Keep the FIRST "available" as the session start; consecutive available
+      // events (from message receipts or resub noise) must not push it forward.
+      if (sessionStart === null) sessionStart = p.at;
       sessionLastSeen = null;
     } else if (p.state === "unavailable" && sessionStart != null) {
       const dur = p.at - sessionStart;

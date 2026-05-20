@@ -315,8 +315,11 @@ func (t *Tracker) onPresence(p *events.Presence) {
 
 	prev, _ := t.db.LatestPresence(t.ctx, c.ID)
 	sameState := prev.State == state
-	sameLastSeen := equalIntPtr(prev.LastSeen, lastSeen)
-	if sameState && sameLastSeen {
+	// For "available" deduplicate on state alone — consecutive available events
+	// are the same ongoing session regardless of whether lastSeen changes.
+	// For "unavailable" also require lastSeen to match so a new last-seen
+	// timestamp from WhatsApp still gets stored.
+	if sameState && (state == "available" || equalIntPtr(prev.LastSeen, lastSeen)) {
 		slog.Debug("tracker: presence unchanged, skipping", "accountID", t.accountID, "jid", jidStr, "state", state)
 		return
 	}
@@ -427,16 +430,21 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		slog.Debug("tracker: message stored", "accountID", t.accountID, "messageID", info.ID, "chat", chatStr, "from", senderStr)
 	}
 
-	// If we found a contact, also record a presence event to mark them active/online.
+	// If we found a contact, record an "available" presence event — but only
+	// if the contact isn't already marked online, so incoming messages don't
+	// push the session start forward with every new message.
 	if contactID != nil && !info.IsFromMe {
-		_, _ = t.db.InsertPresence(t.ctx, *contactID, "available", nil, now)
-		t.hub.Broadcast("presence", map[string]any{
-			"accountId":  t.accountID,
-			"contactId":  *contactID,
-			"jid":        senderStr,
-			"state":      "available",
-			"observedAt": now,
-		})
+		prev, _ := t.db.LatestPresence(t.ctx, *contactID)
+		if prev.State != "available" {
+			_, _ = t.db.InsertPresence(t.ctx, *contactID, "available", nil, now)
+			t.hub.Broadcast("presence", map[string]any{
+				"accountId":  t.accountID,
+				"contactId":  *contactID,
+				"jid":        senderStr,
+				"state":      "available",
+				"observedAt": now,
+			})
+		}
 	}
 
 	t.hub.Broadcast("message", map[string]any{
