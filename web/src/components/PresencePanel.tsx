@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import type { Contact, TimelineEntry } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
+import { InfoTooltip } from "./InfoTooltip";
 
 interface Props {
   entries: TimelineEntry[];
@@ -43,16 +44,80 @@ export default function PresencePanel({ entries, contact }: Props) {
 
       {/* ── Presence stat cards ── */}
       <div className="card" style={{ padding: "14px 16px" }}>
-        <div className="muted" style={{ fontSize: 10, fontWeight: 600, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.07em" }}>Presence</div>
+        <div style={{ marginBottom: 12 }}>
+          <div className="muted" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", display: "flex", alignItems: "center" }}>
+            Presence
+            <InfoTooltip text="These metrics are computed from WhatsApp presence events — when the contact appeared online or went offline. Accuracy depends on how long tracking has been active and whether WhatsApp presence visibility is enabled for this contact." />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 3, lineHeight: 1.45, opacity: 0.8 }}>
+            Online activity summary based on tracked presence events.
+          </div>
+        </div>
         <div className="stats" style={{ marginBottom: 0 }}>
-          {avgSession    != null && <StatCard label="Avg session"          value={formatDuration(avgSession)} />}
-          {longestSess   != null && <StatCard label="Longest session"      value={formatDuration(longestSess)} />}
-          {avgOnlineSec  != null && <StatCard label="Daily avg online"     value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")} />}
-          {streak        != null && <StatCard label={streak.online ? "Online streak" : "Offline for"} value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)} />}
-          {longestOffline!= null && <StatCard label="Longest offline"      value={`${longestOffline}d`} />}
-          {nightOwlPct   != null && <StatCard label="Night owl"            value={`${nightOwlPct}%`} />}
-          {consistency   != null && <StatCard label="Consistency"          value={`${consistency}/100`} />}
-          {picFreqDays   != null && <StatCard label="Pic changes"          value={`every ${picFreqDays}d`} />}
+          {avgSession != null && (
+            <StatCard
+              label="Avg session"
+              value={formatDuration(avgSession)}
+              description="Average duration of a single online session."
+              info="Short sessions (&lt;3 min) suggest quick message checks; longer sessions mean active browsing. Combined with peak hours, this reveals their daily phone habits."
+            />
+          )}
+          {longestSess != null && (
+            <StatCard
+              label="Longest session"
+              value={formatDuration(longestSess)}
+              description="Single longest continuous time online."
+              info="An unusually long session may indicate a video call, a busy work period, or a day spent on the phone. Compare it to the average to see how typical it was."
+            />
+          )}
+          {avgOnlineSec != null && (
+            <StatCard
+              label="Daily avg online"
+              value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")}
+              description="Average online time per day. ▲▼ = change vs. prior week."
+              info="Compare this to your own online time to gauge whether you're both active at similar intensities. A rising trend means they've been using WhatsApp more recently."
+            />
+          )}
+          {streak != null && (
+            <StatCard
+              label={streak.online ? "Online streak" : "Offline for"}
+              value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)}
+              description={streak.online ? "Consecutive days seen online." : "Time since last seen online."}
+              info={streak.online ? "A long active streak means they use WhatsApp consistently every day. Useful for knowing they're reliably reachable." : "They haven't appeared online since this time. This could mean the app is closed, presence is hidden, or they are inactive."}
+            />
+          )}
+          {longestOffline != null && (
+            <StatCard
+              label="Longest offline"
+              value={`${longestOffline}d`}
+              description="Longest gap between any two active days."
+              info="A long offline streak may mark a trip, illness, or a period off WhatsApp entirely. Comparing it to the tracking period shows whether this was unusual or routine."
+            />
+          )}
+          {nightOwlPct != null && (
+            <StatCard
+              label="Night owl"
+              value={`${nightOwlPct}%`}
+              description="Share of online time between midnight and 5am."
+              info="A high score (>20%) suggests late-night habits, shift work, or a different time zone. This is the best time to reach them if you want a faster reply late at night."
+            />
+          )}
+          {consistency != null && (
+            <StatCard
+              label="Consistency"
+              value={`${consistency}/100`}
+              description="How predictable their online schedule is."
+              info="High consistency (>70) means their schedule is very regular — you can reliably reach them at the same times each day. Low consistency (below 30) means their WhatsApp usage is sporadic and hard to predict."
+            />
+          )}
+          {picFreqDays != null && (
+            <StatCard
+              label="Pic changes"
+              value={`every ${picFreqDays}d`}
+              description="Average days between profile picture changes."
+              info="Frequent changes (every few days) signal someone socially active or going through life changes. Rare changes (>90 days) suggest a stable or more private persona."
+            />
+          )}
         </div>
       </div>
 
@@ -60,20 +125,32 @@ export default function PresencePanel({ entries, contact }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         {patternSummary && (
           <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11 }}>Peak hours</div>
-            <div style={{ marginTop: 4, fontWeight: 600, color: "var(--accent)" }}>{patternSummary}</div>
+            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
+              Peak hours
+              <InfoTooltip text="The best window to send a message and get a timely reply. If their peak hours don't overlap with yours, expect longer response gaps even when they're active." />
+            </div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Hours with activity above 50% of their peak</div>
+            <div style={{ marginTop: 6, fontWeight: 600, color: "var(--accent)" }}>{patternSummary}</div>
           </div>
         )}
         {sleepWindow && (
           <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11 }}>Sleep window (est.)</div>
-            <div style={{ marginTop: 4, fontWeight: 600 }}>{sleepWindow}</div>
+            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
+              Sleep window (est.)
+              <InfoTooltip text="Knowing their estimated sleep window helps you avoid sending messages at inappropriate hours and better understand their daily rhythm. Requires at least 3 recurring overnight offline gaps (≥3h, starting 8pm–4am) to compute." />
+            </div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Estimated from recurring overnight offline gaps</div>
+            <div style={{ marginTop: 6, fontWeight: 600 }}>{sleepWindow}</div>
           </div>
         )}
         {firstSeen && (
           <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11 }}>Tracking period</div>
-            <div style={{ marginTop: 4, fontSize: 13 }}>
+            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
+              Tracking period
+              <InfoTooltip text="Longer tracking periods produce more accurate patterns — at least 2 weeks is needed for reliable daily averages, and 4+ weeks for streak and sleep estimates. Short periods may not reflect long-term behavior." />
+            </div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Date range of recorded presence events</div>
+            <div style={{ marginTop: 6, fontSize: 13 }}>
               <span>{formatDate(firstSeen)}</span>
               <span className="muted"> → </span>
               <span>{formatDate(lastSeen!)}</span>
@@ -92,8 +169,11 @@ export default function PresencePanel({ entries, contact }: Props) {
         {/* Hourly + Weekday patterns side-by-side */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Peak Activity Hours</div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes by hour of day</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
+              Peak Activity Hours
+              <InfoTooltip text="If their peak hours don't overlap with yours, most messages will sit unread for hours before a reply — which can feel like low engagement even when they're active. Use this to find the best time to reach them." />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Total online minutes per hour of the day across all tracked days</div>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
                 <BarChart data={hourlyData} barCategoryGap="20%">
@@ -108,8 +188,11 @@ export default function PresencePanel({ entries, contact }: Props) {
           </div>
 
           <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Most Active Days</div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes by day of week</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
+              Most Active Days
+              <InfoTooltip text="Weekend vs. weekday peaks reveal the nature of their WhatsApp usage. High weekend activity often signals personal, social use. High weekday activity may indicate professional use or habit. Weekends are shown in a different color." />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Total online minutes per day of the week (weekends highlighted)</div>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
                 <BarChart data={weekdayData} barCategoryGap="20%">
@@ -131,8 +214,11 @@ export default function PresencePanel({ entries, contact }: Props) {
         {/* Activity Heatmap — full width */}
         {heatmapData.length > 0 && (
           <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>Activity Heatmap</div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>Daily online time — last 16 weeks</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
+              Activity Heatmap
+              <InfoTooltip text="Clusters of dark cells reveal sustained active periods. Gaps (light or empty weeks) can mark vacations, illness, or extended time off WhatsApp. Each cell is one day — darker green = more total online time." />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>Daily online time over the last 16 weeks — darker = more active</div>
             <Heatmap data={heatmapData} />
           </div>
         )}
@@ -140,8 +226,11 @@ export default function PresencePanel({ entries, contact }: Props) {
         {/* 30-Day Trend — full width */}
         {trend30.length > 1 && (
           <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>30-Day Online Trend</div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes per day</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
+              30-Day Online Trend
+              <InfoTooltip text="An upward trend means they've been more active on WhatsApp recently. A downward trend may mean they're busier, switched devices, or are spending less time on their phone. Sudden spikes often correspond to specific events." />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes per day over the last 30 days</div>
             <div style={{ width: "100%", height: 190 }}>
               <ResponsiveContainer>
                 <LineChart data={trend30}>
@@ -293,10 +382,20 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, description, info }: { label: string; value: string; description?: string; info?: string }) {
   return (
     <div className="stat-card">
-      <div className="label">{label}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
+        <div className="label" style={{ display: "flex", alignItems: "center" }}>
+          {label}
+          {info && <InfoTooltip text={info} />}
+        </div>
+        {description && (
+          <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
+            {description}
+          </div>
+        )}
+      </div>
       <div className="value" style={{ fontSize: "1.1rem" }}>{value}</div>
     </div>
   );

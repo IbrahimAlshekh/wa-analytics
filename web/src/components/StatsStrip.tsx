@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "../lib/api";
+import { InfoTooltip } from "./InfoTooltip";
 
 interface Props {
   accountId: number;
@@ -35,8 +36,9 @@ export default function StatsStrip({ accountId, contactId }: Props) {
       <div style={{ display: "flex", gap: 12, alignItems: "stretch", flexWrap: "wrap" }}>
         <div className="card" style={{ flex: "1 1 420px", padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Online time
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center" }}>
+              Activity summary
+              <InfoTooltip text="A quick snapshot of this contact's WhatsApp activity in the selected time range. Use the range tabs to compare behavior across different periods — for example, whether they're more active this week than last." />
             </span>
             <div className="tabs">
               {(["today", "week", "month"] as const).map((r) => (
@@ -53,15 +55,39 @@ export default function StatsStrip({ accountId, contactId }: Props) {
           </div>
           <div className="stats" style={{ marginBottom: 0 }}>
             <div className="stat-card">
-              <div className="label">Online time</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
+                <div className="label" style={{ display: "flex", alignItems: "center" }}>
+                  Online time
+                  <InfoTooltip text="High online time doesn't mean they saw your messages — they may be active in other chats. But it shows they are available and using WhatsApp, making it a good window to reach out." />
+                </div>
+                <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
+                  Total time their WhatsApp showed 'online'
+                </div>
+              </div>
               <div className="value">{formatDuration(stats.data?.onlineSecondsAll ?? 0)}</div>
             </div>
             <div className="stat-card">
-              <div className="label">Pic changes</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
+                <div className="label" style={{ display: "flex", alignItems: "center" }}>
+                  Pic changes
+                  <InfoTooltip text="Even a single change is notable — it may signal a mood shift, a new relationship, or a seasonal update. Each picture is saved and viewable in the Presence tab with its timestamp." />
+                </div>
+                <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
+                  Profile picture changes detected
+                </div>
+              </div>
               <div className="value">{stats.data?.pictureChanges ?? 0}</div>
             </div>
             <div className="stat-card">
-              <div className="label">About changes</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
+                <div className="label" style={{ display: "flex", alignItems: "center" }}>
+                  About changes
+                  <InfoTooltip text="Frequent About changes can reveal someone actively curating their self-presentation. Each change is logged with the full text and timestamp, visible in the Presence tab's Status History." />
+                </div>
+                <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
+                  WhatsApp 'About' text changes detected
+                </div>
+              </div>
               <div className="value">{stats.data?.aboutChanges ?? 0}</div>
             </div>
           </div>
@@ -70,8 +96,14 @@ export default function StatsStrip({ accountId, contactId }: Props) {
 
       {/* Chart */}
       <div className="card">
-        <div style={{ fontSize: 12, color: "var(--fg-muted)", fontWeight: 500, marginBottom: 12 }}>
-          Online minutes per day
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--fg-muted)", fontWeight: 500, display: "flex", alignItems: "center" }}>
+            Online minutes per day
+            <InfoTooltip text="Spikes on specific days can be correlated with events or conversations. Days with zero minutes may mean they switched to another device, had a connectivity issue, or were offline intentionally." />
+          </div>
+          <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 2, opacity: 0.75 }}>
+            Daily breakdown of online time across the selected period
+          </div>
         </div>
         <div style={{ width: "100%", height: 200 }}>
           <ResponsiveContainer>

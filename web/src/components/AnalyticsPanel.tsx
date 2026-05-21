@@ -8,6 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AnalyticsReport, AnalyticsVolumeSide, AnalyticsEmotionCounts, TokenCount, MonthRow } from "../lib/types";
+import { InfoTooltip } from "./InfoTooltip";
 
 interface Props {
   report: AnalyticsReport;
@@ -55,13 +56,21 @@ function TimelineCard({ timeline }: { timeline: AnalyticsReport["timeline"] }) {
   const fmt = (unix: number) => new Date(unix * 1000).toLocaleDateString();
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Timeline</SectionLabel>
+      <SectionLabel
+        description="When you first and last exchanged messages, how many days had at least one message, and your longest streak of consecutive active days."
+        info="Streak length and active-day density reveal the texture of the relationship. A long span with low active-day % means contact is rare and scattered. A long streak that ended months ago may mark when things changed."
+      >Timeline</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
         <StatCard label="First message" value={fmt(timeline.firstMsgUnix)} />
         <StatCard label="Last message" value={fmt(timeline.lastMsgUnix)} />
         <StatCard label="Span" value={`${timeline.spanDays}d`} />
         <StatCard label="Active days" value={String(timeline.daysWithComms)} />
-        <StatCard label="Longest streak" value={`${timeline.longestStreakDays}d`} />
+        <StatCard
+          label="Longest streak"
+          value={`${timeline.longestStreakDays}d`}
+          description="Consecutive days with at least one message."
+          info="Long streaks signal periods of daily, sustained connection. A streak that ended long ago may mark when the relationship shifted — worth comparing to Monthly Evolution."
+        />
         {timeline.highestVolumeDayDate && (
           <StatCard
             label="Busiest day"
@@ -80,7 +89,10 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Initiation &amp; Response</SectionLabel>
+      <SectionLabel
+        description="A session starts when either side breaks 3+ hours of silence. Shows who starts conversations and how quickly each side replies."
+        info="When one person initiates 70%+ of sessions, the other may be less invested or waiting to be reached. Reply time gaps between 'you' and 'them' reveal asymmetry in attention — a large difference often indicates who values the conversation more."
+      >Initiation &amp; Response</SectionLabel>
 
       {/* Session initiation balance bar */}
       <div style={{ marginBottom: 14 }}>
@@ -109,10 +121,20 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
           <StatCard label="Median reply (them)" value={fmtDur(initiation.medianRespThemSec)} />
         )}
         {initiation.longestSilenceSec > 0 && (
-          <StatCard label="Longest silence" value={fmtDur(initiation.longestSilenceSec)} />
+          <StatCard
+            label="Longest silence"
+            value={fmtDur(initiation.longestSilenceSec)}
+            description="Longest gap between any two messages."
+            info="An unusually long single silence may mark a conflict, a trip, or a cooling point in the relationship. Compare it to average silence to see if it was a one-off or the norm."
+          />
         )}
         {initiation.avgSilenceSec > 0 && (
-          <StatCard label="Avg silence" value={fmtDur(initiation.avgSilenceSec)} />
+          <StatCard
+            label="Avg silence"
+            value={fmtDur(initiation.avgSilenceSec)}
+            description="Average gap between consecutive messages."
+            info="High average silence (>12h) means this is an asynchronous relationship — messages are read and replied to later, not in real-time. Low silence (<30min) means both sides are typically active at the same time."
+          />
         )}
       </div>
     </div>
@@ -125,7 +147,10 @@ function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolu
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Volume</SectionLabel>
+      <SectionLabel
+        description="Total messages, words, and media sent by each side. The bar shows your share of total messages."
+        info="A persistent imbalance (one person above 65%) suggests who drives the conversation. Word balance often tells more than message count — short frequent replies look very different from long infrequent ones."
+      >Volume</SectionLabel>
 
       {/* Message balance bar */}
       <div style={{ marginBottom: 14 }}>
@@ -179,7 +204,10 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
 
   return (
     <div className="card">
-      <SectionLabel>Messages by hour</SectionLabel>
+      <SectionLabel
+        description="How many messages each person sends per hour of the day. Blue = you, gray = them."
+        info="Overlapping peaks mean you communicate in real-time. If your high-activity hours don't align, most messages sit unread for hours before a reply — which inflates response times and can feel one-sided."
+      >Messages by hour</SectionLabel>
       <div style={{ width: "100%", height: 180 }}>
         <ResponsiveContainer>
           <BarChart data={data} barCategoryGap="20%" barGap={2}>
@@ -210,7 +238,10 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
 
   return (
     <div className="card">
-      <SectionLabel>Messages by weekday</SectionLabel>
+      <SectionLabel
+        description="Total messages per day of the week. Blue = you, gray = them."
+        info="Weekend vs. weekday peaks reveal the nature of the relationship. Both sides active on weekends often signals a personal bond rather than a professional or obligatory one."
+      >Messages by weekday</SectionLabel>
       <div style={{ width: "100%", height: 160 }}>
         <ResponsiveContainer>
           <BarChart data={data} barCategoryGap="25%" barGap={2}>
@@ -233,7 +264,10 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
 function TemporalMetaCard({ temporal }: { temporal: AnalyticsReport["temporal"] }) {
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Temporal patterns</SectionLabel>
+      <SectionLabel
+        description="Percentage of messages sent between midnight and 5am by each side."
+        info="High night-message rates (>15%) suggest conversations happen when the person is most relaxed and unguarded, or indicate very different time zones. It can also signal emotional intensity — late-night messaging is rarely casual."
+      >Temporal patterns</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
         <StatCard label="Night messages (you)" value={`${temporal.nightPctMe.toFixed(1)}%`} />
         <StatCard label="Night messages (them)" value={`${temporal.nightPctThem.toFixed(1)}%`} />
@@ -249,7 +283,10 @@ function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Emotion fingerprint</SectionLabel>
+      <SectionLabel
+        description="Messages classified by emotional tone using keyword patterns. Bars show your share vs theirs for each emotion."
+        info="The balance of emotions reveals who brings positivity, who asks for support, and the overall register of the relationship. Gratitude or encouragement heavily skewed to one side can signal a support asymmetry — one person giving more than they receive."
+      >Emotion fingerprint</SectionLabel>
 
       <div className="stats" style={{ marginBottom: 12 }}>
         {emotion.laughterMsgsMe + emotion.laughterMsgsThem > 0 && (
@@ -317,7 +354,10 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Language fingerprint</SectionLabel>
+      <SectionLabel
+        description="Most frequently used emojis, words (stop-words removed), and web domains from shared links — ranked by count for each side."
+        info="Shared vocabulary and overlapping emojis signal linguistic rapport and mirroring — a subtle sign of closeness. Domains reveal what content you exchange: news, videos, social media. Wildly different word lists may mean the conversation stays shallow."
+      >Language fingerprint</SectionLabel>
 
       {hasEmojis && (
         <div style={{ marginBottom: 14 }}>
@@ -431,7 +471,10 @@ function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Monthly evolution</SectionLabel>
+      <SectionLabel
+        description="Month-by-month message counts. The last 3 months are bold to highlight recent activity."
+        info="Rising or falling totals show whether the relationship is growing, stable, or cooling. A sudden drop in a previously active month often corresponds to a life event, conflict, or natural drift — cross-reference with the timeline."
+      >Monthly evolution</SectionLabel>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
@@ -477,26 +520,72 @@ function IndicatorCard({ indicators }: { indicators: AnalyticsReport["indicators
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel>Indicators</SectionLabel>
+      <SectionLabel
+        description="Aggregate metrics summarizing the overall balance and dynamics of the conversation."
+        info="Look for imbalances across all indicators together: if your message balance, word balance, and initiation % are all above 60%, you are carrying the relationship — the other person is mostly responding rather than reaching out."
+      >Indicators</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label="Msg balance (you)" value={`${indicators.msgBalancePct.toFixed(1)}%`} />
-        <StatCard label="Word balance (you)" value={`${indicators.wordBalancePct.toFixed(1)}%`} />
-        <StatCard label="Active days %" value={`${indicators.dailyConsistencyPct.toFixed(1)}%`} />
+        <StatCard
+          label="Msg balance (you)"
+          value={`${indicators.msgBalancePct.toFixed(1)}%`}
+          description="Your share of total messages sent."
+          info="Healthy conversations sit between 40–60%. A persistent number above 65% means you are sending most of the messages and likely driving the conversation."
+        />
+        <StatCard
+          label="Word balance (you)"
+          value={`${indicators.wordBalancePct.toFixed(1)}%`}
+          description="Your share of total words written."
+          info="Compare this to your message balance. If your word % is much higher than your message %, your messages are longer — you may be explaining, elaborating, or carrying more emotional weight."
+        />
+        <StatCard
+          label="Active days %"
+          value={`${indicators.dailyConsistencyPct.toFixed(1)}%`}
+          description="Days with at least one message, out of the total span."
+          info="Below 20% with a long span means contact is rare and spread out. Above 70% means you're in near-daily contact. This is one of the strongest signals of how central someone is to your daily life."
+        />
         {indicators.medianRespAllSec > 0 && (
-          <StatCard label="Median reply (all)" value={fmtDur(indicators.medianRespAllSec)} />
+          <StatCard
+            label="Median reply (all)"
+            value={fmtDur(indicators.medianRespAllSec)}
+            description="Median response time across both sides."
+            info="The median is more reliable than the average because it isn't skewed by a few very long gaps. A short median means the conversation flows quickly; a long one means messages often go unanswered for hours."
+          />
         )}
-        <StatCard label="Initiation (you)" value={`${indicators.initiationMePct.toFixed(1)}%`} />
+        <StatCard
+          label="Initiation (you)"
+          value={`${indicators.initiationMePct.toFixed(1)}%`}
+          description="How often you start a new conversation session."
+          info="If you're consistently above 70%, you are the one keeping this relationship alive. If you're below 30%, they reach out far more often. Neither is inherently bad — but a mismatch is worth noticing."
+        />
         {indicators.syncLaughDays > 0 && (
-          <StatCard label="Sync laugh days" value={String(indicators.syncLaughDays)} />
+          <StatCard
+            label="Sync laugh days"
+            value={String(indicators.syncLaughDays)}
+            description="Days when both sides sent laughter messages."
+            info="A day where both of you laughed in the same conversation is a proxy for genuine mutual enjoyment. More sync laugh days generally mean more comfort and shared humor in the relationship."
+          />
         )}
         {indicators.totalQuestions > 0 && (
-          <StatCard label="Total questions" value={fmt(indicators.totalQuestions)} />
+          <StatCard
+            label="Total questions"
+            value={fmt(indicators.totalQuestions)}
+            description="Messages containing a question mark."
+          />
         )}
         {indicators.totalLaughter > 0 && (
-          <StatCard label="Total laughter" value={fmt(indicators.totalLaughter)} />
+          <StatCard
+            label="Total laughter"
+            value={fmt(indicators.totalLaughter)}
+            description="Messages containing laughter expressions."
+          />
         )}
         {trend !== 0 && (
-          <StatCard label={trendLabel} value={`${Math.abs(trend).toFixed(1)}%`} />
+          <StatCard
+            label={trendLabel}
+            value={`${Math.abs(trend).toFixed(1)}%`}
+            description="Change in your message share over recent months."
+            info="A rising trend means you're sending a growing share of messages lately. A falling trend means the other person is becoming more active, or you are becoming less so — either way, the dynamic is shifting."
+          />
         )}
       </div>
     </div>
@@ -505,18 +594,36 @@ function IndicatorCard({ indicators }: { indicators: AnalyticsReport["indicators
 
 // --- helpers ---
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, description, info }: { children: React.ReactNode; description?: string; info?: string }) {
   return (
-    <div style={{ fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
-      {children}
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "flex", alignItems: "center" }}>
+        {children}
+        {info && <InfoTooltip text={info} />}
+      </div>
+      {description && (
+        <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 3, lineHeight: 1.45, opacity: 0.8 }}>
+          {description}
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, description, info }: { label: string; value: string; description?: string; info?: string }) {
   return (
     <div className="stat-card">
-      <div className="label">{label}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
+        <div className="label" style={{ display: "flex", alignItems: "center" }}>
+          {label}
+          {info && <InfoTooltip text={info} />}
+        </div>
+        {description && (
+          <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
+            {description}
+          </div>
+        )}
+      </div>
       <div className="value">{value}</div>
     </div>
   );
