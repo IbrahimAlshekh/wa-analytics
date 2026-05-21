@@ -449,6 +449,16 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
     return <audio src={url} controls style={{ maxWidth: "100%" }} />;
   }
 
+  if (type === "sticker") {
+    return (
+      <img
+        src={url}
+        alt="Sticker"
+        style={{ width: 120, height: 120, objectFit: "contain", display: "block" }}
+      />
+    );
+  }
+
   return (
     <div className="row" style={{ gap: 8, alignItems: "center", padding: "8px 12px", background: "rgba(0,0,0,0.05)", borderRadius: 4 }}>
       <span style={{ fontSize: 20 }}>📄</span>
