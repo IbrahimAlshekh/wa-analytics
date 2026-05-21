@@ -229,6 +229,15 @@ func (c *Client) SendMessage(ctx context.Context, to types.JID, msg *waE2E.Messa
 	return c.cli.SendMessage(ctx, to, msg)
 }
 
+// FetchMessageHistory requests older messages from WhatsApp servers for the
+// conversation identified by info. WhatsApp responds asynchronously via a
+// HistorySync event that the tracker's event handler will process.
+func (c *Client) FetchMessageHistory(ctx context.Context, info *types.MessageInfo) error {
+	msg := c.cli.BuildHistorySyncRequest(info, 50)
+	_, err := c.cli.SendPeerMessage(ctx, msg)
+	return err
+}
+
 func (c *Client) UploadMedia(ctx context.Context, data []byte, appMessageType whatsmeow.MediaType) (whatsmeow.UploadResponse, error) {
 	return c.cli.Upload(ctx, data, appMessageType)
 }

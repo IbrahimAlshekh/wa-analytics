@@ -785,3 +785,35 @@ func sortByAt(es []TimelineEntry) {
 		}
 	}
 }
+
+// GetOldestContactMessage returns the earliest stored message for a contact.
+// Returns an empty Message (zero ID) when no messages exist yet.
+func (db *DB) GetOldestContactMessage(ctx context.Context, accountID, contactID int64) (Message, error) {
+	row := db.QueryRowContext(ctx,
+		`SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp,
+		        COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at
+		 FROM messages
+		 WHERE account_id=? AND contact_id=?
+		 ORDER BY timestamp ASC
+		 LIMIT 1`,
+		accountID, contactID,
+	)
+	var m Message
+	var cid sql.NullInt64
+	var fromMe int
+	if err := row.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
+		&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Message{}, nil
+		}
+		return Message{}, err
+	}
+	if cid.Valid {
+		v := cid.Int64
+		m.ContactID = &v
+	}
+	m.ChatJID = db.dec(m.ChatJID)
+	m.SenderJID = db.dec(m.SenderJID)
+	m.IsFromMe = fromMe == 1
+	return m, nil
+}

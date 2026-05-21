@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -330,6 +331,67 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, map[string]any{"id": resp.ID, "timestamp": now})
+}
+
+// handleFetchMessageHistory sends an on-demand history sync request to WhatsApp
+// for a specific contact, using the oldest locally stored message as the cursor.
+// The actual messages arrive asynchronously via a HistorySync event.
+func (s *Server) handleFetchMessageHistory(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cid, err := parseCID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if _, err := s.db.GetContact(r.Context(), accountID, cid); err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+
+	oldest, err := s.db.GetOldestContactMessage(r.Context(), accountID, cid)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if oldest.ID == 0 {
+		writeErr(w, http.StatusConflict, errors.New("no local messages to paginate from; wait for initial sync"))
+		return
+	}
+
+	chatJID, err := types.ParseJID(oldest.ChatJID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	senderJID, _ := types.ParseJID(oldest.SenderJID)
+
+	info := &types.MessageInfo{
+		MessageSource: types.MessageSource{
+			Chat:     chatJID.ToNonAD(),
+			Sender:   senderJID.ToNonAD(),
+			IsFromMe: oldest.IsFromMe,
+		},
+		ID:        types.MessageID(oldest.MessageID),
+		Timestamp: time.Unix(oldest.Timestamp, 0),
+	}
+
+	client := s.manager.GetByAccountID(accountID)
+	if client == nil || !client.IsConnected() {
+		writeErr(w, http.StatusServiceUnavailable, errors.New("account not connected"))
+		return
+	}
+
+	if err := client.FetchMessageHistory(r.Context(), info); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]bool{"started": true})
 }
 
 // wajid converts a phone number to a JID string.

@@ -55,7 +55,8 @@ export default function App() {
         }
         case "history_sync": {
           const { accountId } = msg;
-          qc.invalidateQueries({ queryKey: ["messages", accountId] });
+          // Messages page drives its own refetch via WS listener.
+          // We only refresh ancillary data here.
           qc.invalidateQueries({ queryKey: ["timeline", accountId] });
           qc.invalidateQueries({ queryKey: ["analytics", accountId] });
           qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });

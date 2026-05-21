@@ -1,8 +1,9 @@
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Message } from "../lib/types";
+import { ws } from "../lib/ws";
 
 function getMediaUrl(path: string) {
   const token = localStorage.getItem("wt_bearer");
@@ -10,11 +11,18 @@ function getMediaUrl(path: string) {
   return `/media/${path}?token=${encodeURIComponent(token)}`;
 }
 
+// "open" means more WA history may exist; "exhausted" means WA returned nothing new
+type WAFetchState = "idle" | "loading" | "open" | "exhausted";
+
 export default function Messages() {
   const qc = useQueryClient();
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
   const cid = Number(cidStr);
+
+  // When true, getNextPageParam allows one more page even if last page < 50 items
+  const allowExtraPageRef = useRef(false);
+  const [, forceRender] = useState(0);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
     useInfiniteQuery({
@@ -23,7 +31,8 @@ export default function Messages() {
         api.messages(accountId, cid, pageParam as number, 50),
       initialPageParam: 0,
       getNextPageParam: (lastPage) => {
-        if (!lastPage || lastPage.length < 50) return undefined;
+        if (!lastPage || lastPage.length === 0) return undefined;
+        if (lastPage.length < 50 && !allowExtraPageRef.current) return undefined;
         return lastPage[lastPage.length - 1].timestamp;
       },
     });
@@ -40,6 +49,72 @@ export default function Messages() {
     const all = (data?.pages ?? []).flat();
     return [...all].sort((a, b) => a.timestamp - b.timestamp);
   }, [data]);
+
+  // ── WA history fetch state ───────────────────────────────────────────────
+  const [waState, setWAState] = useState<WAFetchState>("idle");
+  const waFetchingRef = useRef(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const savedScrollHeightRef = useRef(0);
+
+  // When WA history sync arrives, unlock one extra page and fetch it
+  useEffect(() => {
+    return ws.on((msg) => {
+      if (msg.type !== "history_sync") return;
+      if (msg.accountId !== accountId) return;
+      if (!waFetchingRef.current) return;
+      waFetchingRef.current = false;
+      // Save scroll height before new messages are prepended
+      if (listRef.current) savedScrollHeightRef.current = listRef.current.scrollHeight;
+      // Allow getNextPageParam to return a cursor even if last page was partial
+      allowExtraPageRef.current = true;
+      forceRender((n) => n + 1); // re-render so hasNextPage updates
+    });
+  }, [accountId]);
+
+  // After render where hasNextPage flipped to true (due to allowExtraPageRef), fetch
+  useEffect(() => {
+    if (allowExtraPageRef.current && hasNextPage && !isFetchingNextPage) {
+      allowExtraPageRef.current = false;
+      fetchNextPage().then((result) => {
+        const pages = result.data?.pages ?? [];
+        const lastPage = pages[pages.length - 1] ?? [];
+        setWAState(lastPage.length > 0 ? "open" : "exhausted");
+      });
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Preserve scroll position when older messages are prepended
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || savedScrollHeightRef.current === 0) return;
+    const delta = list.scrollHeight - savedScrollHeightRef.current;
+    if (delta > 0) list.scrollTop += delta;
+    savedScrollHeightRef.current = 0;
+  }, [msgs.length]);
+
+  async function handleFetchFromWA() {
+    setWAState("loading");
+    waFetchingRef.current = true;
+    try {
+      await api.fetchMessageHistory(accountId, cid);
+      // Response arrives via history_sync WS event — set a 15s timeout fallback
+      setTimeout(() => {
+        if (waFetchingRef.current) {
+          waFetchingRef.current = false;
+          setWAState("exhausted");
+        }
+      }, 15_000);
+    } catch {
+      waFetchingRef.current = false;
+      setWAState("idle");
+    }
+  }
+
+  // Scroll-position preservation for local DB pagination (load older from DB)
+  function handleLoadOlderLocal() {
+    if (listRef.current) savedScrollHeightRef.current = listRef.current.scrollHeight;
+    fetchNextPage();
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -74,6 +149,7 @@ export default function Messages() {
 
       {/* Messages list */}
       <div
+        ref={listRef}
         className="messages-list"
         style={{
           flex: 1,
@@ -90,17 +166,38 @@ export default function Messages() {
             <div className="muted">Messages will appear here as they're recorded</div>
           </div>
         )}
+
+        {/* Local DB pagination */}
         {hasNextPage && (
           <div style={{ textAlign: "center", padding: "16px 0", flexShrink: 0 }}>
             <button
               className="btn btn-sm"
-              onClick={() => fetchNextPage()}
+              onClick={handleLoadOlderLocal}
               disabled={isFetchingNextPage}
             >
               {isFetchingNextPage ? "Loading…" : "Load older messages"}
             </button>
           </div>
         )}
+
+        {/* WhatsApp history fetch — shown when local DB is exhausted and we have a cursor */}
+        {!hasNextPage && msgs.length > 0 && waState !== "exhausted" && (
+          <div style={{ textAlign: "center", padding: "16px 0", flexShrink: 0 }}>
+            {waState === "loading" ? (
+              <span className="muted" style={{ fontSize: 13 }}>Fetching from WhatsApp…</span>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={handleFetchFromWA}>
+                {waState === "open" ? "Load more from WhatsApp" : "Fetch older from WhatsApp"}
+              </button>
+            )}
+          </div>
+        )}
+        {!hasNextPage && msgs.length > 0 && waState === "exhausted" && (
+          <div style={{ textAlign: "center", padding: "12px 0", flexShrink: 0 }}>
+            <span className="muted" style={{ fontSize: 12 }}>No more messages</span>
+          </div>
+        )}
+
         <div style={{ flexGrow: 1 }} />
         {msgs.map((m) => (
           <MessageBubble key={m.id} msg={m} />

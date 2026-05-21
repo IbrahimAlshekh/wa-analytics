@@ -142,6 +142,9 @@ export const api = {
   putSchedule: (accountId: number, forceOffline: boolean, slots: ScheduleSlot[]) =>
     request<AccountSchedule>("PUT", `/accounts/${accountId}/schedule`, { forceOffline, slots }),
 
+  fetchMessageHistory: (accountId: number, contactId: number) =>
+    request<{ started: boolean }>("POST", `/accounts/${accountId}/contacts/${contactId}/messages/fetch-history`),
+
   sendMessage: (accountId: number, contactId: number, text: string, file?: File) => {
     if (!file) {
       return request<{ id: string; timestamp: number }>(
