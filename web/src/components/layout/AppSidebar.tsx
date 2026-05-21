@@ -124,7 +124,8 @@ interface AppSidebarProps {
 }
 
 export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.dir() === "rtl";
   const qc = useQueryClient();
 
   const upsertContacts = useStore((s) => s.upsertContacts);
@@ -188,7 +189,7 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
   });
 
   return (
-    <Sidebar collapsible="offcanvas" className="border-e border-border">
+    <Sidebar side={isRTL ? "right" : "left"} collapsible="offcanvas" className="border-e border-border">
       {/* Header */}
       <SidebarHeader className="border-b border-border px-3 py-2.5 gap-2">
         <div className="flex items-center justify-between gap-1">
