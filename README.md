@@ -41,9 +41,129 @@ make build           # builds web/ → internal/api/dist, then go build → bin/
 
 The Go binary contains the entire SPA via `//go:embed all:dist` in `internal/api/static.go`. No `web/dist` directory needs to be present at runtime.
 
-## Deployment
+## Local install (single machine)
 
-Two scripts handle server setup and ongoing deploys.
+The `scripts/local/` directory contains a cross-platform local installer — separate from the server deploy tooling. It installs the app as a user-level background service, maps a local domain, and embeds the logo as a native OS icon.
+
+### Supported platforms
+
+| OS | Service | Icon | DNS |
+|---|---|---|---|
+| Linux | systemd user unit (`systemctl --user`) | `.desktop` entry + hicolor icon | dnsmasq |
+| macOS | launchd LaunchAgent | `.app` bundle with `.icns` | dnsmasq (brew) |
+| Windows | NSSM service (or Scheduled Task fallback) | Embedded `.exe` icon | `hosts` file |
+
+### Quick start
+
+**Linux / macOS:**
+```bash
+./scripts/local/install.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\local\install.ps1
+```
+
+### Options
+
+| Flag | Default | Description |
+|---|---|---|
+| `--yes` / `-AssumeYes` | off | Non-interactive; answer yes to all prompts |
+| `--skip-deps` | off | Skip build-dependency installation |
+| `--skip-build` | off | Skip build (use existing `bin/tracker`) |
+| `--skip-service` | off | Skip background service setup |
+| `--skip-dns` | off | Skip DNS / dnsmasq configuration |
+| `--no-icon` | off | Skip native OS icon embedding |
+| `--listen ADDR` | `:8080` | HTTP listen address |
+| `--domain DOMAIN` | `wa-analytics.local` | Local domain to map |
+| `--uninstall` | — | Remove the installation |
+
+### What gets installed where
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| **Binary** | `~/.local/bin/tracker` | `~/Applications/WA Analytics.app` + symlink `~/.local/bin/tracker` | `%LOCALAPPDATA%\WhatsApp Tracker\tracker.exe` |
+| **Service** | `~/.config/systemd/user/whatsapp-tracker.service` | `~/Library/LaunchAgents/com.whatsapptracker.tracker.plist` | NSSM service `WhatsAppTracker` |
+| **Icon** | `~/.local/share/icons/hicolor/512x512/apps/whatsapp-tracker.png` + `.desktop` | `~/Applications/WA Analytics.app/Contents/Resources/tracker.icns` | Embedded in `tracker.exe` |
+| **Data** | `~/.local/share/whatsapp-tracker/` | `~/.local/share/whatsapp-tracker/` | `%LOCALAPPDATA%\whatsapp-tracker\` |
+
+### DNS — `wa-analytics.local` caveat
+
+> **Important:** The `.local` TLD is reserved for mDNS / Bonjour (RFC 6762). On macOS and Linux desktops running Avahi, `.local` lookups may be intercepted by mDNS before they reach dnsmasq, causing unreliable resolution.
+>
+> The installer warns you and requires confirmation before applying DNS changes. To avoid this, use a different TLD:
+> ```bash
+> ./scripts/local/install.sh --domain wa-analytics.test   # safer
+> ./scripts/local/install.sh --domain wa-analytics.lan
+> ```
+> On **Windows**, dnsmasq is not available — the installer adds a `hosts` file entry instead (requires admin).
+
+### First-run checklist
+
+After the service starts for the first time it auto-generates `<datadir>/.env` containing a random encryption key.
+
+```bash
+# 1. Create your first login user
+tracker user add <username>
+
+# 2. Back up your encryption key — CRITICAL
+cat ~/.local/share/whatsapp-tracker/.env
+```
+
+Open `http://localhost:8080` (or your configured domain). The app redirects to the **register** page until your first user exists.
+
+### Managing the service
+
+**Linux:**
+```bash
+systemctl --user status whatsapp-tracker
+systemctl --user stop   whatsapp-tracker
+systemctl --user start  whatsapp-tracker
+journalctl --user -u whatsapp-tracker -f
+```
+
+**macOS:**
+```bash
+launchctl print  gui/$(id -u)/com.whatsapptracker.tracker
+launchctl stop   com.whatsapptracker.tracker
+launchctl start  com.whatsapptracker.tracker
+tail -f ~/.local/share/whatsapp-tracker/tracker.log
+```
+
+**Windows:**
+```powershell
+Get-Service WhatsAppTracker
+nssm stop  WhatsAppTracker
+nssm start WhatsAppTracker
+```
+
+### Uninstall
+
+```bash
+./scripts/local/uninstall.sh          # Linux / macOS
+# Windows:
+powershell -ExecutionPolicy Bypass -File scripts\local\uninstall.ps1
+```
+
+The data directory (`~/.local/share/whatsapp-tracker/`) is **never removed** — it contains your encryption key. Delete it manually once you are certain you no longer need the data.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `cgo: C compiler "gcc" not found` | Run `--skip-build` and install gcc manually, then re-run |
+| `pnpm: command not found` | Run `corepack enable pnpm` after installing Node 20+ |
+| Port already in use | Change with `--listen :9090` |
+| `wa-analytics.local` doesn't resolve | Run with `--domain wa-analytics.test` (avoids mDNS conflict) |
+| Service not starting | Check logs: `journalctl --user -u whatsapp-tracker` or `tracker.log` in data dir |
+| macOS Xcode CLT installer dialog | Complete the dialog shown by the OS, then re-run `install.sh` |
+
+---
+
+## Deployment (server)
+
+Two scripts handle **server** setup and ongoing deploys. These are in `scripts/server/` and are unrelated to the local install above.
 
 ### Ansible (recommended for remote servers)
 
@@ -126,7 +246,7 @@ make deploy
 
 The binary is only replaced if it actually changed, so `notify: Restart whatsapp-tracker` fires only when needed.
 
-### Useful commands
+### Useful commands (server)
 
 ```bash
 systemctl status whatsapp-tracker        # app health
@@ -134,6 +254,17 @@ journalctl -u whatsapp-tracker -f        # live app logs
 systemctl status nginx                   # nginx health
 certbot renew --dry-run                  # test cert renewal
 ```
+
+### Manual server scripts (alternative to Ansible)
+
+`scripts/server/` contains two shell scripts for servers where Ansible is not available:
+
+| Script | Purpose |
+|---|---|
+| `scripts/server/setup-service.sh <domain> [email]` | One-time server setup: installs deps, builds, installs systemd service, configures nginx + Let's Encrypt SSL |
+| `scripts/server/deploy.sh` | Deploys an update: stops service → `git pull` → build → install → restart |
+
+These target **Ubuntu/Debian** servers and require `sudo`. They are **not** related to the local install scripts in `scripts/local/`.
 
 ## Configuration
 

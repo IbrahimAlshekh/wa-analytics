@@ -1,0 +1,15 @@
+[Unit]
+Description=WA Analytics (WhatsApp Tracker)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@BIN_PATH@ --listen @LISTEN@ --enable-logs
+Environment=WT_DATA_DIR=@DATA_DIR@
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

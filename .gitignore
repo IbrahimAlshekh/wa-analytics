@@ -23,3 +23,6 @@ web/dist/
 *.log
 
 /internal/api/dist
+
+# Windows .exe icon resource (generated per-build by install.ps1 via goversioninfo)
+cmd/tracker/*.syso
