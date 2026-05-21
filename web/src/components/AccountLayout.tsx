@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useMatch, useParams } from "react-router-dom";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
+import { useStore } from "../lib/store";
 
 function getInitials(name: string): string {
   if (name.startsWith("+")) return name.slice(1, 3);
@@ -40,12 +41,12 @@ export default function AccountLayout() {
   const activeCid = activeCidStr ? Number(activeCidStr) : null;
   const isMessages = Boolean(messagesMatch);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { sidebarOpen, setSidebarOpen, upsertContacts, upsertContact } = useStore();
 
   // Auto-close drawer when navigating to a contact
   useEffect(() => {
     setSidebarOpen(false);
-  }, [activeCid]);
+  }, [activeCid, setSidebarOpen]);
 
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput, 300);
@@ -73,6 +74,11 @@ export default function AccountLayout() {
   const allContacts = contactsQ.data?.pages.flatMap((p) => p.contacts ?? []) ?? [];
   const total = contactsQ.data?.pages[0]?.total ?? 0;
 
+  // Seed the store with fresh contact data from the sidebar query
+  useEffect(() => {
+    if (allContacts.length > 0) upsertContacts(allContacts);
+  }, [allContacts, upsertContacts]);
+
   const syncMutation = useMutation({
     mutationFn: () => api.syncContacts(accountId),
     onSuccess: (data) => {
@@ -87,7 +93,8 @@ export default function AccountLayout() {
 
   const addMutation = useMutation({
     mutationFn: () => api.createContact(accountId, phone, addName),
-    onSuccess: () => {
+    onSuccess: (created) => {
+      upsertContact(created);
       setPhone("");
       setAddName("");
       setAddError(null);
@@ -278,23 +285,29 @@ export default function AccountLayout() {
 
 function SidebarContact({
   accountId,
-  contact,
+  contact: contactProp,
   active,
 }: {
   accountId: number;
   contact: Contact;
   active: boolean;
 }) {
-  const { data } = useQuery({
-    queryKey: ["timeline", accountId, contact.id],
-    queryFn: () => api.timeline(accountId, contact.id, 0),
-    refetchInterval: 60_000,
+  // Read from store for live updates (falls back to prop while store seeds)
+  const storeContact = useStore((s) => s.contacts[contactProp.id]);
+  const contact = storeContact ?? contactProp;
+
+  const wsEntries = useStore((s) => {
+    const key = `${accountId}:${contact.id}`;
+    return s.wsEntries[key] ?? [];
   });
 
-  const entries = data?.entries ?? [];
-  const lastPresence = [...entries].reverse().find((e) => e.kind === "presence");
-  const online = lastPresence?.state === "available";
   const displayName = contact.displayName || contact.phone;
+
+  // Derive online status from WS entries (most recent presence)
+  const lastPresence = [...wsEntries]
+    .filter((e) => e.kind === "presence")
+    .sort((a, b) => b.at - a.at)[0];
+  const online = lastPresence?.state === "available";
 
   const lastSeenText = online
     ? "Online now"

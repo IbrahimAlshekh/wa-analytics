@@ -7,7 +7,7 @@ import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
 import PresencePanel from "../components/PresencePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
-import { ws } from "../lib/ws";
+import { useStore, wsKey } from "../lib/store";
 
 function getInitials(name: string): string {
   if (name.startsWith("+")) return name.slice(1, 3);
@@ -62,45 +62,58 @@ export default function ContactDetail() {
   const qc = useQueryClient();
 
   const [range, setRange] = useState<AnalyticsRange>("week");
-  const [wsEntries, setWsEntries] = useState<TimelineEntry[]>([]);
+
+  const { upsertContact, removeContact, addWsEntry, pruneWsEntries } = useStore();
+  const contact = useStore((s) => s.contacts[cid]);
+  const wsEntries = useStore((s) => s.wsEntries[wsKey(accountId, cid)] ?? []);
 
   const toggleTracking = useMutation({
     mutationFn: (enabled: boolean) =>
       api.updateContact(accountId, cid, { trackingEnabled: enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["timeline", accountId, cid] }),
-  });
-
-  const deleteContact = useMutation({
-    mutationFn: () => api.deleteContact(accountId, cid),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      upsertContact(updated);
+      qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
-      navigate(`/accounts/${accountId}/contacts`);
     },
   });
 
-  useEffect(() => {
-    return ws.on((msg) => {
-      if (msg.type !== "presence") return;
-      if (msg.accountId !== accountId || msg.contactId !== cid) return;
-      const entry: TimelineEntry = {
-        kind: "presence",
-        at: msg.observedAt,
-        state: msg.state,
-        lastSeen: msg.lastSeen,
-      };
-      setWsEntries((prev) => {
-        const key = `${entry.kind}:${entry.at}:${entry.state}`;
-        if (prev.some((e) => `${e.kind}:${e.at}:${e.state}` === key)) return prev;
-        return [...prev, entry];
-      });
-    });
-  }, [accountId, cid]);
+  const deleteContactMutation = useMutation({
+    mutationFn: () => api.deleteContact(accountId, cid),
+    onSuccess: () => {
+      removeContact(cid);
+      qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+      qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
+      navigate(`/accounts/${accountId}/contacts`);
+    },
+  });
 
   const tl = useQuery({
     queryKey: ["timeline", accountId, cid],
     queryFn: () => api.timeline(accountId, cid, 0),
     refetchInterval: 30_000,
   });
+
+  // Seed the store whenever the timeline query returns a (possibly updated) contact
+  useEffect(() => {
+    if (tl.data?.contact) upsertContact(tl.data.contact);
+  }, [tl.data?.contact, upsertContact]);
+
+  // Prune WS entries that the server has now absorbed
+  useEffect(() => {
+    if (!tl.data) return;
+    const serverKeys = new Set(
+      (tl.data.entries ?? []).map((e) => `${e.kind}:${e.at}:${e.state ?? ""}`)
+    );
+    pruneWsEntries(accountId, cid, serverKeys);
+  }, [tl.data, accountId, cid, pruneWsEntries]);
+
+  // The global App.tsx WS handler already calls addWsEntry for every presence
+  // event. We only need a local listener for events that arrive while this page
+  // is mounted and App.tsx may have already fired — dedup is handled in the store.
+  useEffect(() => {
+    // Nothing extra needed: App.tsx calls addWsEntry globally.
+    // This effect exists as documentation of the data-flow.
+  }, [accountId, cid, addWsEntry]);
 
   const analyticsQ = useQuery({
     queryKey: ["analytics", accountId, cid, range],
@@ -124,21 +137,13 @@ export default function ContactDetail() {
     return merged;
   }, [tl.data?.entries, wsEntries]);
 
-  // After server refetch absorbs WS entries, drop them from local state
-  useEffect(() => {
-    if (!tl.data) return;
-    const serverKeys = new Set(
-      (tl.data.entries ?? []).map((e) => `${e.kind}:${e.at}:${e.state ?? ""}`)
-    );
-    setWsEntries((prev) => prev.filter((e) => !serverKeys.has(`${e.kind}:${e.at}:${e.state ?? ""}`)));
-  }, [tl.data]);
-
   if (tl.isLoading) return <div className="muted" style={{ padding: "48px 0", textAlign: "center" }}>Loading…</div>;
   if (tl.error) return <div className="error">{(tl.error as Error).message}</div>;
   if (!tl.data) return null;
 
-  const contact = tl.data.contact;
-  const displayName = contact.displayName || contact.phone;
+  // Use store contact (most up-to-date) falling back to query data
+  const c = contact ?? tl.data.contact;
+  const displayName = c.displayName || c.phone;
 
   const presenceEntries = allEntries
     .filter((e) => e.kind === "presence")
@@ -165,14 +170,14 @@ export default function ContactDetail() {
         <div className="avatar avatar-lg">{getInitials(displayName)}</div>
         <div className="contact-hero-info">
           <div className="contact-hero-name">{displayName}</div>
-          <div className="contact-hero-phone">{contact.phone}</div>
+          <div className="contact-hero-phone">{c.phone}</div>
           <div className="row" style={{ gap: 6 }}>
             <span className={`badge ${isOnline ? "badge-online" : "badge-offline"}`}>
               <span className={`dot ${isOnline ? "online" : ""}`} style={{ width: 6, height: 6 }} />
               {isOnline ? "Online now" : "Offline"}
             </span>
-            <span className={`badge ${contact.trackingEnabled ? "badge-tracking" : "badge-paused"}`}>
-              {contact.trackingEnabled ? "Tracking" : "Paused"}
+            <span className={`badge ${c.trackingEnabled ? "badge-tracking" : "badge-paused"}`}>
+              {c.trackingEnabled ? "Tracking" : "Paused"}
             </span>
           </div>
         </div>
@@ -183,25 +188,25 @@ export default function ContactDetail() {
           <button
             className="btn btn-ghost"
             disabled={toggleTracking.isPending}
-            onClick={() => toggleTracking.mutate(!contact.trackingEnabled)}
-            title={contact.trackingEnabled ? "Pause tracking" : "Resume tracking"}
+            onClick={() => toggleTracking.mutate(!c.trackingEnabled)}
+            title={c.trackingEnabled ? "Pause tracking" : "Resume tracking"}
           >
             {toggleTracking.isPending
               ? "…"
-              : contact.trackingEnabled
+              : c.trackingEnabled
               ? "Pause tracking"
               : "Resume tracking"}
           </button>
           <button
             className="btn btn-danger"
-            disabled={deleteContact.isPending}
+            disabled={deleteContactMutation.isPending}
             onClick={() => {
               if (confirm(`Delete ${displayName}? This cannot be undone.`)) {
-                deleteContact.mutate();
+                deleteContactMutation.mutate();
               }
             }}
           >
-            {deleteContact.isPending ? "Deleting…" : "Delete"}
+            {deleteContactMutation.isPending ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>

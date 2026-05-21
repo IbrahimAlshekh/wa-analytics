@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useStore } from "../lib/store";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -8,6 +9,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const setToken = useStore((s) => s.setToken);
 
   useEffect(() => {
     api.setupStatus().then(({ hasUsers }) => {
@@ -21,7 +23,7 @@ export default function Login() {
     setError(null);
     try {
       const { token } = await api.login(username, password);
-      localStorage.setItem("wt_bearer", token);
+      setToken(token);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

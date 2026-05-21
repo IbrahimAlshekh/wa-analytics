@@ -5,25 +5,39 @@ import { api } from "../lib/api";
 import type { Account, ScheduleSlot } from "../lib/types";
 import QRView from "../components/QRView";
 import PhoneCodeView from "../components/PhoneCodeView";
+import { useStore } from "../lib/store";
 
 export default function Accounts() {
   const qc = useQueryClient();
-  const accounts = useQuery({ queryKey: ["accounts"], queryFn: api.listAccounts });
+  const { accounts: storeAccounts, setAccounts, upsertAccount, removeAccount } = useStore();
+  const accountsQ = useQuery({ queryKey: ["accounts"], queryFn: api.listAccounts });
   const [showPair, setShowPair] = useState(false);
   const [pairTab, setPairTab] = useState<"qr" | "phone">("qr");
+
+  // Seed store from query
+  useEffect(() => {
+    if (accountsQ.data) setAccounts(accountsQ.data);
+  }, [accountsQ.data, setAccounts]);
 
   const toggle = useMutation({
     mutationFn: ({ id, trackingActive }: { id: number; trackingActive: boolean }) =>
       api.updateAccount(id, { trackingActive }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onSuccess: (updated) => {
+      upsertAccount(updated);
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteAccount(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onSuccess: (_, id) => {
+      removeAccount(id);
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
   });
 
-  const list: Account[] = accounts.data ?? [];
+  // Use store as the read source; fall back to query data while store seeds
+  const list: Account[] = storeAccounts.length > 0 ? storeAccounts : (accountsQ.data ?? []);
 
   return (
     <div className="col" style={{ gap: 20 }}>
@@ -117,13 +131,15 @@ function AccountRow({
   onDelete: () => void;
 }) {
   const qc = useQueryClient();
+  const upsertAccount = useStore((s) => s.upsertAccount);
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(account.label);
   const [showSchedule, setShowSchedule] = useState(false);
 
   const saveLabel = useMutation({
     mutationFn: () => api.updateAccount(account.id, { label }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      upsertAccount(updated);
       setEditing(false);
       qc.invalidateQueries({ queryKey: ["accounts"] });
     },

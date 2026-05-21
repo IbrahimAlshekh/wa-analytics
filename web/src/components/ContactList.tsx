@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
+import { useStore } from "../lib/store";
 
 interface Props {
   accountId: number;
@@ -32,18 +33,27 @@ export default function ContactList({ accountId }: Props) {
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput, 300);
 
-  // Reset to page 1 whenever the debounced search term changes.
   useEffect(() => { setPage(1); }, [search]);
+
+  const { upsertContacts, upsertContact, removeContact } = useStore();
 
   const contacts = useQuery({
     queryKey: ["contacts", accountId, page, search],
     queryFn: () => api.listContacts(accountId, page, PAGE_SIZE, search),
   });
+
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  const list = contacts.data?.contacts ?? [];
+
+  // Seed store whenever query returns fresh contact data
+  useEffect(() => {
+    if (list.length > 0) upsertContacts(list);
+  }, [list, upsertContacts]);
 
   const syncMutation = useMutation({
     mutationFn: () => api.syncContacts(accountId),
@@ -58,7 +68,8 @@ export default function ContactList({ accountId }: Props) {
 
   const addMutation = useMutation({
     mutationFn: () => api.createContact(accountId, phone, name),
-    onSuccess: () => {
+    onSuccess: (created) => {
+      upsertContact(created);
       setPhone("");
       setName("");
       setError(null);
@@ -72,21 +83,25 @@ export default function ContactList({ accountId }: Props) {
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
       api.updateContact(accountId, id, { trackingEnabled: enabled }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["contacts", accountId] }),
+    onSuccess: (updated) => {
+      upsertContact(updated);
+      qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
+    },
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteContact(accountId, id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      removeContact(id);
       const remaining = (contacts.data?.contacts.length ?? 1) - 1;
       if (remaining === 0 && page > 1) setPage((p) => p - 1);
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+      qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
     },
   });
 
   const total = contacts.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const list = contacts.data?.contacts ?? [];
 
   return (
     <div className="col" style={{ gap: 20 }}>
@@ -190,10 +205,11 @@ export default function ContactList({ accountId }: Props) {
               <ContactRow
                 key={c.id}
                 accountId={accountId}
-                contact={c}
+                contactId={c.id}
                 onToggle={(enabled) => toggle.mutate({ id: c.id, enabled })}
                 onDelete={() => {
-                  if (confirm(`Stop tracking ${c.displayName || c.phone}?`)) {
+                  const contact = c;
+                  if (confirm(`Stop tracking ${contact.displayName || contact.phone}?`)) {
                     remove.mutate(c.id);
                   }
                 }}
@@ -268,26 +284,40 @@ export default function ContactList({ accountId }: Props) {
 
 function ContactRow({
   accountId,
-  contact,
+  contactId,
   onToggle,
   onDelete,
 }: {
   accountId: number;
-  contact: Contact;
+  contactId: number;
   onToggle: (enabled: boolean) => void;
   onDelete: () => void;
 }) {
-  const timeline = useQuery({
-    queryKey: ["timeline", accountId, contact.id],
-    queryFn: () => api.timeline(accountId, contact.id, 0),
-    refetchInterval: 60_000,
-  });
-  const entries = timeline.data?.entries ?? [];
-  const lastPresence = [...entries].reverse().find((e) => e.kind === "presence");
-  const lastAbout = [...entries].reverse().find((e) => e.kind === "about");
+  // Read entirely from store — updates from any component are reflected here
+  const contact = useStore((s) => s.contacts[contactId]);
+  const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contactId}`] ?? []);
+
+  if (!contact) return null;
+
+  const entries = wsEntries;
+  const lastPresence = [...entries]
+    .filter((e) => e.kind === "presence")
+    .sort((a, b) => b.at - a.at)[0];
+  const lastAbout = [...entries]
+    .filter((e) => e.kind === "about")
+    .sort((a, b) => b.at - a.at)[0];
 
   const online = lastPresence?.state === "available";
   const displayName = contact.displayName || contact.phone;
+
+  function formatRelative(unix: number): string {
+    const now = Date.now() / 1000;
+    const diff = Math.max(0, now - unix);
+    if (diff < 60) return `${Math.floor(diff)}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
 
   return (
     <tr>
@@ -349,7 +379,6 @@ function ContactRow({
   );
 }
 
-// Returns page numbers with null representing ellipsis gaps.
 function pageRange(current: number, total: number): (number | null)[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages: (number | null)[] = [1];
@@ -360,13 +389,4 @@ function pageRange(current: number, total: number): (number | null)[] {
   if (right < total - 1) pages.push(null);
   pages.push(total);
   return pages;
-}
-
-function formatRelative(unix: number): string {
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - unix);
-  if (diff < 60) return `${Math.floor(diff)}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }

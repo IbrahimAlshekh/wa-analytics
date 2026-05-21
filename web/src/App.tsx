@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
+import { useStore } from "./lib/store";
 import AccountLayout from "./components/AccountLayout";
 import Accounts from "./pages/Accounts";
 import ContactDetail from "./pages/ContactDetail";
@@ -15,13 +16,13 @@ export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const { token, setToken, backupState, setBackupState, addWsEntry } = useStore();
 
   useEffect(() => {
-    const token = localStorage.getItem("wt_bearer");
     if (!token && !publicPaths.includes(location.pathname)) {
       navigate("/login");
     }
-  }, [location, navigate]);
+  }, [location, navigate, token]);
 
   useEffect(() => {
     ws.start();
@@ -33,6 +34,12 @@ export default function App() {
           break;
         case "presence": {
           const { accountId, contactId } = msg;
+          addWsEntry(accountId, contactId, {
+            kind: "presence",
+            at: msg.observedAt,
+            state: msg.state,
+            lastSeen: msg.lastSeen,
+          });
           qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
           qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
@@ -68,13 +75,10 @@ export default function App() {
     return off;
   }, [qc]);
 
-  const [backupState, setBackupState] = useState<"idle" | "loading" | "error">("idle");
-
   async function triggerBackup() {
     if (backupState === "loading") return;
     setBackupState("loading");
     try {
-      const token = localStorage.getItem("wt_bearer");
       const res = await fetch("/api/backup", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -96,7 +100,7 @@ export default function App() {
   }
 
   const isLogin = publicPaths.includes(location.pathname);
-  const authed = Boolean(localStorage.getItem("wt_bearer"));
+  const authed = Boolean(token);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -119,7 +123,7 @@ export default function App() {
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => {
-                localStorage.removeItem("wt_bearer");
+                setToken(null);
                 navigate("/login");
               }}
             >
