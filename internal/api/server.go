@@ -22,6 +22,7 @@ import (
 type Tracker interface {
 	SubscribeContact(ctx context.Context, c db.Contact)
 	ApplySchedule(accountID int64, forceOffline bool, slots []db.ScheduleSlot)
+	RefreshContactPicture(accountID, contactID int64)
 }
 
 // Config holds runtime configuration for the API server.
@@ -146,6 +147,8 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))
 	s.mux.Handle("POST /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleSendMessage))
 	s.mux.Handle("POST /api/accounts/{id}/contacts/{cid}/messages/fetch-history", apiAuth(s.handleFetchMessageHistory))
+	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stories", apiAuth(s.handleListStories))
+	s.mux.Handle("POST /api/accounts/{id}/contacts/{cid}/refresh-picture", apiAuth(s.handleRefreshPicture))
 
 	// Media (protected)
 	if s.cfg.MediaDir != "" {

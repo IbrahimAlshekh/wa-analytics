@@ -8,6 +8,7 @@ import type {
   MessagesPage,
   ScheduleSlot,
   StatsSummary,
+  Story,
   TimelineResponse,
 } from "./types";
 
@@ -141,6 +142,12 @@ export const api = {
     request<AccountSchedule>("GET", `/accounts/${accountId}/schedule`),
   putSchedule: (accountId: number, forceOffline: boolean, slots: ScheduleSlot[]) =>
     request<AccountSchedule>("PUT", `/accounts/${accountId}/schedule`, { forceOffline, slots }),
+
+  stories: (accountId: number, contactId: number) =>
+    request<Story[]>("GET", `/accounts/${accountId}/contacts/${contactId}/stories`),
+
+  refreshPicture: (accountId: number, contactId: number) =>
+    request<{ started: boolean }>("POST", `/accounts/${accountId}/contacts/${contactId}/refresh-picture`),
 
   fetchMessageHistory: (accountId: number, contactId: number) =>
     request<{ started: boolean }>("POST", `/accounts/${accountId}/contacts/${contactId}/messages/fetch-history`),

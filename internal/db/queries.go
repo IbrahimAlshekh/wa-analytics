@@ -567,6 +567,142 @@ func (db *DB) ListMessageEventsByContact(ctx context.Context, contactID int64) (
 	return out, rows.Err()
 }
 
+// --- Stories ----------------------------------------------------------------
+
+type Story struct {
+	ID         int64  `json:"id"`
+	AccountID  int64  `json:"accountId"`
+	ContactID  *int64 `json:"contactId,omitempty"`
+	SenderJID  string `json:"senderJid"`
+	StoryID    string `json:"storyId"`
+	MediaType  string `json:"mediaType,omitempty"`
+	MediaPath  string `json:"mediaPath,omitempty"`
+	Caption    string `json:"caption,omitempty"`
+	PostedAt   int64  `json:"postedAt"`
+	ReceivedAt int64  `json:"receivedAt"`
+}
+
+func (db *DB) InsertStory(ctx context.Context, s Story) (Story, error) {
+	res, err := db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO stories
+		 (account_id, contact_id, sender_jid, story_id, media_type, media_path, caption, posted_at, received_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.AccountID, nullInt64Ptr(s.ContactID), db.enc(s.SenderJID), s.StoryID,
+		nullStr(s.MediaType), nullStr(s.MediaPath), nullStr(s.Caption),
+		s.PostedAt, s.ReceivedAt)
+	if err != nil {
+		return Story{}, err
+	}
+	id, _ := res.LastInsertId()
+	if id == 0 {
+		return Story{}, nil // duplicate
+	}
+	s.ID = id
+	return s, nil
+}
+
+// RepairStoryMessages moves any messages with chat_jid == "status@broadcast"
+// from the messages table into the stories table. These were stored there due
+// to a JID struct-equality bug in processHistoryMessage. Safe to call multiple
+// times (INSERT OR IGNORE + per-row DELETE).
+func (db *DB) RepairStoryMessages(ctx context.Context) (int, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, account_id, contact_id, sender_jid, message_id,
+		        COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''),
+		        timestamp, received_at, chat_jid
+		 FROM messages`)
+	if err != nil {
+		return 0, err
+	}
+
+	type candidate struct {
+		id         int64
+		accountID  int64
+		contactID  sql.NullInt64
+		senderJID  string // already encrypted in DB
+		messageID  string
+		text       string
+		mediaType  string
+		mediaPath  string
+		ts         int64
+		receivedAt int64
+		chatJID    string // already encrypted in DB
+	}
+
+	var hits []candidate
+	for rows.Next() {
+		var c candidate
+		if err := rows.Scan(&c.id, &c.accountID, &c.contactID, &c.senderJID,
+			&c.messageID, &c.text, &c.mediaType, &c.mediaPath,
+			&c.ts, &c.receivedAt, &c.chatJID); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		if db.dec(c.chatJID) == "status@broadcast" {
+			hits = append(hits, c)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	moved := 0
+	for _, c := range hits {
+		var cid any
+		if c.contactID.Valid {
+			cid = c.contactID.Int64
+		}
+		// senderJID is already stored encrypted — use it verbatim to avoid double-encryption.
+		if _, err := db.ExecContext(ctx,
+			`INSERT OR IGNORE INTO stories
+			 (account_id, contact_id, sender_jid, story_id, media_type, media_path, caption, posted_at, received_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			c.accountID, cid, c.senderJID, c.messageID,
+			nullStr(c.mediaType), nullStr(c.mediaPath), nullStr(c.text),
+			c.ts, c.receivedAt,
+		); err != nil {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, `DELETE FROM messages WHERE id=?`, c.id); err != nil {
+			continue
+		}
+		moved++
+	}
+	return moved, nil
+}
+
+func (db *DB) ListStoriesByContact(ctx context.Context, contactID int64) ([]Story, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, account_id, contact_id, sender_jid, story_id,
+		        COALESCE(media_type,''), COALESCE(media_path,''), COALESCE(caption,''),
+		        posted_at, received_at
+		   FROM stories
+		  WHERE contact_id=?
+		  ORDER BY posted_at DESC`,
+		contactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Story
+	for rows.Next() {
+		var s Story
+		var cid sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.AccountID, &cid, &s.SenderJID, &s.StoryID,
+			&s.MediaType, &s.MediaPath, &s.Caption, &s.PostedAt, &s.ReceivedAt); err != nil {
+			return nil, err
+		}
+		if cid.Valid {
+			v := cid.Int64
+			s.ContactID = &v
+		}
+		s.SenderJID = db.dec(s.SenderJID)
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 // --- Timeline ---------------------------------------------------------------
 
 type TimelineKind string

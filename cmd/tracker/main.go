@@ -105,6 +105,12 @@ func main() {
 	}
 	defer store.Close()
 
+	if n, err := store.RepairStoryMessages(ctx); err != nil {
+		slog.Warn("main: repair story messages failed", "err", err)
+	} else if n > 0 {
+		slog.Info("main: migrated misclassified story messages to stories table", "count", n)
+	}
+
 	hub := api.NewHub()
 
 	manager, err := wa.NewClientManager(ctx, cfg.WhatsmeowDBPath(), cfg.WALogLevel)

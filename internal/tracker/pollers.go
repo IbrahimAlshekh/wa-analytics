@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	minPollInterval = 5 * time.Second
-	maxBackoff      = 5 * time.Minute
+	minPollInterval        = 5 * time.Second
+	maxBackoff             = 5 * time.Minute
+	pictureRefreshThrottle = 5 * time.Minute
 )
 
 func (t *Tracker) runPictureLoop() {
@@ -226,6 +227,28 @@ func (t *Tracker) downloadPicture(_ context.Context, pictureID, url string) stri
 		return ""
 	}
 	return filename
+}
+
+// RefreshContactPicture triggers an immediate profile-picture check for the
+// given contact, throttled to at most once every pictureRefreshThrottle.
+// Runs in the calling goroutine; callers should invoke via go.
+func (t *Tracker) RefreshContactPicture(contactID int64) {
+	now := time.Now().Unix()
+	if v, ok := t.pictureFetchAt.Load(contactID); ok {
+		if last, _ := v.(int64); now-last < int64(pictureRefreshThrottle.Seconds()) {
+			return
+		}
+	}
+	t.pictureFetchAt.Store(contactID, now)
+
+	if !t.wa.IsConnected() {
+		return
+	}
+	c, err := t.db.GetContact(t.ctx, t.accountID, contactID)
+	if err != nil {
+		return
+	}
+	t.checkPicture(t.ctx, c)
 }
 
 func isRateLimit(err error) bool {

@@ -93,6 +93,19 @@ export interface MessagesPage {
   events: MessageEvent[];
 }
 
+export interface Story {
+  id: number;
+  accountId: number;
+  contactId?: number;
+  senderJid: string;
+  storyId: string;
+  mediaType?: string;
+  mediaPath?: string;
+  caption?: string;
+  postedAt: number;
+  receivedAt: number;
+}
+
 export interface TokenCount {
   token: string;
   count: number;
@@ -255,4 +268,5 @@ export type WSEnvelope =
       timestamp: number;
     }
   | { type: "history_sync"; accountId: number }
-  | { type: "message_event"; accountId: number; contactId: number };
+  | { type: "message_event"; accountId: number; contactId: number }
+  | { type: "story"; accountId: number; contactId: number; storyId: string; mediaType?: string; postedAt: number };

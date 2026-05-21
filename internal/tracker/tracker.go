@@ -90,6 +90,16 @@ func (m *TrackerManager) ApplySchedule(accountID int64, forceOffline bool, slots
 	t.ApplySchedule(forceOffline, slots)
 }
 
+// RefreshContactPicture triggers an immediate picture check for one contact,
+// throttled internally to once per 5 minutes.
+func (m *TrackerManager) RefreshContactPicture(accountID, contactID int64) {
+	t := m.Get(accountID)
+	if t == nil {
+		return
+	}
+	go t.RefreshContactPicture(contactID)
+}
+
 // SubscribeContact delegates to the correct account's tracker.
 func (m *TrackerManager) SubscribeContact(ctx context.Context, c db.Contact) {
 	t := m.Get(c.AccountID)
@@ -128,9 +138,11 @@ type Tracker struct {
 	backoffMu    sync.RWMutex
 	backoffUntil time.Time
 
-	scheduleMu   sync.RWMutex
-	forceOffline bool
+	scheduleMu    sync.RWMutex
+	forceOffline  bool
 	scheduleSlots []db.ScheduleSlot
+
+	pictureFetchAt sync.Map // int64 contactID → int64 unix seconds
 }
 
 func newTracker(accountID int64, d Deps) *Tracker {
@@ -193,6 +205,15 @@ func (t *Tracker) HandleEvent(evt any) {
 			// We only care about message content, which is in events.Message.
 			// However, some whatsmeow versions might deliver outgoing messages as receipts.
 			// For now, onMessage handles info.IsFromMe correctly.
+		}
+
+	case *events.UndecryptableMessage:
+		chat := v.Info.Chat.ToNonAD()
+		if chat.Server == types.BroadcastServer && chat.User == types.StatusBroadcastJID.User {
+			slog.Warn("tracker: undecryptable story — sender key missing, story cannot be saved",
+				"accountID", t.accountID, "from", v.Info.Sender.String(), "alt", v.Info.SenderAlt.String(), "storyID", v.Info.ID)
+		} else {
+			slog.Debug("tracker: undecryptable message", "accountID", t.accountID, "from", v.Info.Sender.String(), "chat", chat.String())
 		}
 	}
 }
@@ -438,6 +459,13 @@ func (t *Tracker) resolveContactForEvent(senderJID, chatJID types.JID) *int64 {
 
 // onMessage stores an incoming real-time message.
 func (t *Tracker) onMessage(msg *events.Message) {
+	// Stories arrive as messages to status@broadcast — route them separately.
+	chat := msg.Info.Chat.ToNonAD()
+	if chat.Server == types.BroadcastServer && chat.User == types.StatusBroadcastJID.User {
+		t.onStory(msg)
+		return
+	}
+
 	info := msg.Info
 	now := time.Now().Unix()
 
@@ -623,6 +651,99 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		"mediaType": mediaType,
 		"mediaPath": mediaPath,
 		"timestamp": info.Timestamp.Unix(),
+	})
+}
+
+// resolveStoryContact tries to find a tracked contact for a story sender,
+// checking both primary and alternate JIDs (LID / phone) so we don't miss a
+// story just because the sender key happened to arrive as a LID instead of a
+// phone JID (or vice versa).
+func (t *Tracker) resolveStoryContact(jids ...types.JID) *int64 {
+	for _, jid := range jids {
+		if jid.IsEmpty() {
+			continue
+		}
+		s := jid.String()
+		var c db.Contact
+		var err error
+		if jid.Server == types.HiddenUserServer {
+			c, err = t.db.GetContactByLID(t.ctx, t.accountID, s)
+		} else {
+			c, err = t.db.GetContactByJID(t.ctx, t.accountID, s)
+		}
+		if err == nil {
+			return &c.ID
+		}
+	}
+	return nil
+}
+
+// onStory handles a WhatsApp Status/Story update (chat == status@broadcast).
+func (t *Tracker) onStory(msg *events.Message) {
+	info := msg.Info
+	now := time.Now().Unix()
+
+	senderJID := info.Sender.ToNonAD()
+	senderStr := senderJID.String()
+
+	slog.Debug("tracker: story event received", "accountID", t.accountID, "from", senderStr, "alt", info.SenderAlt.String(), "storyID", info.ID)
+
+	// Only persist stories from tracked contacts.
+	// Try primary sender JID, then the alternate address (LID ↔ phone fallback).
+	contactID := t.resolveStoryContact(senderJID, info.SenderAlt.ToNonAD())
+	if contactID == nil {
+		slog.Debug("tracker: story from untracked contact, skipping", "accountID", t.accountID, "from", senderStr, "alt", info.SenderAlt.String())
+		return
+	}
+
+	text := extractText(msg.Message)
+	mediaType := extractMediaType(msg.Message)
+	var mediaPath string
+
+	if mediaType != "" && t.mediaDir != "" {
+		if downloadable := getDownloadable(msg.Message); downloadable != nil {
+			data, err := t.wa.DownloadMedia(t.ctx, downloadable)
+			if err != nil {
+				slog.Warn("tracker: story download media failed", "accountID", t.accountID, "storyID", info.ID, "err", err)
+			} else {
+				ext := getExtension(mediaType, msg.Message)
+				filename := fmt.Sprintf("story_%d_%s%s", t.accountID, info.ID, ext)
+				fullPath := filepath.Join(t.mediaDir, filename)
+				if err := os.WriteFile(fullPath, data, 0o644); err != nil {
+					slog.Error("tracker: story save media failed", "accountID", t.accountID, "storyID", info.ID, "err", err)
+				} else {
+					mediaPath = filename
+				}
+			}
+		}
+	}
+
+	s := db.Story{
+		AccountID:  t.accountID,
+		ContactID:  contactID,
+		SenderJID:  senderStr,
+		StoryID:    info.ID,
+		MediaType:  mediaType,
+		MediaPath:  mediaPath,
+		Caption:    text,
+		PostedAt:   info.Timestamp.Unix(),
+		ReceivedAt: now,
+	}
+	saved, err := t.db.InsertStory(t.ctx, s)
+	if err != nil {
+		slog.Error("tracker: insert story failed", "accountID", t.accountID, "storyID", info.ID, "err", err)
+		return
+	}
+	if saved.ID == 0 {
+		return // duplicate
+	}
+	slog.Info("tracker: story stored", "accountID", t.accountID, "contact", senderStr, "storyID", info.ID, "mediaType", mediaType)
+	t.hub.Broadcast("story", map[string]any{
+		"accountId": t.accountID,
+		"contactId": *contactID,
+		"storyId":   info.ID,
+		"mediaType": mediaType,
+		"postedAt":  info.Timestamp.Unix(),
 	})
 }
 

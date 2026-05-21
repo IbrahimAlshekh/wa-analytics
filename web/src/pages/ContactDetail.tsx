@@ -8,6 +8,7 @@ import StatsStrip from "../components/StatsStrip";
 import PresencePanel from "../components/PresencePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
 import ContactAvatar from "../components/ContactAvatar";
+import StoriesPanel from "../components/StoriesPanel";
 import { useStore, wsKey } from "../lib/store";
 
 const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
@@ -48,11 +49,12 @@ function formatElapsed(startAt: number): string {
   return `${m}m`;
 }
 
-type MainTab = "status" | "presence" | "analytics";
+type MainTab = "status" | "presence" | "stories" | "analytics";
 
 const MAIN_TABS: { value: MainTab; label: string }[] = [
   { value: "status", label: "Status" },
   { value: "presence", label: "Presence" },
+  { value: "stories", label: "Stories" },
   { value: "analytics", label: "Analytics" },
 ];
 
@@ -89,6 +91,12 @@ export default function ContactDetail() {
       navigate(`/accounts/${accountId}/contacts`);
     },
   });
+
+  // Trigger a fresh profile-picture check whenever the contact page is opened.
+  // The backend throttles this to once per 5 minutes per contact.
+  useEffect(() => {
+    api.refreshPicture(accountId, cid).catch(() => {});
+  }, [accountId, cid]);
 
   const tl = useQuery({
     queryKey: ["timeline", accountId, cid],
@@ -261,6 +269,11 @@ export default function ContactDetail() {
           <StatsStrip accountId={accountId} contactId={cid} />
           <PresencePanel entries={allEntries} contact={c} />
         </>
+      )}
+
+      {/* Tab: Stories */}
+      {tab === "stories" && (
+        <StoriesPanel accountId={accountId} contactId={cid} />
       )}
 
       {/* Tab: Analytics */}

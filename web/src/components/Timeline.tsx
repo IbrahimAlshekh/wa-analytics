@@ -1,14 +1,9 @@
 import { useMemo } from "react";
 import type { TimelineEntry } from "../lib/types";
+import { getMediaUrl } from "../lib/media";
 
 interface Props {
   entries: TimelineEntry[];
-}
-
-function getMediaUrl(path: string) {
-  const token = localStorage.getItem("wt_bearer");
-  if (!token) return `/media/${path}`;
-  return `/media/${path}?token=${encodeURIComponent(token)}`;
 }
 
 function MediaPreview({ type, path }: { type?: string; path: string }) {
@@ -46,7 +41,7 @@ interface NonPresence {
   kind: "picture" | "about";
   at: number;
   text?: string;
-  url?: string;
+  mediaPath?: string;
 }
 
 type Block =
@@ -155,8 +150,8 @@ function EventBlock({ ev }: { ev: NonPresence }) {
       {ev.kind === "picture" ? (
         <span>
           Profile picture changed
-          {ev.url ? (
-            <> <a href={ev.url} target="_blank" rel="noreferrer">view</a></>
+          {ev.mediaPath ? (
+            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer">view</a></>
           ) : null}
         </span>
       ) : (
@@ -180,7 +175,7 @@ function buildBlocks(entries: TimelineEntry[]): Block[] {
       kind: e.kind as "picture" | "about",
       at: e.at,
       text: e.text,
-      url: e.url,
+      mediaPath: e.mediaPath,
     }))
     .sort((a, b) => a.at - b.at);
 

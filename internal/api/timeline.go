@@ -403,6 +403,52 @@ func (s *Server) handleFetchMessageHistory(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusAccepted, map[string]bool{"started": true})
 }
 
+func (s *Server) handleListStories(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cid, err := parseCID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.db.GetContact(r.Context(), accountID, cid); err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	stories, err := s.db.ListStoriesByContact(r.Context(), cid)
+	if err != nil {
+		slog.Error("stories: list failed", "accountID", accountID, "contact_id", cid, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if stories == nil {
+		stories = []db.Story{}
+	}
+	writeJSON(w, http.StatusOK, stories)
+}
+
+func (s *Server) handleRefreshPicture(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cid, err := parseCID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.db.GetContact(r.Context(), accountID, cid); err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	s.tracker.RefreshContactPicture(accountID, cid)
+	writeJSON(w, http.StatusAccepted, map[string]bool{"started": true})
+}
+
 // wajid converts a phone number to a JID string.
 func wajid(phone string) (string, error) {
 	jid, err := wa.JIDFromPhone(phone)
