@@ -1,29 +1,28 @@
-/* ── Design tokens ─────────────────────────────────────────────────── */
+/* ── Design tokens (dark-only) ──────────────────────────────────────── */
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
 
-  /* Colors — Light */
-  --bg:           #f8fafc;
-  --bg-subtle:    #f1f5f9;
-  --fg:           #0f172a;
-  --fg-muted:     #64748b;
-  --border:       #e2e8f0;
-  --border-sub:   #f1f5f9;
-  --accent:       #16a34a;
-  --accent-hov:   #15803d;
-  --accent-soft:  #f0fdf4;
-  --accent-dim:   rgba(22, 163, 74, 0.12);
-  --danger:       #dc2626;
-  --danger-soft:  #fef2f2;
-  --offline:      #94a3b8;
-  --card:         #ffffff;
-  --surface:      #f8fafc;
+  --bg:          #0d1117;
+  --bg-subtle:   #161b22;
+  --fg:          #e6edf3;
+  --fg-muted:    #8b949e;
+  --border:      #21262d;
+  --border-sub:  #1c2128;
+  --accent:      #22c55e;
+  --accent-hov:  #16a34a;
+  --accent-soft: #0d2818;
+  --accent-dim:  rgba(34, 197, 94, 0.12);
+  --danger:      #f87171;
+  --danger-soft: #2a1515;
+  --offline:     #4d5566;
+  --card:        #161b22;
+  --surface:     #0d1117;
 
   /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.30), 0 2px 4px rgba(0, 0, 0, 0.20);
 
   /* Radius */
   --r-xs:   4px;
@@ -38,44 +37,12 @@
   /* Metallic border gradient */
   --border-metallic: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(218, 225, 235, 0.55) 22%,
-    rgba(196, 206, 220, 0.30) 50%,
-    rgba(215, 222, 232, 0.60) 78%,
-    rgba(255, 255, 255, 0.88) 100%
+    rgba(92, 112, 148, 0.70) 0%,
+    rgba(42, 55, 78, 0.55) 25%,
+    rgba(26, 36, 56, 0.80) 50%,
+    rgba(40, 53, 78, 0.55) 75%,
+    rgba(88, 108, 144, 0.65) 100%
   );
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:          #0d1117;
-    --bg-subtle:   #161b22;
-    --fg:          #e6edf3;
-    --fg-muted:    #8b949e;
-    --border:      #21262d;
-    --border-sub:  #1c2128;
-    --accent:      #22c55e;
-    --accent-hov:  #16a34a;
-    --accent-soft: #0d2818;
-    --accent-dim:  rgba(34, 197, 94, 0.12);
-    --danger:      #f87171;
-    --danger-soft: #2a1515;
-    --offline:     #4d5566;
-    --card:        #161b22;
-    --surface:     #0d1117;
-    --shadow-xs:   0 1px 2px rgba(0, 0, 0, 0.20);
-    --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
-    --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.30), 0 2px 4px rgba(0, 0, 0, 0.20);
-
-    --border-metallic: linear-gradient(
-      145deg,
-      rgba(92, 112, 148, 0.70) 0%,
-      rgba(42, 55, 78, 0.55) 25%,
-      rgba(26, 36, 56, 0.80) 50%,
-      rgba(40, 53, 78, 0.55) 75%,
-      rgba(88, 108, 144, 0.65) 100%
-    );
-  }
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────── */
