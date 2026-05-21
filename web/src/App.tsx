@@ -62,6 +62,11 @@ export default function App() {
           }
           break;
         }
+        case "message_event": {
+          const { accountId, contactId } = msg;
+          qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
+          break;
+        }
         case "history_sync": {
           const { accountId } = msg;
           // Messages page drives its own refetch via WS listener.

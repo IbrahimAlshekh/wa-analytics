@@ -85,6 +85,13 @@ func (t *Tracker) processHistoryMessage(webMsg *waWeb.WebMessageInfo) bool {
 	senderStr := senderJID.String()
 
 	msg := webMsg.GetMessage()
+
+	// Skip protocol messages (delete, edit, ephemeral) and reactions — they are
+	// not regular chat messages and have no place in the messages table.
+	if msg.GetProtocolMessage() != nil || msg.GetReactionMessage() != nil {
+		return false
+	}
+
 	text := extractText(msg)
 	mediaType := extractMediaType(msg)
 
@@ -112,16 +119,17 @@ func (t *Tracker) processHistoryMessage(webMsg *waWeb.WebMessageInfo) bool {
 	}
 
 	m := db.Message{
-		AccountID:  t.accountID,
-		ContactID:  contactID,
-		ChatJID:    chatStr,
-		MessageID:  msgID,
-		SenderJID:  senderStr,
-		IsFromMe:   isFromMe,
-		Timestamp:  ts,
-		Text:       text,
-		MediaType:  mediaType,
-		ReceivedAt: time.Now().Unix(),
+		AccountID:       t.accountID,
+		ContactID:       contactID,
+		ChatJID:         chatStr,
+		MessageID:       msgID,
+		SenderJID:       senderStr,
+		IsFromMe:        isFromMe,
+		Timestamp:       ts,
+		Text:            text,
+		MediaType:       mediaType,
+		ReceivedAt:      time.Now().Unix(),
+		QuotedMessageID: extractQuotedMessageID(msg),
 	}
 
 	f := analytics.ExtractFeatures(m.Text, time.Unix(ts, 0))

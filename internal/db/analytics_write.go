@@ -53,8 +53,9 @@ func (db *DB) insertMessageWithDerived(ctx context.Context, m Message, f analyti
 		  text, media_type, media_path, received_at,
 		  word_count, char_count, has_question, has_laughter,
 		  emoji_json, word_json, url_domain_json,
-		  emotion_mask, emotion_counts_json, hour_local, dow_local)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?,?)`,
+		  emotion_mask, emotion_counts_json, hour_local, dow_local,
+		  quoted_message_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?,?, ?)`,
 		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
 		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
 		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt,
@@ -64,6 +65,7 @@ func (db *DB) insertMessageWithDerived(ctx context.Context, m Message, f analyti
 		jsonOrNullStr(f.URLDomains),
 		f.EmotionMask, emotionCountsJSON(f.EmotionCounts),
 		f.HourLocal, f.DowLocal,
+		nullStr(m.QuotedMessageID),
 	)
 	if err != nil {
 		return Message{}, err

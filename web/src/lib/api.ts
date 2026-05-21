@@ -5,7 +5,7 @@ import type {
   AnalyticsReport,
   Contact,
   ContactsPage,
-  Message,
+  MessagesPage,
   ScheduleSlot,
   StatsSummary,
   TimelineResponse,
@@ -125,7 +125,7 @@ export const api = {
     ),
   messages: (accountId: number, contactId: number, before = 0, limit = 50) => {
     const q = before ? `before=${before}&limit=${limit}` : `limit=${limit}`;
-    return request<Message[]>(
+    return request<MessagesPage>(
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/messages?${q}`,
     );

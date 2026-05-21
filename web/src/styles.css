@@ -586,7 +586,6 @@ h1, h2, h3, h4 {
   color: white;
   border-bottom-right-radius: 4px;
 }
-.message-me .message-time { color: rgba(255,255,255,0.65); }
 .message-them {
   align-self: flex-start;
   background: var(--card);
@@ -594,7 +593,61 @@ h1, h2, h3, h4 {
   border-bottom-left-radius: 4px;
 }
 .message-body { word-break: break-word; line-height: 1.45; }
-.message-time { font-size: 11px; color: var(--fg-muted); align-self: flex-end; margin-top: 3px; }
+.message-footer { display: flex; align-items: center; gap: 6px; margin-top: 3px; justify-content: flex-end; }
+.message-time { font-size: 11px; color: var(--fg-muted); }
+.message-me .message-time { color: rgba(255,255,255,0.65); }
+
+/* Reply context preview */
+.message-reply-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.7;
+  border-left: 2px solid currentColor;
+  padding: 2px 6px;
+  margin-bottom: 5px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.message-me .message-reply-preview { background: rgba(255,255,255,0.15); }
+.message-reply-icon { flex-shrink: 0; }
+.message-reply-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Deleted message — original text stays visible but dimmed with strikethrough */
+.message-body-deleted {
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-color: currentColor;
+}
+.message-deleted-badge {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.message-me .message-deleted-badge { color: rgba(255,255,255,0.8); }
+
+/* Edited badge */
+.message-edited-badge { font-size: 10px; opacity: 0.6; }
+.message-me .message-edited-badge { color: rgba(255,255,255,0.7); }
+
+/* Reactions */
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.message-reaction {
+  font-size: 18px;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+}
 
 /* ── Login page ─────────────────────────────────────────────────────── */
 .login-wrap {

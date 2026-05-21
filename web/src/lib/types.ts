@@ -71,6 +71,25 @@ export interface Message {
   mediaType?: string;
   mediaPath?: string;
   receivedAt: number;
+  quotedMessageId?: string;
+}
+
+export interface MessageEvent {
+  id: number;
+  accountId: number;
+  contactId?: number;
+  targetMessageId: string;
+  kind: "reaction" | "delete" | "edit";
+  actorJid: string;
+  isFromMe: boolean;
+  emoji?: string;
+  newText?: string;
+  observedAt: number;
+}
+
+export interface MessagesPage {
+  messages: Message[];
+  events: MessageEvent[];
 }
 
 export interface TokenCount {
@@ -234,4 +253,5 @@ export type WSEnvelope =
       mediaPath?: string;
       timestamp: number;
     }
-  | { type: "history_sync"; accountId: number };
+  | { type: "history_sync"; accountId: number }
+  | { type: "message_event"; accountId: number; contactId: number };

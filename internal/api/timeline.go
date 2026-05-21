@@ -128,8 +128,17 @@ func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if msgs == nil {
 		msgs = []db.Message{}
 	}
-	slog.Debug("messages: listed", "accountID", accountID, "contact_id", cid, "count", len(msgs))
-	writeJSON(w, http.StatusOK, msgs)
+	events, err := s.db.ListMessageEventsByContact(r.Context(), cid)
+	if err != nil {
+		slog.Error("messages: list events failed", "accountID", accountID, "contact_id", cid, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if events == nil {
+		events = []db.MessageEvent{}
+	}
+	slog.Debug("messages: listed", "accountID", accountID, "contact_id", cid, "count", len(msgs), "events", len(events))
+	writeJSON(w, http.StatusOK, map[string]any{"messages": msgs, "events": events})
 }
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {

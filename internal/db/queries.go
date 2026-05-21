@@ -433,28 +433,42 @@ func (db *DB) InsertAbout(ctx context.Context, contactID int64, text string, set
 // --- Messages ---------------------------------------------------------------
 
 type Message struct {
-	ID         int64  `json:"id"`
-	AccountID  int64  `json:"accountId"`
-	ContactID  *int64 `json:"contactId,omitempty"`
-	ChatJID    string `json:"chatJid"`
-	MessageID  string `json:"messageId"`
-	SenderJID  string `json:"senderJid"`
-	IsFromMe   bool   `json:"isFromMe"`
-	Timestamp  int64  `json:"timestamp"`
-	Text       string `json:"text,omitempty"`
-	MediaType  string `json:"mediaType,omitempty"`
-	MediaPath  string `json:"mediaPath,omitempty"`
-	ReceivedAt int64  `json:"receivedAt"`
+	ID              int64  `json:"id"`
+	AccountID       int64  `json:"accountId"`
+	ContactID       *int64 `json:"contactId,omitempty"`
+	ChatJID         string `json:"chatJid"`
+	MessageID       string `json:"messageId"`
+	SenderJID       string `json:"senderJid"`
+	IsFromMe        bool   `json:"isFromMe"`
+	Timestamp       int64  `json:"timestamp"`
+	Text            string `json:"text,omitempty"`
+	MediaType       string `json:"mediaType,omitempty"`
+	MediaPath       string `json:"mediaPath,omitempty"`
+	ReceivedAt      int64  `json:"receivedAt"`
+	QuotedMessageID string `json:"quotedMessageId,omitempty"`
+}
+
+type MessageEvent struct {
+	ID              int64  `json:"id"`
+	AccountID       int64  `json:"accountId"`
+	ContactID       *int64 `json:"contactId,omitempty"`
+	TargetMessageID string `json:"targetMessageId"`
+	Kind            string `json:"kind"`
+	ActorJID        string `json:"actorJid"`
+	IsFromMe        bool   `json:"isFromMe"`
+	Emoji           string `json:"emoji,omitempty"`
+	NewText         string `json:"newText,omitempty"`
+	ObservedAt      int64  `json:"observedAt"`
 }
 
 func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
 	res, err := db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO messages
-		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, media_path, received_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, media_path, received_at, quoted_message_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
 		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
-		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt)
+		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt, nullStr(m.QuotedMessageID))
 	if err != nil {
 		return Message{}, err
 	}
@@ -470,7 +484,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at
+	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at, COALESCE(quoted_message_id,'')
 		   FROM messages WHERE contact_id=?`
 	args := []any{contactID}
 	if before > 0 {
@@ -491,7 +505,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 		var cid sql.NullInt64
 		var fromMe int
 		if err := rows.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
-			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt); err != nil {
+			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt, &m.QuotedMessageID); err != nil {
 			return nil, err
 		}
 		if cid.Valid {
@@ -502,6 +516,49 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 		m.SenderJID = db.dec(m.SenderJID)
 		m.IsFromMe = fromMe == 1
 		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (db *DB) InsertMessageEvent(ctx context.Context, e MessageEvent) error {
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO message_events
+		 (account_id, contact_id, target_message_id, kind, actor_jid, is_from_me, emoji, new_text, observed_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.AccountID, nullInt64Ptr(e.ContactID), e.TargetMessageID, e.Kind,
+		db.enc(e.ActorJID), boolToInt(e.IsFromMe),
+		nullStr(e.Emoji), nullStr(e.NewText), e.ObservedAt)
+	return err
+}
+
+func (db *DB) ListMessageEventsByContact(ctx context.Context, contactID int64) ([]MessageEvent, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, account_id, contact_id, target_message_id, kind, actor_jid,
+		        is_from_me, COALESCE(emoji,''), COALESCE(new_text,''), observed_at
+		   FROM message_events
+		  WHERE contact_id=?
+		  ORDER BY observed_at ASC`,
+		contactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []MessageEvent
+	for rows.Next() {
+		var e MessageEvent
+		var cid sql.NullInt64
+		var fromMe int
+		if err := rows.Scan(&e.ID, &e.AccountID, &cid, &e.TargetMessageID, &e.Kind,
+			&e.ActorJID, &fromMe, &e.Emoji, &e.NewText, &e.ObservedAt); err != nil {
+			return nil, err
+		}
+		if cid.Valid {
+			v := cid.Int64
+			e.ContactID = &v
+		}
+		e.ActorJID = db.dec(e.ActorJID)
+		e.IsFromMe = fromMe == 1
+		out = append(out, e)
 	}
 	return out, rows.Err()
 }
@@ -791,7 +848,8 @@ func sortByAt(es []TimelineEntry) {
 func (db *DB) GetOldestContactMessage(ctx context.Context, accountID, contactID int64) (Message, error) {
 	row := db.QueryRowContext(ctx,
 		`SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp,
-		        COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at
+		        COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at,
+		        COALESCE(quoted_message_id,'')
 		 FROM messages
 		 WHERE account_id=? AND contact_id=?
 		 ORDER BY timestamp ASC
@@ -802,7 +860,7 @@ func (db *DB) GetOldestContactMessage(ctx context.Context, accountID, contactID 
 	var cid sql.NullInt64
 	var fromMe int
 	if err := row.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
-		&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt); err != nil {
+		&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt, &m.QuotedMessageID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Message{}, nil
 		}

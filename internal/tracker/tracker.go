@@ -413,10 +413,102 @@ func (t *Tracker) onPresence(p *events.Presence) {
 	})
 }
 
+// resolveContactForEvent finds the contact ID for a sender JID, falling back to the
+// chat JID (used for outgoing messages where sender == own JID).
+func (t *Tracker) resolveContactForEvent(senderJID, chatJID types.JID) *int64 {
+	lookup := func(jid types.JID) *int64 {
+		s := jid.String()
+		var c db.Contact
+		var err error
+		if jid.Server == types.HiddenUserServer {
+			c, err = t.db.GetContactByLID(t.ctx, t.accountID, s)
+		} else {
+			c, err = t.db.GetContactByJID(t.ctx, t.accountID, s)
+		}
+		if err == nil {
+			return &c.ID
+		}
+		return nil
+	}
+	if id := lookup(senderJID); id != nil {
+		return id
+	}
+	return lookup(chatJID)
+}
+
 // onMessage stores an incoming real-time message.
 func (t *Tracker) onMessage(msg *events.Message) {
 	info := msg.Info
 	now := time.Now().Unix()
+
+	// ── Special message actions ──────────────────────────────────────────────
+	// Reactions, deletions, and edits arrive as events.Message but are not
+	// regular chat messages. Handle them first and return early.
+
+	if reaction := msg.Message.GetReactionMessage(); reaction != nil {
+		targetID := reaction.GetKey().GetID()
+		if targetID == "" {
+			return
+		}
+		contactID := t.resolveContactForEvent(info.Sender.ToNonAD(), info.Chat.ToNonAD())
+		if err := t.db.InsertMessageEvent(t.ctx, db.MessageEvent{
+			AccountID:       t.accountID,
+			ContactID:       contactID,
+			TargetMessageID: targetID,
+			Kind:            "reaction",
+			ActorJID:        info.Sender.ToNonAD().String(),
+			IsFromMe:        info.IsFromMe,
+			Emoji:           reaction.GetText(),
+			ObservedAt:      now,
+		}); err != nil {
+			slog.Warn("tracker: insert reaction event failed", "accountID", t.accountID, "err", err)
+		}
+		if contactID != nil {
+			t.hub.Broadcast("message_event", map[string]any{"accountId": t.accountID, "contactId": *contactID})
+		}
+		return
+	}
+
+	if proto := msg.Message.GetProtocolMessage(); proto != nil {
+		targetID := proto.GetKey().GetID()
+		if targetID == "" {
+			return
+		}
+		contactID := t.resolveContactForEvent(info.Sender.ToNonAD(), info.Chat.ToNonAD())
+		switch proto.GetType() {
+		case waE2E.ProtocolMessage_REVOKE:
+			if err := t.db.InsertMessageEvent(t.ctx, db.MessageEvent{
+				AccountID:       t.accountID,
+				ContactID:       contactID,
+				TargetMessageID: targetID,
+				Kind:            "delete",
+				ActorJID:        info.Sender.ToNonAD().String(),
+				IsFromMe:        info.IsFromMe,
+				ObservedAt:      now,
+			}); err != nil {
+				slog.Warn("tracker: insert delete event failed", "accountID", t.accountID, "err", err)
+			} else if contactID != nil {
+				t.hub.Broadcast("message_event", map[string]any{"accountId": t.accountID, "contactId": *contactID})
+			}
+		case waE2E.ProtocolMessage_MESSAGE_EDIT:
+			newText := extractText(proto.GetEditedMessage())
+			if err := t.db.InsertMessageEvent(t.ctx, db.MessageEvent{
+				AccountID:       t.accountID,
+				ContactID:       contactID,
+				TargetMessageID: targetID,
+				Kind:            "edit",
+				ActorJID:        info.Sender.ToNonAD().String(),
+				IsFromMe:        info.IsFromMe,
+				NewText:         newText,
+				ObservedAt:      now,
+			}); err != nil {
+				slog.Warn("tracker: insert edit event failed", "accountID", t.accountID, "err", err)
+			} else if contactID != nil {
+				t.hub.Broadcast("message_event", map[string]any{"accountId": t.accountID, "contactId": *contactID})
+			}
+		}
+		return
+	}
 
 	// Determine text and media type.
 	text := extractText(msg.Message)
@@ -480,17 +572,18 @@ func (t *Tracker) onMessage(msg *events.Message) {
 	}
 
 	m := db.Message{
-		AccountID:  t.accountID,
-		ContactID:  contactID,
-		ChatJID:    chatStr,
-		MessageID:  info.ID,
-		SenderJID:  senderStr,
-		IsFromMe:   info.IsFromMe,
-		Timestamp:  info.Timestamp.Unix(),
-		Text:       text,
-		MediaType:  mediaType,
-		MediaPath:  mediaPath,
-		ReceivedAt: now,
+		AccountID:       t.accountID,
+		ContactID:       contactID,
+		ChatJID:         chatStr,
+		MessageID:       info.ID,
+		SenderJID:       senderStr,
+		IsFromMe:        info.IsFromMe,
+		Timestamp:       info.Timestamp.Unix(),
+		Text:            text,
+		MediaType:       mediaType,
+		MediaPath:       mediaPath,
+		ReceivedAt:      now,
+		QuotedMessageID: extractQuotedMessageID(msg.Message),
 	}
 	f := analytics.ExtractFeatures(m.Text, time.Unix(m.Timestamp, 0))
 	saved, err := t.db.InsertMessageWithAnalytics(t.ctx, m, f)
@@ -543,6 +636,12 @@ func extractText(msg *waE2E.Message) string {
 	if ext := msg.GetExtendedTextMessage(); ext != nil {
 		return ext.GetText()
 	}
+	// WhatsApp wraps edited messages in a FutureProofMessage via GetEditedMessage().
+	if em := msg.GetEditedMessage(); em != nil {
+		if inner := extractText(em.GetMessage()); inner != "" {
+			return inner
+		}
+	}
 	if img := msg.GetImageMessage(); img != nil {
 		return img.GetCaption()
 	}
@@ -554,6 +653,40 @@ func extractText(msg *waE2E.Message) string {
 	}
 	if dwc := msg.GetDocumentWithCaptionMessage(); dwc != nil && dwc.Message != nil {
 		return dwc.Message.GetDocumentMessage().GetCaption()
+	}
+	return ""
+}
+
+// extractQuotedMessageID returns the StanzaID of the quoted (replied-to) message,
+// or "" if this message is not a reply.
+func extractQuotedMessageID(msg *waE2E.Message) string {
+	if msg == nil {
+		return ""
+	}
+	if ext := msg.GetExtendedTextMessage(); ext != nil {
+		if ci := ext.GetContextInfo(); ci != nil {
+			return ci.GetStanzaID()
+		}
+	}
+	if img := msg.GetImageMessage(); img != nil {
+		if ci := img.GetContextInfo(); ci != nil {
+			return ci.GetStanzaID()
+		}
+	}
+	if vid := msg.GetVideoMessage(); vid != nil {
+		if ci := vid.GetContextInfo(); ci != nil {
+			return ci.GetStanzaID()
+		}
+	}
+	if aud := msg.GetAudioMessage(); aud != nil {
+		if ci := aud.GetContextInfo(); ci != nil {
+			return ci.GetStanzaID()
+		}
+	}
+	if doc := msg.GetDocumentMessage(); doc != nil {
+		if ci := doc.GetContextInfo(); ci != nil {
+			return ci.GetStanzaID()
+		}
 	}
 	return ""
 }

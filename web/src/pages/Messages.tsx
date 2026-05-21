@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import type { Message } from "../lib/types";
+import type { Message, MessageEvent } from "../lib/types";
 import { ws } from "../lib/ws";
 
 function getMediaUrl(path: string) {
@@ -31,9 +31,10 @@ export default function Messages() {
         api.messages(accountId, cid, pageParam as number, 50),
       initialPageParam: 0,
       getNextPageParam: (lastPage) => {
-        if (!lastPage || lastPage.length === 0) return undefined;
-        if (lastPage.length < 50 && !allowExtraPageRef.current) return undefined;
-        return lastPage[lastPage.length - 1].timestamp;
+        const msgs = lastPage?.messages;
+        if (!msgs || msgs.length === 0) return undefined;
+        if (msgs.length < 50 && !allowExtraPageRef.current) return undefined;
+        return msgs[msgs.length - 1].timestamp;
       },
     });
 
@@ -46,9 +47,38 @@ export default function Messages() {
   });
 
   const msgs: Message[] = useMemo(() => {
-    const all = (data?.pages ?? []).flat();
-    return [...all].sort((a, b) => a.timestamp - b.timestamp);
+    const all = (data?.pages ?? []).flatMap((p) => p.messages);
+    return [...all]
+      // Filter out content-less rows — these are protocol/system messages
+      // (edit notifications, ephemeral acks, etc.) that were stored before
+      // the tracker learned to skip them. They have no displayable content.
+      .filter((m) => m.text || m.mediaType || m.mediaPath || m.quotedMessageId)
+      .sort((a, b) => a.timestamp - b.timestamp);
   }, [data]);
+
+  // Events: server returns all events for the contact on every response; use last page.
+  const events: MessageEvent[] = useMemo(() => {
+    const pages = data?.pages ?? [];
+    if (pages.length === 0) return [];
+    return pages[pages.length - 1].events;
+  }, [data]);
+
+  const eventsByTarget = useMemo(() => {
+    const map = new Map<string, MessageEvent[]>();
+    for (const ev of events) {
+      const list = map.get(ev.targetMessageId) ?? [];
+      list.push(ev);
+      map.set(ev.targetMessageId, list);
+    }
+    return map;
+  }, [events]);
+
+  // Index messages by messageId for reply-to lookups.
+  const msgById = useMemo(() => {
+    const map = new Map<string, Message>();
+    for (const m of msgs) map.set(m.messageId, m);
+    return map;
+  }, [msgs]);
 
   // ── WA history fetch state ───────────────────────────────────────────────
   const [waState, setWAState] = useState<WAFetchState>("idle");
@@ -77,8 +107,8 @@ export default function Messages() {
       allowExtraPageRef.current = false;
       fetchNextPage().then((result) => {
         const pages = result.data?.pages ?? [];
-        const lastPage = pages[pages.length - 1] ?? [];
-        setWAState(lastPage.length > 0 ? "open" : "exhausted");
+        const lastPage = pages[pages.length - 1];
+        setWAState((lastPage?.messages?.length ?? 0) > 0 ? "open" : "exhausted");
       });
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
@@ -200,7 +230,12 @@ export default function Messages() {
 
         <div style={{ flexGrow: 1 }} />
         {msgs.map((m) => (
-          <MessageBubble key={m.id} msg={m} />
+          <MessageBubble
+            key={m.id}
+            msg={m}
+            annotations={eventsByTarget.get(m.messageId) ?? []}
+            quotedMsg={m.quotedMessageId ? msgById.get(m.quotedMessageId) : undefined}
+          />
         ))}
       </div>
 
@@ -289,7 +324,15 @@ function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File
   );
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubble({
+  msg,
+  annotations,
+  quotedMsg,
+}: {
+  msg: Message;
+  annotations: MessageEvent[];
+  quotedMsg?: Message;
+}) {
   const ts = new Date(msg.timestamp * 1000).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -297,23 +340,82 @@ function MessageBubble({ msg }: { msg: Message }) {
     minute: "2-digit",
   });
 
+  // Reactions: last-wins per actor, filter out removals (empty emoji)
+  const reactionsByActor = new Map<string, MessageEvent>();
+  for (const ev of annotations) {
+    if (ev.kind === "reaction") reactionsByActor.set(ev.actorJid, ev);
+  }
+  const activeReactions = [...reactionsByActor.values()].filter((ev) => ev.emoji);
+
+  const isDeleted = annotations.some((ev) => ev.kind === "delete");
+  const edits = annotations
+    .filter((ev) => ev.kind === "edit")
+    .sort((a, b) => b.observedAt - a.observedAt);
+  const latestEdit = edits[0];
+
+  const displayText = latestEdit?.newText || msg.text;
+
   return (
     <div className={`message-bubble ${msg.isFromMe ? "message-me" : "message-them"}`}>
-      <div className="message-body">
+      {/* Reply context */}
+      {quotedMsg && (
+        <div className="message-reply-preview">
+          <span className="message-reply-icon">↩</span>
+          <span className="message-reply-text">
+            {quotedMsg.text
+              ? quotedMsg.text.slice(0, 80) + (quotedMsg.text.length > 80 ? "…" : "")
+              : quotedMsg.mediaType
+              ? `[${quotedMsg.mediaType}]`
+              : "[message]"}
+          </span>
+        </div>
+      )}
+      {!quotedMsg && msg.quotedMessageId && (
+        <div className="message-reply-preview message-reply-unknown">
+          <span className="message-reply-icon">↩</span>
+          <span className="message-reply-text muted">Reply to earlier message</span>
+        </div>
+      )}
+
+      {/* Body — always show original content; overlay deleted style if needed */}
+      <div className={`message-body${isDeleted ? " message-body-deleted" : ""}`}>
         {msg.mediaPath ? (
           <div className="col" style={{ gap: 8 }}>
             <MediaPreview type={msg.mediaType} path={msg.mediaPath} />
-            {msg.text && <span>{msg.text}</span>}
+            {displayText && <span>{displayText}</span>}
           </div>
-        ) : msg.text ? (
-          <span>{msg.text}</span>
+        ) : displayText ? (
+          <span>{displayText}</span>
         ) : msg.mediaType ? (
           <span className="muted">[{msg.mediaType}]</span>
-        ) : (
-          <span className="muted">[message]</span>
-        )}
+        ) : null}
       </div>
-      <time className="message-time">{ts}</time>
+
+      {/* Footer row: badges + time */}
+      <div className="message-footer">
+        {isDeleted && (
+          <span className="message-deleted-badge">🗑 deleted</span>
+        )}
+        {latestEdit && !isDeleted && (
+          <span className="message-edited-badge">✏ edited</span>
+        )}
+        <time className="message-time">{ts}</time>
+      </div>
+
+      {/* Reactions */}
+      {activeReactions.length > 0 && (
+        <div className="message-reactions">
+          {activeReactions.map((ev) => (
+            <span
+              key={ev.actorJid}
+              className="message-reaction"
+              title={ev.isFromMe ? "You" : ev.actorJid}
+            >
+              {ev.emoji}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
