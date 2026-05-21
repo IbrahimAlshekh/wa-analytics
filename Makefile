@@ -18,9 +18,9 @@ web-install:
 
 web-build:
 	# pnpm v11 requires approve-builds AFTER packages are in the local store.
-	# Pass 1: download everything (exits non-zero if build scripts blocked — that's ok).
-	# Pass 2: approve esbuild now that it's in the store, then reinstall + build.
-	cd web && (pnpm install --no-frozen-lockfile || true) && (pnpm approve-builds esbuild || true) && pnpm install --no-frozen-lockfile && pnpm build
+	# Pass 1: download everything (build scripts may be blocked — that's ok).
+	# Pass 2: approve whatever is pending, then reinstall + build.
+	cd web && (pnpm install --no-frozen-lockfile || true) && (pnpm approve-builds --all || true) && pnpm install --no-frozen-lockfile && pnpm build
 
 build: web-build
 	mkdir -p bin
