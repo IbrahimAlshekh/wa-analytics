@@ -104,6 +104,9 @@ fi
 log_step "Installing binary"
 os_install_binary
 
+log_step "Seeding default credentials"
+seed_admin_user
+
 if [ "$EMBED_ICON" = "1" ]; then
     log_step "Setting up native OS icon"
     os_embed_icon
@@ -132,8 +135,10 @@ fi
 printf "  Data dir:   %s\n" "$DATA_DIR"
 printf "\n"
 printf "  ${_BOLD}First-run checklist:${_RESET}\n"
-printf "  1. Add your first user:  tracker user add <username>\n"
-printf "  2. Back up your app key: cat %s/.env\n" "$DATA_DIR"
+printf "  1. Log in with the default credentials:\n"
+printf "       username: admin   password: admin\n"
+printf "  2. Change the admin password after first login.\n"
+printf "  3. Back up your app key: cat %s/.env\n" "$DATA_DIR"
 printf "     Losing this file means encrypted data CANNOT be recovered.\n"
 printf "\n"
 if [ "$OS" = "linux" ]; then

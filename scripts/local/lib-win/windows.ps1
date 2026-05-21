@@ -309,6 +309,26 @@ function Win-ConfigureDns {
     Write-Info "Access the app at:  http://$($script:DOMAIN)$($script:LISTEN)"
 }
 
+# ── Step: seed default admin user ────────────────────────────────────────
+
+function Win-SeedAdminUser {
+    if (-not (Test-Path $BIN_DEST)) {
+        Write-Warn "Binary not found at $BIN_DEST — skipping seed"
+        return
+    }
+
+    $existing = & $BIN_DEST user list 2>&1
+    if ([string]::IsNullOrWhiteSpace($existing)) {
+        Write-Info "Seeding default admin user..."
+        $env:WT_DATA_DIR = $script:DATA_DIR
+        & $BIN_DEST user add admin admin
+        Write-Ok "Default user created — username: admin  password: admin"
+        Write-Warn "Change the admin password after your first login!"
+    } else {
+        Write-Skip "Users already exist — skipping seed"
+    }
+}
+
 # ── Step: verify ──────────────────────────────────────────────────────────
 
 function Win-Verify {

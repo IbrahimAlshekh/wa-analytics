@@ -100,6 +100,9 @@ if (-not $SkipBuild) {
 Write-Step "Installing binary"
 Win-InstallBinary
 
+Write-Step "Seeding default credentials"
+Win-SeedAdminUser
+
 if (-not $SkipService) {
     Write-Step "Installing background service"
     Win-InstallService
@@ -125,8 +128,10 @@ Write-Host "  Domain URL: http://$Domain$Listen" -ForegroundColor White
 Write-Host "  Data dir:   $($script:DATA_DIR)"
 Write-Host ""
 Write-Host "  First-run checklist:" -ForegroundColor Yellow
-Write-Host "  1. Add your first user:  tracker user add <username>"
-Write-Host "  2. Back up your app key: cat $($script:DATA_DIR)\.env"
+Write-Host "  1. Log in with the default credentials:"
+Write-Host "       username: admin   password: admin" -ForegroundColor Yellow
+Write-Host "  2. Change the admin password after first login."
+Write-Host "  3. Back up your app key: $($script:DATA_DIR)\.env"
 Write-Host "     Losing this file means encrypted data CANNOT be recovered."
 Write-Host ""
 Write-Host "  Service commands:"

@@ -101,17 +101,16 @@ powershell -ExecutionPolicy Bypass -File scripts\local\install.ps1
 
 ### First-run checklist
 
-After the service starts for the first time it auto-generates `<datadir>/.env` containing a random encryption key.
+The installer automatically seeds a default login — **username: `admin`, password: `admin`**. Change it immediately after your first login.
+
+After the service starts for the first time it also auto-generates `<datadir>/.env` containing a random encryption key.
 
 ```bash
-# 1. Create your first login user
-tracker user add <username>
-
-# 2. Back up your encryption key — CRITICAL
+# Back up your encryption key — CRITICAL
 cat ~/.local/share/whatsapp-tracker/.env
 ```
 
-Open `http://localhost:8080` (or your configured domain). The app redirects to the **register** page until your first user exists.
+Open `http://localhost:8080` (or your configured domain) and log in with `admin` / `admin`.
 
 ### Managing the service
 

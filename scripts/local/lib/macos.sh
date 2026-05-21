@@ -254,6 +254,23 @@ _print_dns_caveat() {
     log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
+# ── Step: seed default admin user ────────────────────────────────────────
+
+seed_admin_user() {
+    [ -x "$APP_BIN" ] || { log_warn "Binary not found at $APP_BIN — skipping seed"; return 0; }
+
+    local existing
+    existing=$(WT_DATA_DIR="$DATA_DIR" "$APP_BIN" user list 2>/dev/null || true)
+    if [ -z "$existing" ]; then
+        log_info "Seeding default admin user..."
+        WT_DATA_DIR="$DATA_DIR" "$APP_BIN" user add admin admin
+        log_ok "Default user created — username: admin  password: admin"
+        log_warn "Change the admin password after your first login!"
+    else
+        log_skip "Users already exist — skipping seed"
+    fi
+}
+
 # ── Step: verify ──────────────────────────────────────────────────────────
 
 os_verify() {
