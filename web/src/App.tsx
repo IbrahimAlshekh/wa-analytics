@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
@@ -58,6 +58,33 @@ export default function App() {
     return off;
   }, [qc]);
 
+  const [backupState, setBackupState] = useState<"idle" | "loading" | "error">("idle");
+
+  async function triggerBackup() {
+    if (backupState === "loading") return;
+    setBackupState("loading");
+    try {
+      const token = localStorage.getItem("wt_bearer");
+      const res = await fetch("/api/backup", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup_${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupState("idle");
+    } catch {
+      setBackupState("error");
+      setTimeout(() => setBackupState("idle"), 3000);
+    }
+  }
+
   const isLogin = publicPaths.includes(location.pathname);
   const authed = Boolean(localStorage.getItem("wt_bearer"));
 
@@ -70,15 +97,25 @@ export default function App() {
         </Link>
         <div className="app-bar-fill" />
         {authed && (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => {
-              localStorage.removeItem("wt_bearer");
-              navigate("/login");
-            }}
-          >
-            Logout
-          </button>
+          <>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={triggerBackup}
+              disabled={backupState === "loading"}
+              title="Download backup ZIP"
+            >
+              {backupState === "loading" ? "Backing up…" : backupState === "error" ? "Failed" : "Backup"}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                localStorage.removeItem("wt_bearer");
+                navigate("/login");
+              }}
+            >
+              Logout
+            </button>
+          </>
         )}
       </header>
 

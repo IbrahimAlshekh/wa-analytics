@@ -196,6 +196,7 @@ func main() {
 		Bearer:   cfg.Bearer,
 		Dev:      cfg.Dev,
 		JWTKey:   cfg.JWTKey,
+		DataDir:  cfg.DataDir,
 		MediaDir: mediaDir,
 	}, store, manager, trackerMgr, hub)
 

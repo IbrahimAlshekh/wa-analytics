@@ -28,6 +28,7 @@ type Config struct {
 	Bearer   string
 	Dev      bool
 	JWTKey   []byte // signing key for JWT tokens, derived from the app key
+	DataDir  string
 	MediaDir string
 }
 
@@ -153,6 +154,9 @@ func (s *Server) routes() {
 	// Auth
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
 	s.mux.Handle("POST /api/refresh", apiAuth(s.handleRefresh))
+
+	// Backup
+	s.mux.Handle("GET /api/backup", apiAuth(s.handleBackup))
 
 	// Setup (unauthenticated — only active before any user exists)
 	s.mux.HandleFunc("GET /api/setup/status", s.handleSetupStatus)
