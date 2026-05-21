@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 
 export default function Register() {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -21,7 +23,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirm) {
-      setError("Passwords do not match");
+      setError(t("auth.register.passwordMismatch"));
       return;
     }
     setLoading(true);
@@ -31,7 +33,7 @@ export default function Register() {
       setToken(token);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : t("auth.register.failed"));
     } finally {
       setLoading(false);
     }
@@ -42,17 +44,17 @@ export default function Register() {
       <div className="login-box">
         <div className="login-brand">
           <div className="login-brand-mark">W</div>
-          <div className="login-brand-title">WA Tracker</div>
-          <div className="login-brand-sub">Create your admin account</div>
+          <div className="login-brand-title">{t("auth.brand")}</div>
+          <div className="login-brand-sub">{t("auth.register.subtitle")}</div>
         </div>
         <div className="card">
           <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
             <div className="form-field">
-              <label className="form-label" htmlFor="reg-user">Username</label>
+              <label className="form-label" htmlFor="reg-user">{t("auth.register.username")}</label>
               <input
                 id="reg-user"
                 className="input"
-                placeholder="username"
+                placeholder={t("auth.register.usernamePlaceholder")}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -61,12 +63,12 @@ export default function Register() {
               />
             </div>
             <div className="form-field">
-              <label className="form-label" htmlFor="reg-pass">Password</label>
+              <label className="form-label" htmlFor="reg-pass">{t("auth.register.password")}</label>
               <input
                 id="reg-pass"
                 className="input"
                 type="password"
-                placeholder="min. 8 characters"
+                placeholder={t("auth.register.passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -74,7 +76,7 @@ export default function Register() {
               />
             </div>
             <div className="form-field">
-              <label className="form-label" htmlFor="reg-confirm">Confirm password</label>
+              <label className="form-label" htmlFor="reg-confirm">{t("auth.register.confirmPassword")}</label>
               <input
                 id="reg-confirm"
                 className="input"
@@ -92,7 +94,7 @@ export default function Register() {
               disabled={loading}
               style={{ marginTop: 4 }}
             >
-              {loading ? "Creating account…" : "Create account"}
+              {loading ? t("auth.register.submitting") : t("auth.register.submit")}
             </button>
           </form>
           {error && (

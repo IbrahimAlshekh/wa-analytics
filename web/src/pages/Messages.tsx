@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Message, MessageEvent } from "../lib/types";
 import { ws } from "../lib/ws";
@@ -10,6 +11,7 @@ import { getMediaUrl } from "../lib/media";
 type WAFetchState = "idle" | "loading" | "open" | "exhausted";
 
 export default function Messages() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
@@ -156,18 +158,18 @@ export default function Messages() {
         }}
       >
         <div className="breadcrumb">
-          <Link to={`/accounts/${accountId}/contacts/${cid}`}>← Back</Link>
+          <Link to={`/accounts/${accountId}/contacts/${cid}`}>{t("messages.back")}</Link>
           <span className="breadcrumb-sep">/</span>
-          <span>Messages</span>
+          <span>{t("messages.title")}</span>
         </div>
         <span className="muted" style={{ fontSize: 12 }}>
-          {msgs.length} loaded
+          {t("messages.loaded", { count: msgs.length })}
         </span>
       </div>
 
       {isLoading && (
         <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>
-          Loading…
+          {t("messages.loading")}
         </div>
       )}
       {error && <div className="error" style={{ padding: "8px 20px" }}>{(error as Error).message}</div>}
@@ -187,8 +189,8 @@ export default function Messages() {
         {msgs.length === 0 && !isLoading && (
           <div className="empty-state">
             <div className="empty-state-icon">💬</div>
-            <div style={{ fontWeight: 500 }}>No messages yet</div>
-            <div className="muted">Messages will appear here as they're recorded</div>
+            <div style={{ fontWeight: 500 }}>{t("messages.emptyTitle")}</div>
+            <div className="muted">{t("messages.emptyDesc")}</div>
           </div>
         )}
 
@@ -200,7 +202,7 @@ export default function Messages() {
               onClick={handleLoadOlderLocal}
               disabled={isFetchingNextPage}
             >
-              {isFetchingNextPage ? "Loading…" : "Load older messages"}
+              {isFetchingNextPage ? t("messages.loadingOlder") : t("messages.loadOlder")}
             </button>
           </div>
         )}
@@ -209,17 +211,17 @@ export default function Messages() {
         {!hasNextPage && msgs.length > 0 && waState !== "exhausted" && (
           <div style={{ textAlign: "center", padding: "16px 0", flexShrink: 0 }}>
             {waState === "loading" ? (
-              <span className="muted" style={{ fontSize: 13 }}>Fetching from WhatsApp…</span>
+              <span className="muted" style={{ fontSize: 13 }}>{t("messages.fetchingWhatsApp")}</span>
             ) : (
               <button className="btn btn-ghost btn-sm" onClick={handleFetchFromWA}>
-                {waState === "open" ? "Load more from WhatsApp" : "Fetch older from WhatsApp"}
+                {waState === "open" ? t("messages.loadMoreWhatsApp") : t("messages.fetchOlderWhatsApp")}
               </button>
             )}
           </div>
         )}
         {!hasNextPage && msgs.length > 0 && waState === "exhausted" && (
           <div style={{ textAlign: "center", padding: "12px 0", flexShrink: 0 }}>
-            <span className="muted" style={{ fontSize: 12 }}>No more messages</span>
+            <span className="muted" style={{ fontSize: 12 }}>{t("messages.noMore")}</span>
           </div>
         )}
 
@@ -258,6 +260,7 @@ export default function Messages() {
 }
 
 function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File) => void, disabled: boolean }) {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -285,7 +288,7 @@ function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File
         <input
           type="text"
           className="input"
-          placeholder="Type a message..."
+          placeholder={t("messages.placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={disabled}
@@ -303,7 +306,7 @@ function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File
         className="btn btn-ghost"
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled}
-        title="Attach file"
+        title={t("messages.attachFile")}
         style={{ padding: "8px 12px" }}
       >
         📎
@@ -313,7 +316,7 @@ function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File
         className="btn btn-primary"
         disabled={disabled || (!text.trim() && !file)}
       >
-        Send
+        {t("messages.send")}
       </button>
     </form>
   );
@@ -328,6 +331,7 @@ function MessageBubble({
   annotations: MessageEvent[];
   quotedMsg?: Message;
 }) {
+  const { t } = useTranslation();
   const ts = new Date(msg.timestamp * 1000).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -368,7 +372,7 @@ function MessageBubble({
       {!quotedMsg && msg.quotedMessageId && (
         <div className="message-reply-preview message-reply-unknown">
           <span className="message-reply-icon">↩</span>
-          <span className="message-reply-text muted">Reply to earlier message</span>
+          <span className="message-reply-text muted">{t("messages.replyFallback")}</span>
         </div>
       )}
 
@@ -389,10 +393,10 @@ function MessageBubble({
       {/* Footer row: badges + time */}
       <div className="message-footer">
         {isDeleted && (
-          <span className="message-deleted-badge">🗑 deleted</span>
+          <span className="message-deleted-badge">🗑 {t("messages.deleted")}</span>
         )}
         {latestEdit && !isDeleted && (
-          <span className="message-edited-badge">✏ edited</span>
+          <span className="message-edited-badge">✏ {t("messages.edited")}</span>
         )}
         <time className="message-time">{ts}</time>
       </div>
@@ -404,7 +408,7 @@ function MessageBubble({
             <span
               key={ev.actorJid}
               className="message-reaction"
-              title={ev.isFromMe ? "You" : ev.actorJid}
+              title={ev.isFromMe ? t("messages.you") : ev.actorJid}
             >
               {ev.emoji}
             </span>
@@ -416,6 +420,7 @@ function MessageBubble({
 }
 
 function MediaPreview({ type, path }: { type?: string; path: string }) {
+  const { t } = useTranslation();
   const url = useMemo(() => getMediaUrl(path), [path]);
 
   if (type === "image") {
@@ -423,7 +428,7 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
       <a href={url} target="_blank" rel="noreferrer">
         <img
           src={url}
-          alt="WhatsApp Media"
+          alt={t("messages.mediaAlt")}
           style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }}
         />
       </a>
@@ -448,7 +453,7 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
     return (
       <img
         src={url}
-        alt="Sticker"
+        alt={t("messages.sticker")}
         style={{ width: 120, height: 120, objectFit: "contain", display: "block" }}
       />
     );
@@ -458,8 +463,8 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
     <div className="row" style={{ gap: 8, alignItems: "center", padding: "8px 12px", background: "rgba(0,0,0,0.05)", borderRadius: 4 }}>
       <span style={{ fontSize: 20 }}>📄</span>
       <div className="col">
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{type || "File"}</span>
-        <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Download</a>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{type || t("messages.file")}</span>
+        <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>{t("messages.messageFallback")}</a>
       </div>
     </div>
   );

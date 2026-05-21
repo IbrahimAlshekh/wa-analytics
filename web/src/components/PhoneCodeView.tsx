@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 
 export default function PhoneCodeView() {
+  const { t } = useTranslation();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,13 +26,11 @@ export default function PhoneCodeView() {
   return (
     <form onSubmit={submit} className="col">
       <p className="muted">
-        Enter your phone in international format (e.g. +14155551234). Then in
-        WhatsApp: Linked devices → Link a device → Link with phone number
-        instead.
+        {t("phone.instruction")}
       </p>
       <input
         className="input"
-        placeholder="+14155551234"
+        placeholder={t("phone.placeholder")}
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
       />
@@ -39,11 +39,11 @@ export default function PhoneCodeView() {
         type="submit"
         disabled={!phone || loading}
       >
-        {loading ? "Generating…" : "Get pairing code"}
+        {loading ? t("phone.generating") : t("phone.get")}
       </button>
       {code && (
         <div className="col" style={{ alignItems: "center", marginTop: 16 }}>
-          <span className="muted">Enter this code on your phone:</span>
+          <span className="muted">{t("phone.enterCode")}</span>
           <span className="code">
             {code.match(/.{1,4}/g)?.join(" ") ?? code}
           </span>

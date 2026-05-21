@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { AnalyticsRange, TimelineEntry } from "../lib/types";
 import SessionTimeline from "../components/Timeline";
@@ -10,12 +11,6 @@ import AnalyticsPanel from "../components/AnalyticsPanel";
 import ContactAvatar from "../components/ContactAvatar";
 import StoriesPanel from "../components/StoriesPanel";
 import { useStore, wsKey } from "../lib/store";
-
-const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
-  { value: "day", label: "Daily" },
-  { value: "week", label: "Weekly" },
-  { value: "all", label: "General" },
-];
 
 function formatRelative(unix: number): string {
   const diff = Math.max(0, Math.floor(Date.now() / 1000 - unix));
@@ -51,19 +46,26 @@ function formatElapsed(startAt: number): string {
 
 type MainTab = "status" | "presence" | "stories" | "analytics";
 
-const MAIN_TABS: { value: MainTab; label: string }[] = [
-  { value: "status", label: "Status" },
-  { value: "presence", label: "Presence" },
-  { value: "stories", label: "Stories" },
-  { value: "analytics", label: "Analytics" },
-];
-
 export default function ContactDetail() {
+  const { t } = useTranslation();
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
   const cid = Number(cidStr);
   const navigate = useNavigate();
   const qc = useQueryClient();
+
+  const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
+    { value: "day", label: t("contactDetail.rangeDaily") },
+    { value: "week", label: t("contactDetail.rangeWeekly") },
+    { value: "all", label: t("contactDetail.rangeGeneral") },
+  ];
+
+  const MAIN_TABS: { value: MainTab; label: string }[] = [
+    { value: "status", label: t("contactDetail.tabStatus") },
+    { value: "presence", label: t("contactDetail.tabPresence") },
+    { value: "stories", label: t("contactDetail.tabStories") },
+    { value: "analytics", label: t("contactDetail.tabAnalytics") },
+  ];
 
   const [tab, setTab] = useState<MainTab>("status");
   const [range, setRange] = useState<AnalyticsRange>("week");
@@ -157,7 +159,7 @@ export default function ContactDetail() {
     return merged;
   }, [tl.data?.entries, wsEntries]);
 
-  if (tl.isLoading) return <div className="muted" style={{ padding: "48px 0", textAlign: "center" }}>Loading…</div>;
+  if (tl.isLoading) return <div className="muted" style={{ padding: "48px 0", textAlign: "center" }}>{t("contactDetail.loading")}</div>;
   if (tl.error) return <div className="error">{(tl.error as Error).message}</div>;
   if (!tl.data) return null;
 
@@ -194,39 +196,39 @@ export default function ContactDetail() {
           <div className="row" style={{ gap: 6 }}>
             <span className={`badge ${isOnline ? "badge-online" : "badge-offline"}`}>
               <span className={`dot ${isOnline ? "online" : ""}`} style={{ width: 6, height: 6 }} />
-              {isOnline ? "Online now" : "Offline"}
+              {isOnline ? t("contactDetail.badgeOnline") : t("contactDetail.badgeOffline")}
             </span>
             <span className={`badge ${c.trackingEnabled ? "badge-tracking" : "badge-paused"}`}>
-              {c.trackingEnabled ? "Tracking" : "Paused"}
+              {c.trackingEnabled ? t("contactDetail.badgeTracking") : t("contactDetail.badgePaused")}
             </span>
           </div>
         </div>
         <div className="contact-hero-actions">
           <Link to={`/accounts/${accountId}/contacts/${cid}/messages`} className="btn">
-            Messages
+            {t("contactDetail.messages")}
           </Link>
           <button
             className="btn btn-ghost"
             disabled={toggleTracking.isPending}
             onClick={() => toggleTracking.mutate(!c.trackingEnabled)}
-            title={c.trackingEnabled ? "Pause tracking" : "Resume tracking"}
+            title={c.trackingEnabled ? t("contactDetail.pauseTracking") : t("contactDetail.resumeTracking")}
           >
             {toggleTracking.isPending
               ? "…"
               : c.trackingEnabled
-              ? "Pause tracking"
-              : "Resume tracking"}
+              ? t("contactDetail.pauseTracking")
+              : t("contactDetail.resumeTracking")}
           </button>
           <button
             className="btn btn-danger"
             disabled={deleteContactMutation.isPending}
             onClick={() => {
-              if (confirm(`Delete ${displayName}? This cannot be undone.`)) {
+              if (confirm(t("contactDetail.deleteConfirm", { name: displayName }))) {
                 deleteContactMutation.mutate();
               }
             }}
           >
-            {deleteContactMutation.isPending ? "Deleting…" : "Delete"}
+            {deleteContactMutation.isPending ? t("contactDetail.deleting") : t("contactDetail.delete")}
           </button>
         </div>
       </div>
@@ -256,7 +258,7 @@ export default function ContactDetail() {
           />
           <div className="card">
             <div style={{ marginBottom: 16 }}>
-              <span className="section-label">Activity Timeline</span>
+              <span className="section-label">{t("contactDetail.activityTimeline")}</span>
             </div>
             <SessionTimeline entries={allEntries} />
           </div>
@@ -282,7 +284,7 @@ export default function ContactDetail() {
           <div className="card" style={{ padding: "10px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
-                Range
+                {t("contactDetail.rangeLabel")}
               </span>
               <div className="tabs">
                 {RANGE_LABELS.map(({ value, label }) => (
@@ -296,7 +298,7 @@ export default function ContactDetail() {
           {analyticsQ.data ? (
             <AnalyticsPanel report={analyticsQ.data} />
           ) : analyticsQ.isLoading ? (
-            <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>Loading analytics…</div>
+            <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>{t("contactDetail.loadingAnalytics")}</div>
           ) : null}
         </>
       )}
@@ -359,6 +361,7 @@ function LiveStatusCard({
   sessionStart: number | null;
   lastPresence: TimelineEntry | undefined;
 }) {
+  const { t } = useTranslation();
   const [, tick] = useState(0);
 
   useEffect(() => {
@@ -371,8 +374,8 @@ function LiveStatusCard({
 
   const lastSeenText = !isOnline && lastPresence
     ? lastPresence.lastSeen
-      ? `last seen ${formatRelative(lastPresence.lastSeen)}`
-      : `last seen ${formatRelative(lastPresence.at)}`
+      ? t("contactDetail.lastSeen", { time: formatRelative(lastPresence.lastSeen) })
+      : t("contactDetail.lastSeen", { time: formatRelative(lastPresence.at) })
     : null;
 
   const elapsed = isOnline && sessionStart != null ? formatElapsed(sessionStart) : null;
@@ -386,19 +389,19 @@ function LiveStatusCard({
             style={{ width: 14, height: 14, flexShrink: 0 }}
           />
           <div>
-            <div className="live-status-label">{isOnline ? "Online" : "Offline"}</div>
-            {elapsed && <div className="live-status-sub">for {elapsed}</div>}
+            <div className="live-status-label">{isOnline ? t("contactDetail.online") : t("contactDetail.offline")}</div>
+            {elapsed && <div className="live-status-sub">{t("contactDetail.onlineFor", { elapsed })}</div>}
             {lastSeenText && <div className="live-status-sub">{lastSeenText}</div>}
           </div>
         </div>
         {isOnline && sessionStart != null && (
-          <div className="live-status-since">since {formatTime(sessionStart)}</div>
+          <div className="live-status-since">{t("contactDetail.onlineSince", { time: formatTime(sessionStart) })}</div>
         )}
       </div>
 
       {recentSessions.length > 0 && (
         <div className="live-status-sessions">
-          <div className="live-status-sessions-label">Recent sessions</div>
+          <div className="live-status-sessions-label">{t("contactDetail.recentSessions")}</div>
           {recentSessions.map((s, i) => (
             <div key={i} className="live-status-session-row">
               <span
@@ -412,7 +415,7 @@ function LiveStatusCard({
               />
               <span className="live-session-time">
                 {formatTime(s.startAt)}
-                {s.endAt ? ` – ${formatTime(s.endAt)}` : " – now"}
+                {s.endAt ? ` – ${formatTime(s.endAt)}` : ` – ${t("contactDetail.nowLabel")}`}
               </span>
               {s.durationSec != null && (
                 <span className="live-session-dur">{formatDuration(s.durationSec)}</span>

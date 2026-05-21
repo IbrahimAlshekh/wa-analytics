@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Story } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
@@ -23,13 +24,14 @@ function formatDate(unix: number): string {
 }
 
 export default function StoriesPanel({ accountId, contactId }: { accountId: number; contactId: number }) {
+  const { t } = useTranslation();
   const { data: stories, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["stories", accountId, contactId],
     queryFn: () => api.stories(accountId, contactId),
   });
 
   if (isLoading) {
-    return <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>Loading…</div>;
+    return <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>{t("stories.loading")}</div>;
   }
   if (error) {
     return <div className="error" style={{ padding: "8px 0" }}>{(error as Error).message}</div>;
@@ -39,10 +41,9 @@ export default function StoriesPanel({ accountId, contactId }: { accountId: numb
       <div className="card">
         <div className="empty-state">
           <div className="empty-state-icon">📖</div>
-          <div style={{ fontWeight: 500 }}>No stories yet</div>
+          <div style={{ fontWeight: 500 }}>{t("stories.emptyTitle")}</div>
           <div className="muted" style={{ fontSize: 13 }}>
-            Stories are captured in real-time when posted, and from WhatsApp's history sync on connect.
-            Only stories posted while the tracker is active and connected can be saved.
+            {t("stories.emptyDesc")}
           </div>
           <button
             className="btn btn-sm btn-ghost"
@@ -50,7 +51,7 @@ export default function StoriesPanel({ accountId, contactId }: { accountId: numb
             disabled={isFetching}
             onClick={() => refetch()}
           >
-            {isFetching ? "Refreshing…" : "Refresh"}
+            {isFetching ? t("stories.refreshing") : t("stories.refresh")}
           </button>
         </div>
       </div>
@@ -63,13 +64,13 @@ export default function StoriesPanel({ accountId, contactId }: { accountId: numb
   return (
     <div className="col" style={{ gap: 20 }}>
       <div className="card" style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span className="muted" style={{ fontSize: 12 }}>{stories.length} {stories.length === 1 ? "story" : "stories"} recorded</span>
+        <span className="muted" style={{ fontSize: 12 }}>{t("stories.count", { count: stories.length })}</span>
         <button
           className="btn btn-sm btn-ghost"
           disabled={isFetching}
           onClick={() => refetch()}
         >
-          {isFetching ? "Refreshing…" : "Refresh"}
+          {isFetching ? t("stories.refreshing") : t("stories.refresh")}
         </button>
       </div>
 
@@ -88,6 +89,7 @@ export default function StoriesPanel({ accountId, contactId }: { accountId: numb
 }
 
 function StoryCard({ story }: { story: Story }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const hasMedia = Boolean(story.mediaPath);
@@ -105,7 +107,7 @@ function StoryCard({ story }: { story: Story }) {
       {isImage && story.mediaPath && (
         <img
           src={getMediaUrl(story.mediaPath)}
-          alt="Story"
+          alt={t("stories.storyAlt")}
           style={{ width: "100%", aspectRatio: "9/16", objectFit: "cover", display: "block" }}
         />
       )}
@@ -131,7 +133,7 @@ function StoryCard({ story }: { story: Story }) {
           }}
         >
           <span style={{ fontSize: 14, textAlign: "center", lineHeight: 1.5, fontWeight: 500 }}>
-            {story.caption || <em className="muted">Text story</em>}
+            {story.caption || <em className="muted">{t("stories.textStory")}</em>}
           </span>
         </div>
       )}
@@ -156,7 +158,7 @@ function StoryCard({ story }: { story: Story }) {
             className="btn btn-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            Download
+            {t("stories.download")}
           </a>
         </div>
       )}
@@ -195,6 +197,7 @@ function StoryCard({ story }: { story: Story }) {
 }
 
 function Lightbox({ src, caption, time, onClose }: { src: string; caption?: string; time: string; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       style={{
@@ -212,7 +215,7 @@ function Lightbox({ src, caption, time, onClose }: { src: string; caption?: stri
     >
       <img
         src={src}
-        alt="Story"
+        alt={t("stories.mediaAlt")}
         style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: 8 }}
         onClick={(e) => e.stopPropagation()}
       />

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import logoSrc from "./assets/wa_analytics_logo_512.png";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ws } from "./lib/ws";
 import { useStore } from "./lib/store";
 import AccountLayout from "./components/AccountLayout";
@@ -17,7 +18,12 @@ export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t, i18n } = useTranslation();
   const { token, setToken, backupState, setBackupState, addWsEntry, setLastPresence } = useStore();
+
+  function toggleLanguage() {
+    i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar");
+  }
 
   useEffect(() => {
     if (!token && !publicPaths.includes(location.pathname)) {
@@ -119,18 +125,26 @@ export default function App() {
       <header className="app-bar">
         <Link to="/" className="app-logo">
           <img src={logoSrc} className="app-logo-mark" alt="WA Analytics" />
-          {!isLogin && <span>WA Tracker</span>}
+          {!isLogin && <span>{t("app.name")}</span>}
         </Link>
         <div className="app-bar-fill" />
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={toggleLanguage}
+          title={t("lang.switchTo")}
+          style={{ fontFamily: "inherit", letterSpacing: 0 }}
+        >
+          {i18n.language === "ar" ? t("lang.en") : t("lang.ar")}
+        </button>
         {authed && (
           <>
             <button
               className="btn btn-ghost btn-sm"
               onClick={triggerBackup}
               disabled={backupState === "loading"}
-              title="Download backup ZIP"
+              title={t("app.backupTitle")}
             >
-              {backupState === "loading" ? "Backing up…" : backupState === "error" ? "Failed" : "Backup"}
+              {backupState === "loading" ? t("app.backingUp") : backupState === "error" ? t("app.backupFailed") : t("app.backup")}
             </button>
             <button
               className="btn btn-ghost btn-sm"
@@ -139,7 +153,7 @@ export default function App() {
                 navigate("/login");
               }}
             >
-              Logout
+              {t("app.logout")}
             </button>
           </>
         )}
@@ -168,10 +182,10 @@ export default function App() {
               <div className="main-empty">
                 <div className="main-empty-icon">👤</div>
                 <div style={{ fontWeight: 600, fontSize: 15 }}>
-                  Select a contact
+                  {t("app.selectContact")}
                 </div>
                 <div className="muted">
-                  Choose a contact from the sidebar to view their details
+                  {t("app.selectContactDesc")}
                 </div>
               </div>
             }

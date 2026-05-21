@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
 import { useStore } from "../lib/store";
@@ -28,6 +29,7 @@ function useDebounce(value: string, delay: number): string {
 }
 
 export default function ContactList({ accountId }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -52,7 +54,6 @@ export default function ContactList({ accountId }: Props) {
 
   const list = contacts.data?.contacts ?? [];
 
-  // Seed store whenever query returns fresh contact data
   useEffect(() => {
     if (list.length > 0) upsertContacts(list);
   }, [list, upsertContacts]);
@@ -60,12 +61,12 @@ export default function ContactList({ accountId }: Props) {
   const syncMutation = useMutation({
     mutationFn: () => api.syncContacts(accountId),
     onSuccess: (data) => {
-      setSyncMsg(`Synced ${data.synced} contacts from WhatsApp`);
+      setSyncMsg(t("contacts.syncSuccess", { count: data.synced }));
       setTimeout(() => setSyncMsg(null), 4000);
       setPage(1);
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
-    onError: (e) => setSyncMsg(`Sync failed: ${e instanceof Error ? e.message : String(e)}`),
+    onError: (e) => setSyncMsg(t("contacts.syncFailed", { error: e instanceof Error ? e.message : String(e) })),
   });
 
   const addMutation = useMutation({
@@ -111,22 +112,22 @@ export default function ContactList({ accountId }: Props) {
       {/* Page header */}
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
-          Contacts
+          {t("contacts.title")}
         </h2>
         <div className="row" style={{ gap: 8 }}>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            title="Import all contacts from WhatsApp (untracked)"
+            title={t("contacts.syncTitle")}
           >
-            {syncMutation.isPending ? "Syncing…" : "Sync contacts"}
+            {syncMutation.isPending ? t("contacts.syncing") : t("contacts.sync")}
           </button>
           <button
             className={showForm ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
             onClick={() => { setShowForm((v) => !v); setError(null); }}
           >
-            {showForm ? "Cancel" : "+ Add contact"}
+            {showForm ? t("contacts.cancel") : t("contacts.addContact")}
           </button>
         </div>
       </div>
@@ -144,7 +145,7 @@ export default function ContactList({ accountId }: Props) {
         <input
           className="input"
           style={{ width: "100%", paddingLeft: 30, boxSizing: "border-box" }}
-          placeholder="Search by name or phone…"
+          placeholder={t("contacts.searchPlaceholder")}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
@@ -163,27 +164,27 @@ export default function ContactList({ accountId }: Props) {
       {/* Add form */}
       {showForm && (
         <div className="card">
-          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>Add a contact to track</div>
+          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>{t("contacts.addFormTitle")}</div>
           <form
             onSubmit={(e) => { e.preventDefault(); addMutation.mutate(); }}
             style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
           >
             <input
               className="input"
-              placeholder="+14155551234"
+              placeholder={t("contacts.phonePlaceholder")}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               style={{ flex: "1 1 160px" }}
             />
             <input
               className="input"
-              placeholder="Display name (optional)"
+              placeholder={t("contacts.namePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               style={{ flex: "2 1 200px" }}
             />
             <button className="btn btn-primary" type="submit" disabled={!phone || addMutation.isPending}>
-              {addMutation.isPending ? "Adding…" : "Add"}
+              {addMutation.isPending ? t("contacts.adding") : t("contacts.add")}
             </button>
           </form>
           {error && <div className="error" style={{ marginTop: 10 }}>{error}</div>}
@@ -196,9 +197,9 @@ export default function ContactList({ accountId }: Props) {
           <thead>
             <tr>
               <th style={{ width: 40 }}></th>
-              <th>Contact</th>
-              <th>About</th>
-              <th style={{ width: 80 }}>Tracking</th>
+              <th>{t("contacts.tableContact")}</th>
+              <th>{t("contacts.tableAbout")}</th>
+              <th style={{ width: 80 }}>{t("contacts.tableTracking")}</th>
               <th style={{ width: 80 }}></th>
             </tr>
           </thead>
@@ -211,7 +212,7 @@ export default function ContactList({ accountId }: Props) {
                 onToggle={(enabled) => toggle.mutate({ id: c.id, enabled })}
                 onDelete={() => {
                   const contact = c;
-                  if (confirm(`Stop tracking ${contact.displayName || contact.phone}?`)) {
+                  if (confirm(t("contacts.removeConfirm", { name: contact.displayName || contact.phone }))) {
                     remove.mutate(c.id);
                   }
                 }}
@@ -222,8 +223,8 @@ export default function ContactList({ accountId }: Props) {
                 <td colSpan={5}>
                   <div className="empty-state">
                     <div className="empty-state-icon">👤</div>
-                    <div style={{ fontWeight: 500 }}>No contacts yet</div>
-                    <div className="muted">Add a contact above to start tracking</div>
+                    <div style={{ fontWeight: 500 }}>{t("contacts.emptyTitle")}</div>
+                    <div className="muted">{t("contacts.emptyDesc")}</div>
                   </div>
                 </td>
               </tr>
@@ -244,7 +245,9 @@ export default function ContactList({ accountId }: Props) {
             }}
           >
             <span className="muted">
-              {total === 0 ? "No contacts" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`}
+              {total === 0
+                ? t("contacts.noContacts")
+                : t("contacts.pagination", { start: (page - 1) * PAGE_SIZE + 1, end: Math.min(page * PAGE_SIZE, total), total })}
             </span>
             <div className="row" style={{ gap: 4 }}>
               <button
@@ -252,7 +255,7 @@ export default function ContactList({ accountId }: Props) {
                 onClick={() => setPage((p) => p - 1)}
                 disabled={page === 1}
               >
-                ‹ Prev
+                {t("contacts.prev")}
               </button>
               {pageRange(page, totalPages).map((p, i) =>
                 p === null ? (
@@ -274,7 +277,7 @@ export default function ContactList({ accountId }: Props) {
                 onClick={() => setPage((p) => p + 1)}
                 disabled={page === totalPages}
               >
-                Next ›
+                {t("contacts.next")}
               </button>
             </div>
           </div>
@@ -295,7 +298,7 @@ function ContactRow({
   onToggle: (enabled: boolean) => void;
   onDelete: () => void;
 }) {
-  // Read entirely from store — updates from any component are reflected here
+  const { t } = useTranslation();
   const contact = useStore((s) => s.contacts[contactId]);
   const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contactId}`]) ?? [];
 
@@ -315,10 +318,17 @@ function ContactRow({
   function formatRelative(unix: number): string {
     const now = Date.now() / 1000;
     const diff = Math.max(0, now - unix);
-    if (diff < 60) return `${Math.floor(diff)}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
+    if (diff < 60) return `${Math.floor(diff)}s`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    return `${Math.floor(diff / 86400)}d`;
+  }
+
+  function presenceLabel(): string {
+    if (!lastPresence) return "";
+    if (online) return t("contacts.online");
+    if (lastPresence.lastSeen) return t("contacts.lastSeen", { time: formatRelative(lastPresence.lastSeen) });
+    return t("contacts.offlineSince", { time: formatRelative(lastPresence.at) });
   }
 
   return (
@@ -349,11 +359,7 @@ function ContactRow({
           </Link>
           <span className="muted" style={{ fontSize: 11 }}>
             {contact.phone}
-            {lastPresence && (
-              <> · {online ? "Online now" : lastPresence.lastSeen
-                ? `Last seen ${formatRelative(lastPresence.lastSeen)}`
-                : `Offline ${formatRelative(lastPresence.at)}`}</>
-            )}
+            {lastPresence && <> · {presenceLabel()}</>}
           </span>
         </div>
       </td>
@@ -363,7 +369,7 @@ function ContactRow({
         </div>
       </td>
       <td>
-        <label className="toggle" title={contact.trackingEnabled ? "Tracking on" : "Tracking off"}>
+        <label className="toggle" title={contact.trackingEnabled ? t("contacts.trackingOn") : t("contacts.trackingOff")}>
           <input
             type="checkbox"
             checked={contact.trackingEnabled}
@@ -374,7 +380,7 @@ function ContactRow({
       </td>
       <td style={{ paddingRight: 16 }}>
         <button className="btn btn-danger btn-sm" onClick={onDelete}>
-          Remove
+          {t("contactDetail.delete")}
         </button>
       </td>
     </tr>

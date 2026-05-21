@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { ws } from "../lib/ws";
 
 export default function QRView() {
+  const { t } = useTranslation();
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -30,7 +32,7 @@ export default function QRView() {
   return (
     <div className="col" style={{ alignItems: "center" }}>
       <p className="muted">
-        Open WhatsApp on your phone → Linked devices → Link a device.
+        {t("qr.instruction")}
       </p>
       {code ? (
         <div className="qr">
@@ -40,7 +42,7 @@ export default function QRView() {
         <div className="qr" style={{ width: 264, height: 264 }} />
       )}
       <button className="btn btn-primary" onClick={start} disabled={starting}>
-        {code ? "Refresh" : "Generate QR"}
+        {code ? t("qr.refresh") : t("qr.generate")}
       </button>
       {error && <div className="error">{error}</div>}
     </div>

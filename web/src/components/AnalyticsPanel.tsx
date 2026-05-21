@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 import type { AnalyticsReport, AnalyticsVolumeSide, AnalyticsEmotionCounts, TokenCount, MonthRow } from "../lib/types";
 import { InfoTooltip } from "./InfoTooltip";
 
@@ -24,13 +25,14 @@ const EMOTION_ICONS: Record<keyof AnalyticsEmotionCounts, string> = {
 };
 
 export default function AnalyticsPanel({ report }: Props) {
+  const { t } = useTranslation();
   const { volume, temporal, emotion, timeline, initiation, language, indicators } = report;
 
   const totalMsgs = volume.me.messages + volume.them.messages;
   if (totalMsgs === 0) {
     return (
       <div className="card" style={{ padding: "24px 16px", textAlign: "center" }}>
-        <span className="muted" style={{ fontSize: 13 }}>No messages in this range.</span>
+        <span className="muted" style={{ fontSize: 13 }}>{t("analytics.noMessages")}</span>
       </div>
     );
   }
@@ -52,28 +54,29 @@ export default function AnalyticsPanel({ report }: Props) {
 }
 
 function TimelineCard({ timeline }: { timeline: AnalyticsReport["timeline"] }) {
+  const { t } = useTranslation();
   if (!timeline.firstMsgUnix) return null;
   const fmt = (unix: number) => new Date(unix * 1000).toLocaleDateString();
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="When you first and last exchanged messages, how many days had at least one message, and your longest streak of consecutive active days."
-        info="Streak length and active-day density reveal the texture of the relationship. A long span with low active-day % means contact is rare and scattered. A long streak that ended months ago may mark when things changed."
+        description={t("analytics.timeline.description")}
+        info={t("analytics.timeline.tooltip")}
       >Timeline</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label="First message" value={fmt(timeline.firstMsgUnix)} />
-        <StatCard label="Last message" value={fmt(timeline.lastMsgUnix)} />
-        <StatCard label="Span" value={`${timeline.spanDays}d`} />
-        <StatCard label="Active days" value={String(timeline.daysWithComms)} />
+        <StatCard label={t("analytics.timeline.firstMessage")} value={fmt(timeline.firstMsgUnix)} />
+        <StatCard label={t("analytics.timeline.lastMessage")} value={fmt(timeline.lastMsgUnix)} />
+        <StatCard label={t("analytics.timeline.span")} value={`${timeline.spanDays}d`} />
+        <StatCard label={t("analytics.timeline.activeDays")} value={String(timeline.daysWithComms)} />
         <StatCard
-          label="Longest streak"
+          label={t("analytics.timeline.longestStreak")}
           value={`${timeline.longestStreakDays}d`}
-          description="Consecutive days with at least one message."
-          info="Long streaks signal periods of daily, sustained connection. A streak that ended long ago may mark when the relationship shifted — worth comparing to Monthly Evolution."
+          description={t("analytics.timeline.longestStreakDesc")}
+          info={t("analytics.timeline.longestStreakTooltip")}
         />
         {timeline.highestVolumeDayDate && (
           <StatCard
-            label="Busiest day"
+            label={t("analytics.timeline.busiestDay")}
             value={`${timeline.highestVolumeDayDate} (${timeline.highestVolumeDayCount})`}
           />
         )}
@@ -83,6 +86,7 @@ function TimelineCard({ timeline }: { timeline: AnalyticsReport["timeline"] }) {
 }
 
 function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiation"] }) {
+  const { t } = useTranslation();
   if (initiation.sessions === 0) return null;
 
   const mePct = initiation.initiationMeSharePct;
@@ -90,15 +94,15 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="A session starts when either side breaks 3+ hours of silence. Shows who starts conversations and how quickly each side replies."
-        info="When one person initiates 70%+ of sessions, the other may be less invested or waiting to be reached. Reply time gaps between 'you' and 'them' reveal asymmetry in attention — a large difference often indicates who values the conversation more."
+        description={t("analytics.initiation.description")}
+        info={t("analytics.initiation.tooltip")}
       >Initiation &amp; Response</SectionLabel>
 
       {/* Session initiation balance bar */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--fg-muted)", marginBottom: 4 }}>
-          <span>You started {mePct.toFixed(1)}%</span>
-          <span>Them {(100 - mePct).toFixed(1)}%</span>
+          <span>{t("analytics.initiation.youStarted", { pct: mePct.toFixed(1) })}</span>
+          <span>{t("analytics.initiation.themPct", { pct: (100 - mePct).toFixed(1) })}</span>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${mePct}%`, background: "var(--accent)", borderRadius: 4 }} />
@@ -106,34 +110,34 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
       </div>
 
       <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label="Sessions" value={String(initiation.sessions)} />
-        <StatCard label="Avg msgs/session" value={initiation.avgSessionMsgs.toFixed(1)} />
+        <StatCard label={t("analytics.initiation.sessions")} value={String(initiation.sessions)} />
+        <StatCard label={t("analytics.initiation.avgMsgsPerSession")} value={initiation.avgSessionMsgs.toFixed(1)} />
         {initiation.avgRespMeSec > 0 && (
-          <StatCard label="Avg reply (you)" value={fmtDur(initiation.avgRespMeSec)} />
+          <StatCard label={t("analytics.initiation.avgReplyYou")} value={fmtDur(initiation.avgRespMeSec)} />
         )}
         {initiation.avgRespThemSec > 0 && (
-          <StatCard label="Avg reply (them)" value={fmtDur(initiation.avgRespThemSec)} />
+          <StatCard label={t("analytics.initiation.avgReplyThem")} value={fmtDur(initiation.avgRespThemSec)} />
         )}
         {initiation.medianRespMeSec > 0 && (
-          <StatCard label="Median reply (you)" value={fmtDur(initiation.medianRespMeSec)} />
+          <StatCard label={t("analytics.initiation.medianReplyYou")} value={fmtDur(initiation.medianRespMeSec)} />
         )}
         {initiation.medianRespThemSec > 0 && (
-          <StatCard label="Median reply (them)" value={fmtDur(initiation.medianRespThemSec)} />
+          <StatCard label={t("analytics.initiation.medianReplyThem")} value={fmtDur(initiation.medianRespThemSec)} />
         )}
         {initiation.longestSilenceSec > 0 && (
           <StatCard
-            label="Longest silence"
+            label={t("analytics.initiation.longestSilence")}
             value={fmtDur(initiation.longestSilenceSec)}
-            description="Longest gap between any two messages."
-            info="An unusually long single silence may mark a conflict, a trip, or a cooling point in the relationship. Compare it to average silence to see if it was a one-off or the norm."
+            description={t("analytics.initiation.longestSilenceDesc")}
+            info={t("analytics.initiation.longestSilenceTooltip")}
           />
         )}
         {initiation.avgSilenceSec > 0 && (
           <StatCard
-            label="Avg silence"
+            label={t("analytics.initiation.avgSilence")}
             value={fmtDur(initiation.avgSilenceSec)}
-            description="Average gap between consecutive messages."
-            info="High average silence (>12h) means this is an asynchronous relationship — messages are read and replied to later, not in real-time. Low silence (<30min) means both sides are typically active at the same time."
+            description={t("analytics.initiation.avgSilenceDesc")}
+            info={t("analytics.initiation.avgSilenceTooltip")}
           />
         )}
       </div>
@@ -142,21 +146,22 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
 }
 
 function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolumeSide }) {
+  const { t } = useTranslation();
   const total = me.messages + them.messages;
   const meBar = total > 0 ? (me.messages / total) * 100 : 50;
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Total messages, words, and media sent by each side. The bar shows your share of total messages."
-        info="A persistent imbalance (one person above 65%) suggests who drives the conversation. Word balance often tells more than message count — short frequent replies look very different from long infrequent ones."
+        description={t("analytics.volume.description")}
+        info={t("analytics.volume.tooltip")}
       >Volume</SectionLabel>
 
       {/* Message balance bar */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--fg-muted)", marginBottom: 4 }}>
-          <span>You {me.sharePct.toFixed(1)}%</span>
-          <span>Them {them.sharePct.toFixed(1)}%</span>
+          <span>{t("analytics.volume.youPct", { pct: me.sharePct.toFixed(1) })}</span>
+          <span>{t("analytics.volume.themPct", { pct: them.sharePct.toFixed(1) })}</span>
         </div>
         <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${meBar}%`, background: "var(--accent)", borderRadius: 4 }} />
@@ -164,35 +169,37 @@ function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolu
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <VolumeSideBox label="You" side={me} accent="var(--accent)" />
-        <VolumeSideBox label="Them" side={them} accent="var(--fg-muted)" />
+        <VolumeSideBox label={t("analytics.you")} side={me} accent="var(--accent)" />
+        <VolumeSideBox label={t("analytics.them")} side={them} accent="var(--fg-muted)" />
       </div>
     </div>
   );
 }
 
 function VolumeSideBox({ label, side, accent }: { label: string; side: AnalyticsVolumeSide; accent: string }) {
+  const { t } = useTranslation();
   const media = side.voiceNotes + side.photos + side.videos + side.stickers + side.documents;
   return (
     <div style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 12px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
       <div className="stats" style={{ marginBottom: 0, gap: 6 }}>
-        <MiniStat label="Messages" value={fmt(side.messages)} />
-        <MiniStat label="Words" value={fmt(side.words)} />
-        <MiniStat label="Avg words" value={side.avgWordsPerMsg.toFixed(1)} />
-        {side.voiceNotes > 0 && <MiniStat label="Voice notes" value={fmt(side.voiceNotes)} />}
-        {side.photos > 0 && <MiniStat label="Photos" value={fmt(side.photos)} />}
-        {side.videos > 0 && <MiniStat label="Videos" value={fmt(side.videos)} />}
-        {side.stickers > 0 && <MiniStat label="Stickers" value={fmt(side.stickers)} />}
-        {side.documents > 0 && <MiniStat label="Docs" value={fmt(side.documents)} />}
-        {side.links > 0 && <MiniStat label="Links" value={fmt(side.links)} />}
-        {media > 0 && <MiniStat label="Total media" value={fmt(media)} />}
+        <MiniStat label={t("analytics.volume.messages")} value={fmt(side.messages)} />
+        <MiniStat label={t("analytics.volume.words")} value={fmt(side.words)} />
+        <MiniStat label={t("analytics.volume.avgWords")} value={side.avgWordsPerMsg.toFixed(1)} />
+        {side.voiceNotes > 0 && <MiniStat label={t("analytics.volume.voiceNotes")} value={fmt(side.voiceNotes)} />}
+        {side.photos > 0 && <MiniStat label={t("analytics.volume.photos")} value={fmt(side.photos)} />}
+        {side.videos > 0 && <MiniStat label={t("analytics.volume.videos")} value={fmt(side.videos)} />}
+        {side.stickers > 0 && <MiniStat label={t("analytics.volume.stickers")} value={fmt(side.stickers)} />}
+        {side.documents > 0 && <MiniStat label={t("analytics.volume.docs")} value={fmt(side.documents)} />}
+        {side.links > 0 && <MiniStat label={t("analytics.volume.links")} value={fmt(side.links)} />}
+        {media > 0 && <MiniStat label={t("analytics.volume.totalMedia")} value={fmt(media)} />}
       </div>
     </div>
   );
 }
 
 function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number[] }) {
+  const { t } = useTranslation();
   const data = hourMe.map((me, h) => ({
     hour: h,
     label: `${String(h).padStart(2, "0")}:00`,
@@ -205,8 +212,8 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
   return (
     <div className="card">
       <SectionLabel
-        description="How many messages each person sends per hour of the day. Blue = you, gray = them."
-        info="Overlapping peaks mean you communicate in real-time. If your high-activity hours don't align, most messages sit unread for hours before a reply — which inflates response times and can feel one-sided."
+        description={t("analytics.hourly.description")}
+        info={t("analytics.hourly.tooltip")}
       >Messages by hour</SectionLabel>
       <div style={{ width: "100%", height: 180 }}>
         <ResponsiveContainer>
@@ -218,8 +225,8 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
               contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
               cursor={{ fill: "var(--accent-dim)" }}
             />
-            <Bar dataKey="me" name="You" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="them" name="Them" fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
+            <Bar dataKey="me" name={t("analytics.you")} fill="var(--accent)" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="them" name={t("analytics.them")} fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -228,6 +235,7 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
 }
 
 function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
+  const { t } = useTranslation();
   const data = DOW_LABELS.map((label, i) => ({
     label,
     me: dowMe[i] ?? 0,
@@ -239,8 +247,8 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
   return (
     <div className="card">
       <SectionLabel
-        description="Total messages per day of the week. Blue = you, gray = them."
-        info="Weekend vs. weekday peaks reveal the nature of the relationship. Both sides active on weekends often signals a personal bond rather than a professional or obligatory one."
+        description={t("analytics.weekday.description")}
+        info={t("analytics.weekday.tooltip")}
       >Messages by weekday</SectionLabel>
       <div style={{ width: "100%", height: 160 }}>
         <ResponsiveContainer>
@@ -252,8 +260,8 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
               contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
               cursor={{ fill: "var(--accent-dim)" }}
             />
-            <Bar dataKey="me" name="You" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="them" name="Them" fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
+            <Bar dataKey="me" name={t("analytics.you")} fill="var(--accent)" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="them" name={t("analytics.them")} fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -262,21 +270,23 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
 }
 
 function TemporalMetaCard({ temporal }: { temporal: AnalyticsReport["temporal"] }) {
+  const { t } = useTranslation();
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Percentage of messages sent between midnight and 5am by each side."
-        info="High night-message rates (>15%) suggest conversations happen when the person is most relaxed and unguarded, or indicate very different time zones. It can also signal emotional intensity — late-night messaging is rarely casual."
+        description={t("analytics.temporal.description")}
+        info={t("analytics.temporal.tooltip")}
       >Temporal patterns</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label="Night messages (you)" value={`${temporal.nightPctMe.toFixed(1)}%`} />
-        <StatCard label="Night messages (them)" value={`${temporal.nightPctThem.toFixed(1)}%`} />
+        <StatCard label={t("analytics.temporal.nightYou")} value={`${temporal.nightPctMe.toFixed(1)}%`} />
+        <StatCard label={t("analytics.temporal.nightThem")} value={`${temporal.nightPctThem.toFixed(1)}%`} />
       </div>
     </div>
   );
 }
 
 function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
+  const { t } = useTranslation();
   const hasEmotion = EMOTION_KEYS.some(
     (k) => (emotion.countsMe[k] ?? 0) > 0 || (emotion.countsThem[k] ?? 0) > 0,
   );
@@ -284,21 +294,21 @@ function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Messages classified by emotional tone using keyword patterns. Bars show your share vs theirs for each emotion."
-        info="The balance of emotions reveals who brings positivity, who asks for support, and the overall register of the relationship. Gratitude or encouragement heavily skewed to one side can signal a support asymmetry — one person giving more than they receive."
+        description={t("analytics.emotion.description")}
+        info={t("analytics.emotion.tooltip")}
       >Emotion fingerprint</SectionLabel>
 
       <div className="stats" style={{ marginBottom: 12 }}>
         {emotion.laughterMsgsMe + emotion.laughterMsgsThem > 0 && (
           <>
-            <StatCard label="Laughs (you)" value={fmt(emotion.laughterMsgsMe)} />
-            <StatCard label="Laughs (them)" value={fmt(emotion.laughterMsgsThem)} />
+            <StatCard label={t("analytics.emotion.laughsYou")} value={fmt(emotion.laughterMsgsMe)} />
+            <StatCard label={t("analytics.emotion.laughsThem")} value={fmt(emotion.laughterMsgsThem)} />
           </>
         )}
         {emotion.questionsMe + emotion.questionsThem > 0 && (
           <>
-            <StatCard label="Questions (you)" value={fmt(emotion.questionsMe)} />
-            <StatCard label="Questions (them)" value={fmt(emotion.questionsThem)} />
+            <StatCard label={t("analytics.emotion.questionsYou")} value={fmt(emotion.questionsMe)} />
+            <StatCard label={t("analytics.emotion.questionsThem")} value={fmt(emotion.questionsThem)} />
           </>
         )}
       </div>
@@ -339,6 +349,7 @@ function EmotionRow({
 }
 
 function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
+  const { t } = useTranslation();
   const topEmojisMe = language.topEmojisMe ?? [];
   const topEmojisThem = language.topEmojisThem ?? [];
   const topWordsMe = language.topWordsMe ?? [];
@@ -355,16 +366,16 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Most frequently used emojis, words (stop-words removed), and web domains from shared links — ranked by count for each side."
-        info="Shared vocabulary and overlapping emojis signal linguistic rapport and mirroring — a subtle sign of closeness. Domains reveal what content you exchange: news, videos, social media. Wildly different word lists may mean the conversation stays shallow."
+        description={t("analytics.language.description")}
+        info={t("analytics.language.tooltip")}
       >Language fingerprint</SectionLabel>
 
       {hasEmojis && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>Top emojis</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topEmojis")}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>You</div>
+              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.you")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {topEmojisMe.map((tc) => (
                   <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
@@ -372,7 +383,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Them</div>
+              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.them")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {topEmojisThem.map((tc) => (
                   <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
@@ -385,20 +396,20 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
 
       {hasWords && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>Top words</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topWords")}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <WordList label="You" tokens={topWordsMe} accent="var(--accent)" />
-            <WordList label="Them" tokens={topWordsThem} accent="var(--fg-muted)" />
+            <WordList label={t("analytics.you")} tokens={topWordsMe} accent="var(--accent)" />
+            <WordList label={t("analytics.them")} tokens={topWordsThem} accent="var(--fg-muted)" />
           </div>
         </div>
       )}
 
       {hasDomains && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>Top domains</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topDomains")}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>You</div>
+              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.you")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {topDomainsMe.map((tc) => (
                   <DomainPill key={tc.token} token={tc.token} count={tc.count} />
@@ -406,7 +417,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Them</div>
+              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.them")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {topDomainsThem.map((tc) => (
                   <DomainPill key={tc.token} token={tc.token} count={tc.count} />
@@ -465,6 +476,7 @@ function WordList({ label, tokens, accent }: { label: string; tokens: TokenCount
 }
 
 function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
+  const { t } = useTranslation();
   if (!months || months.length < 2) return null;
 
   const recent3 = new Set(months.slice(-3).map((m) => m.month));
@@ -472,16 +484,22 @@ function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Month-by-month message counts. The last 3 months are bold to highlight recent activity."
-        info="Rising or falling totals show whether the relationship is growing, stable, or cooling. A sudden drop in a previously active month often corresponds to a life event, conflict, or natural drift — cross-reference with the timeline."
+        description={t("analytics.monthly.description")}
+        info={t("analytics.monthly.tooltip")}
       >Monthly evolution</SectionLabel>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr>
-              {["Month", "You", "Them", "Total", "Your %"].map((h) => (
-                <th key={h} style={{ textAlign: h === "Month" ? "left" : "right", padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border)" }}>
-                  {h}
+              {[
+                { key: "month", label: t("analytics.monthly.month") },
+                { key: "you", label: t("analytics.monthly.you") },
+                { key: "them", label: t("analytics.monthly.them") },
+                { key: "total", label: t("analytics.monthly.total") },
+                { key: "yourPct", label: t("analytics.monthly.yourPct") },
+              ].map((h) => (
+                <th key={h.key} style={{ textAlign: h.key === "month" ? "left" : "right", padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border)" }}>
+                  {h.label}
                 </th>
               ))}
             </tr>
@@ -511,80 +529,81 @@ function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
 }
 
 function IndicatorCard({ indicators }: { indicators: AnalyticsReport["indicators"] }) {
+  const { t } = useTranslation();
   const trend = indicators.meShareTrendPct;
   const trendLabel = trend === 0
-    ? "Share trend"
+    ? t("analytics.indicators.shareTrend")
     : trend > 0
-      ? `Share trend ▲`
-      : `Share trend ▼`;
+      ? t("analytics.indicators.shareTrendUp")
+      : t("analytics.indicators.shareTrendDown");
 
   return (
     <div className="card" style={{ padding: "14px 16px" }}>
       <SectionLabel
-        description="Aggregate metrics summarizing the overall balance and dynamics of the conversation."
-        info="Look for imbalances across all indicators together: if your message balance, word balance, and initiation % are all above 60%, you are carrying the relationship — the other person is mostly responding rather than reaching out."
+        description={t("analytics.indicators.description")}
+        info={t("analytics.indicators.tooltip")}
       >Indicators</SectionLabel>
       <div className="stats" style={{ marginBottom: 0 }}>
         <StatCard
-          label="Msg balance (you)"
+          label={t("analytics.indicators.msgBalance")}
           value={`${indicators.msgBalancePct.toFixed(1)}%`}
-          description="Your share of total messages sent."
-          info="Healthy conversations sit between 40–60%. A persistent number above 65% means you are sending most of the messages and likely driving the conversation."
+          description={t("analytics.indicators.msgBalanceDesc")}
+          info={t("analytics.indicators.msgBalanceTooltip")}
         />
         <StatCard
-          label="Word balance (you)"
+          label={t("analytics.indicators.wordBalance")}
           value={`${indicators.wordBalancePct.toFixed(1)}%`}
-          description="Your share of total words written."
-          info="Compare this to your message balance. If your word % is much higher than your message %, your messages are longer — you may be explaining, elaborating, or carrying more emotional weight."
+          description={t("analytics.indicators.wordBalanceDesc")}
+          info={t("analytics.indicators.wordBalanceTooltip")}
         />
         <StatCard
-          label="Active days %"
+          label={t("analytics.indicators.activeDaysPct")}
           value={`${indicators.dailyConsistencyPct.toFixed(1)}%`}
-          description="Days with at least one message, out of the total span."
-          info="Below 20% with a long span means contact is rare and spread out. Above 70% means you're in near-daily contact. This is one of the strongest signals of how central someone is to your daily life."
+          description={t("analytics.indicators.activeDaysPctDesc")}
+          info={t("analytics.indicators.activeDaysPctTooltip")}
         />
         {indicators.medianRespAllSec > 0 && (
           <StatCard
-            label="Median reply (all)"
+            label={t("analytics.indicators.medianReply")}
             value={fmtDur(indicators.medianRespAllSec)}
-            description="Median response time across both sides."
-            info="The median is more reliable than the average because it isn't skewed by a few very long gaps. A short median means the conversation flows quickly; a long one means messages often go unanswered for hours."
+            description={t("analytics.indicators.medianReplyDesc")}
+            info={t("analytics.indicators.medianReplyTooltip")}
           />
         )}
         <StatCard
-          label="Initiation (you)"
+          label={t("analytics.indicators.initiationYou")}
           value={`${indicators.initiationMePct.toFixed(1)}%`}
-          description="How often you start a new conversation session."
-          info="If you're consistently above 70%, you are the one keeping this relationship alive. If you're below 30%, they reach out far more often. Neither is inherently bad — but a mismatch is worth noticing."
+          description={t("analytics.indicators.initiationYouDesc")}
+          info={t("analytics.indicators.initiationYouTooltip")}
         />
         {indicators.syncLaughDays > 0 && (
           <StatCard
-            label="Sync laugh days"
+            label={t("analytics.indicators.syncLaughDays")}
             value={String(indicators.syncLaughDays)}
-            description="Days when both sides sent laughter messages."
-            info="A day where both of you laughed in the same conversation is a proxy for genuine mutual enjoyment. More sync laugh days generally mean more comfort and shared humor in the relationship."
+            description={t("analytics.indicators.syncLaughDaysDesc")}
+            info={t("analytics.indicators.syncLaughDaysTooltip")}
           />
         )}
         {indicators.totalQuestions > 0 && (
           <StatCard
-            label="Total questions"
+            label={t("analytics.indicators.totalQuestions")}
             value={fmt(indicators.totalQuestions)}
-            description="Messages containing a question mark."
+            description={t("analytics.indicators.totalQuestionsDesc")}
           />
         )}
         {indicators.totalLaughter > 0 && (
           <StatCard
-            label="Total laughter"
+            label={t("analytics.indicators.totalLaughter")}
             value={fmt(indicators.totalLaughter)}
-            description="Messages containing laughter expressions."
+            description={t("analytics.indicators.totalLaughterDesc")}
           />
         )}
         {trend !== 0 && (
           <StatCard
             label={trendLabel}
             value={`${Math.abs(trend).toFixed(1)}%`}
-            description="Change in your message share over recent months."
-            info="A rising trend means you're sending a growing share of messages lately. A falling trend means the other person is becoming more active, or you are becoming less so — either way, the dynamic is shifting."
+            description={t("analytics.indicators.shareTrendDesc")}
+            info={t("analytics.indicators.shareTrendTooltip")}
           />
         )}
       </div>

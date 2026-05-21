@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useMatch, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
 import { useStore } from "../lib/store";
@@ -26,6 +27,7 @@ function formatRelative(unix: number): string {
 const PAGE_SIZE = 50;
 
 export default function AccountLayout() {
+  const { t } = useTranslation();
   const { id: accountIdStr } = useParams<{ id: string }>();
   const accountId = Number(accountIdStr);
 
@@ -82,13 +84,13 @@ export default function AccountLayout() {
   const syncMutation = useMutation({
     mutationFn: () => api.syncContacts(accountId),
     onSuccess: (data) => {
-      setSyncMsg(`Synced ${data.synced}`);
+      setSyncMsg(t("sidebar.syncSuccess", { count: data.synced }));
       setTimeout(() => setSyncMsg(null), 3000);
       qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) =>
-      setSyncMsg(`Failed: ${e instanceof Error ? e.message : String(e)}`),
+      setSyncMsg(t("sidebar.syncFailed", { error: e instanceof Error ? e.message : String(e) })),
   });
 
   const addMutation = useMutation({
@@ -114,11 +116,11 @@ export default function AccountLayout() {
       <aside className={`sidebar${sidebarOpen ? " sidebar-open" : ""}`}>
         {/* Header */}
         <div className="sidebar-header">
-          <span className="sidebar-title">Contacts</span>
+          <span className="sidebar-title">{t("sidebar.title")}</span>
           <div className="row" style={{ gap: 4 }}>
             <button
               className="btn btn-ghost btn-sm"
-              title="Sync contacts from WhatsApp"
+              title={t("sidebar.syncTitle")}
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
             >
@@ -136,7 +138,7 @@ export default function AccountLayout() {
             <button
               className="sidebar-close-btn btn btn-ghost btn-sm"
               onClick={() => setSidebarOpen(false)}
-              aria-label="Close contacts"
+              aria-label={t("sidebar.closeContacts")}
             >
               ✕
             </button>
@@ -156,14 +158,14 @@ export default function AccountLayout() {
             >
               <input
                 className="input"
-                placeholder="+14155551234"
+                placeholder={t("sidebar.phonePlaceholder")}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 style={{ marginBottom: 6, fontSize: 13 }}
               />
               <input
                 className="input"
-                placeholder="Name (optional)"
+                placeholder={t("sidebar.namePlaceholder")}
                 value={addName}
                 onChange={(e) => setAddName(e.target.value)}
                 style={{ marginBottom: 6, fontSize: 13 }}
@@ -174,7 +176,7 @@ export default function AccountLayout() {
                 disabled={!phone || addMutation.isPending}
                 style={{ width: "100%" }}
               >
-                {addMutation.isPending ? "Adding…" : "Add contact"}
+                {addMutation.isPending ? t("sidebar.adding") : t("sidebar.addContact")}
               </button>
               {addError && (
                 <div className="error" style={{ marginTop: 6, fontSize: 12 }}>
@@ -204,7 +206,7 @@ export default function AccountLayout() {
             <input
               className="input"
               style={{ paddingLeft: 28, fontSize: 13 }}
-              placeholder="Search…"
+              placeholder={t("sidebar.searchPlaceholder")}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
             />
@@ -234,11 +236,11 @@ export default function AccountLayout() {
         {/* Contact list */}
         <div className="sidebar-contacts">
           {contactsQ.isLoading && (
-            <div className="sidebar-empty">Loading…</div>
+            <div className="sidebar-empty">{t("sidebar.loadingMore")}</div>
           )}
           {!contactsQ.isLoading && allContacts.length === 0 && (
             <div className="sidebar-empty">
-              {search ? "No results" : "No contacts yet"}
+              {search ? t("sidebar.noResults") : t("sidebar.noContacts")}
             </div>
           )}
           {allContacts.map((c) => (
@@ -256,8 +258,8 @@ export default function AccountLayout() {
               disabled={contactsQ.isFetchingNextPage}
             >
               {contactsQ.isFetchingNextPage
-                ? "Loading…"
-                : `${total - allContacts.length} more…`}
+                ? t("sidebar.loadingMore")
+                : t("sidebar.moreContacts", { count: total - allContacts.length })}
             </button>
           )}
         </div>
@@ -268,12 +270,12 @@ export default function AccountLayout() {
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => setSidebarOpen(true)}
-            aria-label="Open contacts"
+            aria-label={t("sidebar.openContacts")}
             style={{ padding: "6px 8px" }}
           >
             ☰
           </button>
-          <span>Contacts</span>
+          <span>{t("sidebar.mobileLabel")}</span>
         </div>
         <div className={`page-content${isMessages ? " page-content-fill" : ""}`}>
           <Outlet />
@@ -292,6 +294,7 @@ function SidebarContact({
   contact: Contact;
   active: boolean;
 }) {
+  const { t } = useTranslation();
   // Read from store for live updates (falls back to prop while store seeds)
   const storeContact = useStore((s) => s.contacts[contactProp.id]);
   const contact = storeContact ?? contactProp;
@@ -303,13 +306,13 @@ function SidebarContact({
   const online = presence?.state === "available";
 
   const lastSeenText = online
-    ? "Online now"
+    ? t("sidebar.online")
     : presence
     ? presence.lastSeen
-      ? `Last seen ${formatRelative(presence.lastSeen)}`
-      : `Offline ${formatRelative(presence.at)}`
+      ? t("sidebar.lastSeen", { time: formatRelative(presence.lastSeen) })
+      : t("sidebar.offlineSince", { time: formatRelative(presence.at) })
     : contact.trackingEnabled
-    ? "No activity yet"
+    ? t("sidebar.noActivity")
     : null;
 
   return (
@@ -361,7 +364,7 @@ function SidebarContact({
         )}
       </div>
       {!contact.trackingEnabled && (
-        <span className="sidebar-paused-tag">paused</span>
+        <span className="sidebar-paused-tag">{t("sidebar.paused")}</span>
       )}
     </Link>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Account, ScheduleSlot } from "../lib/types";
 import QRView from "../components/QRView";
@@ -8,6 +9,7 @@ import PhoneCodeView from "../components/PhoneCodeView";
 import { useStore } from "../lib/store";
 
 export default function Accounts() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { accounts: storeAccounts, setAccounts, upsertAccount, removeAccount } = useStore();
   const accountsQ = useQuery({ queryKey: ["accounts"], queryFn: api.listAccounts });
@@ -45,34 +47,34 @@ export default function Accounts() {
       {/* Page header */}
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
-          Linked accounts
+          {t("accounts.title")}
         </h2>
         <button
           className={showPair ? "btn btn-ghost btn-sm" : "btn btn-primary btn-sm"}
           onClick={() => setShowPair((v) => !v)}
         >
-          {showPair ? "Cancel" : "+ Add account"}
+          {showPair ? t("accounts.cancel") : t("accounts.addAccount")}
         </button>
       </div>
 
       {/* Pairing panel */}
       {showPair && (
         <div className="card">
-          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>Link a WhatsApp account</div>
+          <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600 }}>{t("accounts.linkTitle")}</div>
           <div className="tabs" style={{ marginBottom: 20, width: "fit-content" }}>
             <button
               className="btn"
               aria-current={pairTab === "qr"}
               onClick={() => setPairTab("qr")}
             >
-              QR code
+              {t("accounts.qrTab")}
             </button>
             <button
               className="btn"
               aria-current={pairTab === "phone"}
               onClick={() => setPairTab("phone")}
             >
-              Phone code
+              {t("accounts.phoneTab")}
             </button>
           </div>
           {pairTab === "qr" ? <QRView /> : <PhoneCodeView />}
@@ -84,8 +86,8 @@ export default function Accounts() {
         <div className="card">
           <div className="empty-state">
             <div className="empty-state-icon">📱</div>
-            <div style={{ fontWeight: 500 }}>No accounts linked yet</div>
-            <div className="muted">Click "+ Add account" to link your WhatsApp</div>
+            <div style={{ fontWeight: 500 }}>{t("accounts.emptyTitle")}</div>
+            <div className="muted">{t("accounts.emptyDesc")}</div>
           </div>
         </div>
       )}
@@ -96,8 +98,8 @@ export default function Accounts() {
             <thead>
               <tr>
                 <th style={{ width: 40 }}></th>
-                <th>Account</th>
-                <th style={{ width: 100 }}>Tracking</th>
+                <th>{t("accounts.tableAccount")}</th>
+                <th style={{ width: 100 }}>{t("accounts.tableTracking")}</th>
                 <th style={{ width: 80 }}></th>
               </tr>
             </thead>
@@ -108,7 +110,7 @@ export default function Accounts() {
                   account={acc}
                   onToggle={(v) => toggle.mutate({ id: acc.id, trackingActive: v })}
                   onDelete={() => {
-                    if (confirm(`Remove account ${acc.label || acc.jid}?`))
+                    if (confirm(t("accounts.removeConfirm", { name: acc.label || acc.jid })))
                       remove.mutate(acc.id);
                   }}
                 />
@@ -130,6 +132,7 @@ function AccountRow({
   onToggle: (v: boolean) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const upsertAccount = useStore((s) => s.upsertAccount);
   const [editing, setEditing] = useState(false);
@@ -184,13 +187,13 @@ function AccountRow({
                   className="btn btn-primary btn-sm"
                   onClick={() => saveLabel.mutate()}
                 >
-                  Save
+                  {t("accounts.save")}
                 </button>
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => { setLabel(account.label); setEditing(false); }}
                 >
-                  Cancel
+                  {t("accounts.cancel")}
                 </button>
               </div>
             ) : (
@@ -201,14 +204,14 @@ function AccountRow({
                   style={{ fontSize: 11, padding: "1px 6px", marginLeft: 4, height: "auto" }}
                   onClick={() => setEditing(true)}
                 >
-                  rename
+                  {t("accounts.rename")}
                 </button>
               </span>
             )}
           </div>
         </td>
         <td>
-          <label className="toggle" title={account.trackingActive ? "Tracking on" : "Tracking off"}>
+          <label className="toggle" title={account.trackingActive ? t("accounts.trackingOn") : t("accounts.trackingOff")}>
             <input
               type="checkbox"
               checked={account.trackingActive}
@@ -222,12 +225,12 @@ function AccountRow({
             <button
               className={`btn btn-sm ${showSchedule ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setShowSchedule((v) => !v)}
-              title="Connection schedule"
+              title={t("accounts.connectionSchedule")}
             >
-              Schedule
+              {t("accounts.schedule")}
             </button>
             <button className="btn btn-danger btn-sm" onClick={onDelete}>
-              Remove
+              {t("accounts.remove")}
             </button>
           </div>
         </td>
@@ -255,6 +258,7 @@ function timeToMinutes(t: string): number {
 }
 
 function SchedulePanel({ accountId }: { accountId: number }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const schedule = useQuery({
@@ -298,17 +302,17 @@ function SchedulePanel({ accountId }: { accountId: number }) {
   }
 
   if (schedule.isLoading) {
-    return <div style={{ padding: "12px 16px" }} className="muted">Loading schedule…</div>;
+    return <div style={{ padding: "12px 16px" }} className="muted">{t("accounts.loadingSchedule")}</div>;
   }
 
   return (
     <div className="schedule-panel">
-      <div className="schedule-panel-title">Connection Schedule</div>
+      <div className="schedule-panel-title">{t("accounts.connectionSchedule")}</div>
 
       <label className="schedule-toggle-row">
         <div>
-          <div style={{ fontWeight: 500, fontSize: 13 }}>Force offline</div>
-          <div className="muted" style={{ fontSize: 12 }}>Immediately disconnect and stay offline until toggled off</div>
+          <div style={{ fontWeight: 500, fontSize: 13 }}>{t("accounts.forceOffline")}</div>
+          <div className="muted" style={{ fontSize: 12 }}>{t("accounts.forceOfflineDesc")}</div>
         </div>
         <label className="toggle">
           <input
@@ -323,8 +327,8 @@ function SchedulePanel({ accountId }: { accountId: number }) {
       {!forceOffline && (
         <div className="schedule-slots">
           <div className="schedule-slots-label">
-            Active time slots
-            <span className="muted" style={{ fontWeight: 400, marginLeft: 6 }}>(empty = always connected)</span>
+            {t("accounts.activeSlots")}
+            <span className="muted" style={{ fontWeight: 400, marginLeft: 6 }}>{t("accounts.emptySlotsHint")}</span>
           </div>
           {slots.map((s, i) => (
             <div key={i} className="schedule-slot-row">
@@ -344,13 +348,13 @@ function SchedulePanel({ accountId }: { accountId: number }) {
                 onChange={(e) => updateSlot(i, "endMin", timeToMinutes(e.target.value))}
               />
               {s.startMin >= s.endMin && (
-                <span className="muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>overnight</span>
+                <span className="muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>{t("accounts.overnight")}</span>
               )}
               <button className="btn btn-ghost btn-sm" onClick={() => removeSlot(i)} style={{ marginLeft: "auto" }}>✕</button>
             </div>
           ))}
           <button className="btn btn-ghost btn-sm" onClick={addSlot} style={{ alignSelf: "flex-start" }}>
-            + Add slot
+            {t("accounts.addSlot")}
           </button>
         </div>
       )}
@@ -361,13 +365,13 @@ function SchedulePanel({ accountId }: { accountId: number }) {
           disabled={!dirty || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? "Saving…" : "Save"}
+          {save.isPending ? t("accounts.saving") : t("accounts.save")}
         </button>
         {save.isError && (
-          <span style={{ fontSize: 12, color: "var(--danger)" }}>Save failed</span>
+          <span style={{ fontSize: 12, color: "var(--danger)" }}>{t("accounts.saveFailed")}</span>
         )}
         {save.isSuccess && !dirty && (
-          <span className="muted" style={{ fontSize: 12 }}>Saved</span>
+          <span className="muted" style={{ fontSize: 12 }}>{t("accounts.saved")}</span>
         )}
       </div>
     </div>

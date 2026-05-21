@@ -3,6 +3,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 import type { Contact, TimelineEntry } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
 import { InfoTooltip } from "./InfoTooltip";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function PresencePanel({ entries, contact }: Props) {
+  const { t } = useTranslation();
   const safeEntries = entries ?? [];
   const hourlyData    = computePeakHours(safeEntries);
   const weekdayData   = computeWeekdayActivity(safeEntries);
@@ -46,76 +48,76 @@ export default function PresencePanel({ entries, contact }: Props) {
       <div className="card" style={{ padding: "14px 16px" }}>
         <div style={{ marginBottom: 12 }}>
           <div className="muted" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", display: "flex", alignItems: "center" }}>
-            Presence
-            <InfoTooltip text="These metrics are computed from WhatsApp presence events — when the contact appeared online or went offline. Accuracy depends on how long tracking has been active and whether WhatsApp presence visibility is enabled for this contact." />
+            {t("presence.sectionTitle")}
+            <InfoTooltip text={t("presence.sectionTooltip")} />
           </div>
           <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 3, lineHeight: 1.45, opacity: 0.8 }}>
-            Online activity summary based on tracked presence events.
+            {t("presence.sectionDesc")}
           </div>
         </div>
         <div className="stats" style={{ marginBottom: 0 }}>
           {avgSession != null && (
             <StatCard
-              label="Avg session"
+              label={t("presence.avgSession")}
               value={formatDuration(avgSession)}
-              description="Average duration of a single online session."
-              info="Short sessions (&lt;3 min) suggest quick message checks; longer sessions mean active browsing. Combined with peak hours, this reveals their daily phone habits."
+              description={t("presence.avgSessionDesc")}
+              info={t("presence.avgSessionTooltip")}
             />
           )}
           {longestSess != null && (
             <StatCard
-              label="Longest session"
+              label={t("presence.longestSession")}
               value={formatDuration(longestSess)}
-              description="Single longest continuous time online."
-              info="An unusually long session may indicate a video call, a busy work period, or a day spent on the phone. Compare it to the average to see how typical it was."
+              description={t("presence.longestSessionDesc")}
+              info={t("presence.longestSessionTooltip")}
             />
           )}
           {avgOnlineSec != null && (
             <StatCard
-              label="Daily avg online"
+              label={t("presence.dailyAvg")}
               value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")}
-              description="Average online time per day. ▲▼ = change vs. prior week."
-              info="Compare this to your own online time to gauge whether you're both active at similar intensities. A rising trend means they've been using WhatsApp more recently."
+              description={t("presence.dailyAvgDesc")}
+              info={t("presence.dailyAvgTooltip")}
             />
           )}
           {streak != null && (
             <StatCard
-              label={streak.online ? "Online streak" : "Offline for"}
+              label={streak.online ? t("presence.onlineStreak") : t("presence.offlineFor")}
               value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)}
-              description={streak.online ? "Consecutive days seen online." : "Time since last seen online."}
-              info={streak.online ? "A long active streak means they use WhatsApp consistently every day. Useful for knowing they're reliably reachable." : "They haven't appeared online since this time. This could mean the app is closed, presence is hidden, or they are inactive."}
+              description={streak.online ? t("presence.onlineStreakDesc") : t("presence.offlineForDesc")}
+              info={streak.online ? t("presence.onlineStreakTooltip") : t("presence.offlineForTooltip")}
             />
           )}
           {longestOffline != null && (
             <StatCard
-              label="Longest offline"
+              label={t("presence.longestOffline")}
               value={`${longestOffline}d`}
-              description="Longest gap between any two active days."
-              info="A long offline streak may mark a trip, illness, or a period off WhatsApp entirely. Comparing it to the tracking period shows whether this was unusual or routine."
+              description={t("presence.longestOfflineDesc")}
+              info={t("presence.longestOfflineTooltip")}
             />
           )}
           {nightOwlPct != null && (
             <StatCard
-              label="Night owl"
+              label={t("presence.nightOwl")}
               value={`${nightOwlPct}%`}
-              description="Share of online time between midnight and 5am."
-              info="A high score (>20%) suggests late-night habits, shift work, or a different time zone. This is the best time to reach them if you want a faster reply late at night."
+              description={t("presence.nightOwlDesc")}
+              info={t("presence.nightOwlTooltip")}
             />
           )}
           {consistency != null && (
             <StatCard
-              label="Consistency"
+              label={t("presence.consistency")}
               value={`${consistency}/100`}
-              description="How predictable their online schedule is."
-              info="High consistency (>70) means their schedule is very regular — you can reliably reach them at the same times each day. Low consistency (below 30) means their WhatsApp usage is sporadic and hard to predict."
+              description={t("presence.consistencyDesc")}
+              info={t("presence.consistencyTooltip")}
             />
           )}
           {picFreqDays != null && (
             <StatCard
-              label="Pic changes"
-              value={`every ${picFreqDays}d`}
-              description="Average days between profile picture changes."
-              info="Frequent changes (every few days) signal someone socially active or going through life changes. Rare changes (>90 days) suggest a stable or more private persona."
+              label={t("presence.picChanges")}
+              value={t("presence.picFreqValue", { n: picFreqDays })}
+              description={t("presence.picChangesDesc")}
+              info={t("presence.picChangesTooltip")}
             />
           )}
         </div>
@@ -126,30 +128,30 @@ export default function PresencePanel({ entries, contact }: Props) {
         {patternSummary && (
           <div className="card" style={{ padding: "12px 16px" }}>
             <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              Peak hours
-              <InfoTooltip text="The best window to send a message and get a timely reply. If their peak hours don't overlap with yours, expect longer response gaps even when they're active." />
+              {t("presence.peakHours")}
+              <InfoTooltip text={t("presence.peakHoursTooltip")} />
             </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Hours with activity above 50% of their peak</div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.peakHoursDesc")}</div>
             <div style={{ marginTop: 6, fontWeight: 600, color: "var(--accent)" }}>{patternSummary}</div>
           </div>
         )}
         {sleepWindow && (
           <div className="card" style={{ padding: "12px 16px" }}>
             <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              Sleep window (est.)
-              <InfoTooltip text="Knowing their estimated sleep window helps you avoid sending messages at inappropriate hours and better understand their daily rhythm. Requires at least 3 recurring overnight offline gaps (≥3h, starting 8pm–4am) to compute." />
+              {t("presence.sleepWindow")}
+              <InfoTooltip text={t("presence.sleepWindowTooltip")} />
             </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Estimated from recurring overnight offline gaps</div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.sleepWindowDesc")}</div>
             <div style={{ marginTop: 6, fontWeight: 600 }}>{sleepWindow}</div>
           </div>
         )}
         {firstSeen && (
           <div className="card" style={{ padding: "12px 16px" }}>
             <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              Tracking period
-              <InfoTooltip text="Longer tracking periods produce more accurate patterns — at least 2 weeks is needed for reliable daily averages, and 4+ weeks for streak and sleep estimates. Short periods may not reflect long-term behavior." />
+              {t("presence.trackingPeriod")}
+              <InfoTooltip text={t("presence.trackingPeriodTooltip")} />
             </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>Date range of recorded presence events</div>
+            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.trackingPeriodDesc")}</div>
             <div style={{ marginTop: 6, fontSize: 13 }}>
               <span>{formatDate(firstSeen)}</span>
               <span className="muted"> → </span>
@@ -164,16 +166,16 @@ export default function PresencePanel({ entries, contact }: Props) {
           — hourly pattern, weekday pattern, heatmap, 30-day trend
       ══════════════════════════════════════════════════════════ */}
       <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">Presence &amp; Activity</div>
+        <div className="section-label">{t("presence.presenceActivity")}</div>
 
         {/* Hourly + Weekday patterns side-by-side */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div className="card">
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              Peak Activity Hours
-              <InfoTooltip text="If their peak hours don't overlap with yours, most messages will sit unread for hours before a reply — which can feel like low engagement even when they're active. Use this to find the best time to reach them." />
+              {t("presence.peakHoursChart")}
+              <InfoTooltip text={t("presence.peakHoursChartTooltip")} />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Total online minutes per hour of the day across all tracked days</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.peakHoursChartDesc")}</div>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
                 <BarChart data={hourlyData} barCategoryGap="20%">
@@ -189,10 +191,10 @@ export default function PresencePanel({ entries, contact }: Props) {
 
           <div className="card">
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              Most Active Days
-              <InfoTooltip text="Weekend vs. weekday peaks reveal the nature of their WhatsApp usage. High weekend activity often signals personal, social use. High weekday activity may indicate professional use or habit. Weekends are shown in a different color." />
+              {t("presence.mostActiveDays")}
+              <InfoTooltip text={t("presence.mostActiveDaysTooltip")} />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Total online minutes per day of the week (weekends highlighted)</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.mostActiveDaysDesc")}</div>
             <div style={{ width: "100%", height: 180 }}>
               <ResponsiveContainer>
                 <BarChart data={weekdayData} barCategoryGap="20%">
@@ -215,10 +217,10 @@ export default function PresencePanel({ entries, contact }: Props) {
         {heatmapData.length > 0 && (
           <div className="card">
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              Activity Heatmap
-              <InfoTooltip text="Clusters of dark cells reveal sustained active periods. Gaps (light or empty weeks) can mark vacations, illness, or extended time off WhatsApp. Each cell is one day — darker green = more total online time." />
+              {t("presence.heatmap")}
+              <InfoTooltip text={t("presence.heatmapTooltip")} />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>Daily online time over the last 16 weeks — darker = more active</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>{t("presence.heatmapDesc")}</div>
             <Heatmap data={heatmapData} />
           </div>
         )}
@@ -227,10 +229,10 @@ export default function PresencePanel({ entries, contact }: Props) {
         {trend30.length > 1 && (
           <div className="card">
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              30-Day Online Trend
-              <InfoTooltip text="An upward trend means they've been more active on WhatsApp recently. A downward trend may mean they're busier, switched devices, or are spending less time on their phone. Sudden spikes often correspond to specific events." />
+              {t("presence.trend30")}
+              <InfoTooltip text={t("presence.trend30Tooltip")} />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Online minutes per day over the last 30 days</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.trend30Desc")}</div>
             <div style={{ width: "100%", height: 190 }}>
               <ResponsiveContainer>
                 <LineChart data={trend30}>
@@ -250,10 +252,10 @@ export default function PresencePanel({ entries, contact }: Props) {
           Section: Profile Picture History
       ══════════════════════════════════════════════════════════ */}
       <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">Profile Picture History</div>
+        <div className="section-label">{t("presence.picHistoryTitle")}</div>
         <div className="card">
           {pictureHistory.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>No profile pictures recorded yet.</div>
+            <div className="muted" style={{ fontSize: 13 }}>{t("presence.picHistoryEmpty")}</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 12 }}>
               {pictureHistory.map((e, i) => {
@@ -274,7 +276,7 @@ export default function PresencePanel({ entries, contact }: Props) {
                     />
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: i === 0 ? "var(--accent)" : "var(--fg)" }}>
-                        {i === 0 ? "Latest" : `#${pictureHistory.length - i}`}
+                        {i === 0 ? t("presence.picLatest") : t("presence.picNumber", { n: pictureHistory.length - i })}
                       </div>
                       <div className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</div>
                     </div>
@@ -290,10 +292,10 @@ export default function PresencePanel({ entries, contact }: Props) {
           Section: Status (About) History
       ══════════════════════════════════════════════════════════ */}
       <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">Status History</div>
+        <div className="section-label">{t("presence.statusHistoryTitle")}</div>
         <div className="card">
           {aboutHistory.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>No status changes recorded yet.</div>
+            <div className="muted" style={{ fontSize: 13 }}>{t("presence.statusHistoryEmpty")}</div>
           ) : (
             <div className="col" style={{ gap: 0 }}>
               {aboutHistory.map((e, i) => (
@@ -319,13 +321,13 @@ export default function PresencePanel({ entries, contact }: Props) {
                   />
                   <div className="col" style={{ gap: 2, flex: 1 }}>
                     <div style={{ fontSize: 13 }}>
-                      {e.text ? e.text : <em className="muted" style={{ fontSize: 12 }}>(cleared)</em>}
+                      {e.text ? e.text : <em className="muted" style={{ fontSize: 12 }}>{t("presence.aboutCleared")}</em>}
                     </div>
                     <div className="muted" style={{ fontSize: 11 }}>{formatDatetime(e.at)}</div>
                   </div>
                   {i === 0 && (
                     <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", flexShrink: 0, paddingTop: 2 }}>
-                      Current
+                      {t("presence.currentStatus")}
                     </span>
                   )}
                 </div>
@@ -340,21 +342,21 @@ export default function PresencePanel({ entries, contact }: Props) {
       ══════════════════════════════════════════════════════════ */}
       {contact && (
         <div className="col" style={{ gap: 12 }}>
-          <div className="section-label">Other Information</div>
+          <div className="section-label">{t("presence.otherInfo")}</div>
           <div className="card">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-              <InfoRow label="Phone" value={contact.phone} />
-              <InfoRow label="JID" value={contact.jid} mono />
-              <InfoRow label="Display Name" value={contact.displayName || "—"} />
-              <InfoRow label="Tracking" value={contact.trackingEnabled ? "Active" : "Paused"} />
-              <InfoRow label="Added" value={formatDatetime(contact.addedAt)} />
-              {firstSeen && <InfoRow label="First seen" value={formatDatetime(firstSeen)} />}
-              {lastSeen && <InfoRow label="Last seen" value={formatDatetime(lastSeen)} />}
+              <InfoRow label={t("presence.phone")} value={contact.phone} />
+              <InfoRow label={t("presence.jid")} value={contact.jid} mono />
+              <InfoRow label={t("presence.displayName")} value={contact.displayName || "—"} />
+              <InfoRow label={t("presence.tracking")} value={contact.trackingEnabled ? t("presence.trackingActive") : t("presence.trackingPaused")} />
+              <InfoRow label={t("presence.added")} value={formatDatetime(contact.addedAt)} />
+              {firstSeen && <InfoRow label={t("presence.firstSeen")} value={formatDatetime(firstSeen)} />}
+              {lastSeen && <InfoRow label={t("presence.lastSeen")} value={formatDatetime(lastSeen)} />}
               {pictureHistory.length > 0 && (
-                <InfoRow label="Picture changes" value={`${pictureHistory.length} recorded`} />
+                <InfoRow label={t("presence.pictureChanges")} value={t("presence.pictureChangesValue", { count: pictureHistory.length })} />
               )}
               {aboutHistory.length > 0 && (
-                <InfoRow label="Status changes" value={`${aboutHistory.length} recorded`} />
+                <InfoRow label={t("presence.statusChanges")} value={t("presence.statusChangesValue", { count: aboutHistory.length })} />
               )}
             </div>
           </div>
@@ -363,7 +365,7 @@ export default function PresencePanel({ entries, contact }: Props) {
 
       {/* ── Export ── */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn" onClick={() => exportCSV(safeEntries)}>Export CSV</button>
+        <button className="btn" onClick={() => exportCSV(safeEntries)}>{t("presence.exportCsv")}</button>
       </div>
 
     </div>

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 
 export default function Login() {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function Login() {
       setToken(token);
       navigate("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : t("auth.login.failed"));
     } finally {
       setLoading(false);
     }
@@ -37,17 +39,17 @@ export default function Login() {
       <div className="login-box">
         <div className="login-brand">
           <div className="login-brand-mark">W</div>
-          <div className="login-brand-title">WA Tracker</div>
-          <div className="login-brand-sub">Sign in to your account</div>
+          <div className="login-brand-title">{t("auth.brand")}</div>
+          <div className="login-brand-sub">{t("auth.login.subtitle")}</div>
         </div>
         <div className="card">
           <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
             <div className="form-field">
-              <label className="form-label" htmlFor="login-user">Username</label>
+              <label className="form-label" htmlFor="login-user">{t("auth.login.username")}</label>
               <input
                 id="login-user"
                 className="input"
-                placeholder="username"
+                placeholder={t("auth.login.usernamePlaceholder")}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -56,7 +58,7 @@ export default function Login() {
               />
             </div>
             <div className="form-field">
-              <label className="form-label" htmlFor="login-pass">Password</label>
+              <label className="form-label" htmlFor="login-pass">{t("auth.login.password")}</label>
               <input
                 id="login-pass"
                 className="input"
@@ -74,7 +76,7 @@ export default function Login() {
               disabled={loading}
               style={{ marginTop: 4 }}
             >
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? t("auth.login.submitting") : t("auth.login.submit")}
             </button>
           </form>
           {error && (

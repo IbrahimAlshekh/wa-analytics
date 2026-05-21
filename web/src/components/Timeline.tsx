@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { TimelineEntry } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 function MediaPreview({ type, path }: { type?: string; path: string }) {
+  const { t } = useTranslation();
   const url = useMemo(() => getMediaUrl(path), [path]);
 
   if (type === "image") {
@@ -23,7 +25,7 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
 
   return (
     <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: "inline-block", marginTop: 4 }}>
-      View {type || "media"}
+      {t("timeline.viewMedia", { type: type || "media" })}
     </a>
   );
 }
@@ -50,8 +52,10 @@ type Block =
   | { type: "event"; ev: NonPresence };
 
 export default function SessionTimeline({ entries }: Props) {
+  const { t } = useTranslation();
+
   if (!entries?.length) {
-    return <div className="muted">No events yet.</div>;
+    return <div className="muted">{t("timeline.noEvents")}</div>;
   }
 
   const messages = entries
@@ -65,9 +69,9 @@ export default function SessionTimeline({ entries }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>Recent Messages</h4>
+        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>{t("timeline.recentMessages")}</h4>
         {messages.length === 0 ? (
-          <div className="muted">No messages yet.</div>
+          <div className="muted">{t("timeline.noMessages")}</div>
         ) : (
           <div className="session-timeline">
             {messages.map((e, i) => (
@@ -75,7 +79,7 @@ export default function SessionTimeline({ entries }: Props) {
                 <time className="session-time">{formatTime(e.at)}</time>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <span>
-                    {e.isFromMe ? "Sent" : "Received"}:{" "}
+                    {e.isFromMe ? t("timeline.sent") : t("timeline.received")}:{" "}
                     <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
                       {e.text || (e.mediaPath ? "" : <span className="muted">[{e.mediaType || "media"}]</span>)}
                     </em>
@@ -89,9 +93,9 @@ export default function SessionTimeline({ entries }: Props) {
       </div>
 
       <div>
-        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>Status</h4>
+        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>{t("timeline.statusSection")}</h4>
         {blocks.length === 0 ? (
-          <div className="muted">No sessions recorded yet.</div>
+          <div className="muted">{t("timeline.noSessions")}</div>
         ) : (
           <div className="session-timeline">
             {blocks.map((b, i) => {
@@ -107,8 +111,9 @@ export default function SessionTimeline({ entries }: Props) {
 }
 
 function SessionBlock({ session }: { session: Session }) {
+  const { t } = useTranslation();
   const start = formatTime(session.startAt);
-  const end = session.endAt ? formatTime(session.endAt) : "now";
+  const end = session.endAt ? formatTime(session.endAt) : t("contactDetail.nowLabel");
   const dur = session.durationSec != null ? formatDuration(session.durationSec) : null;
   const lastSeenDiff =
     session.lastSeen != null && session.endAt != null
@@ -120,13 +125,13 @@ function SessionBlock({ session }: { session: Session }) {
       <div className="session-header">
         <span className="session-dot session-dot-online" />
         <span className="session-label">
-          Online {start} – {end}
+          {t("timeline.onlineSession", { start, end })}
           {dur ? <span className="session-duration">({dur})</span> : null}
         </span>
       </div>
       {lastSeenDiff != null && lastSeenDiff > 0 && (
         <div className="session-meta">
-          Last activity {formatDuration(lastSeenDiff)} before going offline
+          {t("timeline.lastActivity", { duration: formatDuration(lastSeenDiff) })}
         </div>
       )}
     </div>
@@ -134,28 +139,30 @@ function SessionBlock({ session }: { session: Session }) {
 }
 
 function GapBlock({ fromAt, toAt }: { fromAt: number; toAt: number }) {
+  const { t } = useTranslation();
   const dur = formatDuration(toAt - fromAt);
   return (
     <div className="session-block session-offline">
       <span className="session-dot session-dot-offline" />
-      <span className="session-label session-muted">Offline {dur}</span>
+      <span className="session-label session-muted">{t("timeline.offlineGap", { duration: dur })}</span>
     </div>
   );
 }
 
 function EventBlock({ ev }: { ev: NonPresence }) {
+  const { t } = useTranslation();
   return (
     <div className="session-event">
       <time className="session-time">{formatTime(ev.at)}</time>
       {ev.kind === "picture" ? (
         <span>
-          Profile picture changed
+          {t("timeline.picChanged")}
           {ev.mediaPath ? (
-            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer">view</a></>
+            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer">{t("timeline.view")}</a></>
           ) : null}
         </span>
       ) : (
-        <span>About updated: <em>{ev.text || "(empty)"}</em></span>
+        <span>{t("timeline.aboutUpdated")} <em>{ev.text || t("timeline.aboutEmpty")}</em></span>
       )}
     </div>
   );
