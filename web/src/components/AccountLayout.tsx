@@ -302,22 +302,18 @@ function SidebarContact({
   const storeContact = useStore((s) => s.contacts[contactProp.id]);
   const contact = storeContact ?? contactProp;
 
-  const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contact.id}`]) ?? [];
+  const presence = useStore((s) => s.lastPresence[`${accountId}:${contact.id}`]);
 
   const displayName = contact.displayName || contact.phone;
 
-  // Derive online status from WS entries (most recent presence)
-  const lastPresence = [...wsEntries]
-    .filter((e) => e.kind === "presence")
-    .sort((a, b) => b.at - a.at)[0];
-  const online = lastPresence?.state === "available";
+  const online = presence?.state === "available";
 
   const lastSeenText = online
     ? "Online now"
-    : lastPresence
-    ? lastPresence.lastSeen
-      ? `Last seen ${formatRelative(lastPresence.lastSeen)}`
-      : `Offline ${formatRelative(lastPresence.at)}`
+    : presence
+    ? presence.lastSeen
+      ? `Last seen ${formatRelative(presence.lastSeen)}`
+      : `Offline ${formatRelative(presence.at)}`
     : contact.trackingEnabled
     ? "No activity yet"
     : null;

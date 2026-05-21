@@ -17,7 +17,7 @@ export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, setToken, backupState, setBackupState, addWsEntry } = useStore();
+  const { token, setToken, backupState, setBackupState, addWsEntry, setLastPresence } = useStore();
 
   useEffect(() => {
     if (!token && !publicPaths.includes(location.pathname)) {
@@ -41,6 +41,7 @@ export default function App() {
             state: msg.state,
             lastSeen: msg.lastSeen,
           });
+          setLastPresence(accountId, contactId, msg.state, msg.observedAt, msg.lastSeen);
           qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
           qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });

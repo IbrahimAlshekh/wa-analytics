@@ -72,7 +72,7 @@ export default function ContactDetail() {
   const [tab, setTab] = useState<MainTab>("status");
   const [range, setRange] = useState<AnalyticsRange>("week");
 
-  const { upsertContact, removeContact, addWsEntry, pruneWsEntries } = useStore();
+  const { upsertContact, removeContact, addWsEntry, pruneWsEntries, setLastPresence } = useStore();
   const contact = useStore((s) => s.contacts[cid]);
   const wsEntries = useStore((s) => s.wsEntries[wsKey(accountId, cid)]) ?? [];
 
@@ -106,6 +106,15 @@ export default function ContactDetail() {
   useEffect(() => {
     if (tl.data?.contact) upsertContact(tl.data.contact);
   }, [tl.data?.contact, upsertContact]);
+
+  // Seed lastPresence from the timeline so the sidebar always has a value
+  useEffect(() => {
+    if (!tl.data?.entries) return;
+    const latest = [...tl.data.entries]
+      .filter((e) => e.kind === "presence" && e.state)
+      .sort((a, b) => b.at - a.at)[0];
+    if (latest?.state) setLastPresence(accountId, cid, latest.state, latest.at, latest.lastSeen);
+  }, [tl.data?.entries, accountId, cid, setLastPresence]);
 
   // Prune WS entries that the server has now absorbed
   useEffect(() => {

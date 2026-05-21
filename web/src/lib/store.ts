@@ -30,6 +30,10 @@ interface AppStore {
   addWsEntry: (accountId: number, contactId: number, entry: TimelineEntry) => void;
   pruneWsEntries: (accountId: number, contactId: number, serverKeys: Set<string>) => void;
 
+  // Last-known presence per contact — never pruned, only updated
+  lastPresence: Record<string, { state: "available" | "unavailable"; at: number; lastSeen?: number }>;
+  setLastPresence: (accountId: number, contactId: number, state: "available" | "unavailable", at: number, lastSeen?: number) => void;
+
   // App-level UI state
   backupState: "idle" | "loading" | "error";
   setBackupState: (s: "idle" | "loading" | "error") => void;
@@ -95,6 +99,17 @@ export const useStore = create<AppStore>((set) => ({
         [key]: (s.wsEntries[key] ?? []).filter((e) => !serverKeys.has(entryKey(e))),
       },
     }));
+  },
+
+  // Last-known presence
+  lastPresence: {},
+  setLastPresence: (accountId, contactId, state, at, lastSeen) => {
+    const key = wsKey(accountId, contactId);
+    set((s) => {
+      const existing = s.lastPresence[key];
+      if (existing && existing.at >= at) return s;
+      return { lastPresence: { ...s.lastPresence, [key]: { state, at, lastSeen } } };
+    });
   },
 
   // App UI
