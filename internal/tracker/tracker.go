@@ -181,29 +181,32 @@ func (t *Tracker) HandleEvent(evt any) {
 }
 
 func (t *Tracker) onConnected() {
-	t.mu.Lock()
-	if t.running {
-		t.mu.Unlock()
-		return
-	}
-	t.running = true
-	t.mu.Unlock()
-
-	// SendAvailable must be called before subscribing to presence so WhatsApp
-	// knows to push events to us.
+	// SendAvailable must be called on every (re)connection so WhatsApp knows
+	// to push presence events to us. It must happen before subscribing.
 	if err := t.wa.SendAvailable(t.ctx); err != nil {
 		slog.Warn("tracker: send available failed", "accountID", t.accountID, "err", err)
 	}
 
-	slog.Info("tracker: starting workers", "accountID", t.accountID, "poll_interval", t.interval)
-	t.wg.Add(4)
-	go t.runPictureLoop()
-	go t.runAboutLoop()
-	go t.runResubLoop()
-	go func() {
-		defer t.wg.Done()
-		t.startSubscriptions()
-	}()
+	t.mu.Lock()
+	firstConnect := !t.running
+	t.running = true
+	t.mu.Unlock()
+
+	if firstConnect {
+		slog.Info("tracker: starting workers", "accountID", t.accountID, "poll_interval", t.interval)
+		t.wg.Add(4)
+		go t.runPictureLoop()
+		go t.runAboutLoop()
+		go t.runResubLoop()
+		go func() {
+			defer t.wg.Done()
+			t.startSubscriptions()
+		}()
+	} else {
+		// Reconnected: re-subscribe without spinning up additional worker goroutines.
+		slog.Info("tracker: reconnected — refreshing presence subscriptions", "accountID", t.accountID)
+		go t.startSubscriptions()
+	}
 }
 
 func (t *Tracker) stopWorkers() {
@@ -213,15 +216,47 @@ func (t *Tracker) stopWorkers() {
 	slog.Info("tracker: workers stopped", "accountID", t.accountID)
 }
 
+// startSubscriptions subscribes to presence for all tracked contacts.
+// Calls are spread out over time to avoid triggering WhatsApp rate-limits.
 func (t *Tracker) startSubscriptions() {
+	if t.checkBackoff() {
+		slog.Debug("tracker: skipping subscriptions — in rate-limit backoff", "accountID", t.accountID)
+		return
+	}
+
 	contacts, err := t.db.ListTrackedContacts(t.ctx, t.accountID)
 	if err != nil {
 		slog.Error("tracker: list contacts for subscription", "accountID", t.accountID, "err", err)
 		return
 	}
-	slog.Info("tracker: subscribing to presence", "accountID", t.accountID, "count", len(contacts))
+	n := len(contacts)
+	if n == 0 {
+		return
+	}
+
+	// Spread N calls evenly across ~90 s to avoid bursting the subscription API.
+	// Floor: 400 ms (fast enough); ceiling: 3 s (no point spreading wider).
+	gap := 90 * time.Second / time.Duration(n)
+	if gap < 400*time.Millisecond {
+		gap = 400 * time.Millisecond
+	}
+	if gap > 3*time.Second {
+		gap = 3 * time.Second
+	}
+
+	slog.Info("tracker: subscribing to presence", "accountID", t.accountID, "count", n, "gap", gap)
 	failed := 0
-	for _, c := range contacts {
+	for i, c := range contacts {
+		select {
+		case <-t.ctx.Done():
+			return
+		default:
+		}
+		if t.checkBackoff() {
+			slog.Debug("tracker: stopping subscriptions — entered backoff mid-loop", "accountID", t.accountID)
+			return
+		}
+
 		jid, err := types.ParseJID(c.JID)
 		if err != nil {
 			slog.Error("tracker: invalid jid", "accountID", t.accountID, "jid", c.JID, "err", err)
@@ -229,6 +264,12 @@ func (t *Tracker) startSubscriptions() {
 			continue
 		}
 		if err := t.wa.SubscribePresence(t.ctx, jid); err != nil {
+			if isRateLimit(err) {
+				slog.Log(t.ctx, config.LevelAudit, "tracker: rate limited on SubscribePresence — backing off",
+					"accountID", t.accountID, "jid", c.JID, "err", err)
+				t.setBackoff(5 * time.Minute)
+				return
+			}
 			slog.Warn("tracker: subscribe presence failed", "accountID", t.accountID, "jid", c.JID, "err", err)
 			failed++
 		} else {
@@ -237,9 +278,19 @@ func (t *Tracker) startSubscriptions() {
 				t.storeLID(c, jid)
 			}
 		}
+
+		// Sleep between calls, skipping the gap after the last contact.
+		if i < n-1 {
+			select {
+			case <-t.ctx.Done():
+				return
+			case <-time.After(gap):
+			}
+		}
 	}
+
 	if failed > 0 {
-		slog.Warn("tracker: some subscriptions failed", "accountID", t.accountID, "failed", failed, "total", len(contacts))
+		slog.Warn("tracker: some subscriptions failed", "accountID", t.accountID, "failed", failed, "total", n)
 	}
 }
 
@@ -256,6 +307,9 @@ func (t *Tracker) SubscribeContact(ctx context.Context, c db.Contact) {
 		return
 	}
 	if err := t.wa.SubscribePresence(ctx, jid); err != nil {
+		if isRateLimit(err) {
+			t.setBackoff(5 * time.Minute)
+		}
 		slog.Warn("tracker: subscribe presence failed", "accountID", t.accountID, "jid", c.JID, "err", err)
 		return
 	}
@@ -519,6 +573,14 @@ func (t *Tracker) runResubLoop() {
 		case <-tick.C:
 			if !t.isRunning() || !t.wa.IsConnected() {
 				continue
+			}
+			if t.checkBackoff() {
+				slog.Debug("tracker: skipping resub — in rate-limit backoff", "accountID", t.accountID)
+				continue
+			}
+			// Re-announce ourselves as available so WhatsApp knows to push events.
+			if err := t.wa.SendAvailable(t.ctx); err != nil {
+				slog.Warn("tracker: resub SendAvailable failed", "accountID", t.accountID, "err", err)
 			}
 			slog.Debug("tracker: re-subscribing to presence", "accountID", t.accountID)
 			t.startSubscriptions()
