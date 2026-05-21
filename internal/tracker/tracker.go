@@ -80,6 +80,16 @@ func (m *TrackerManager) StopAll() {
 	}
 }
 
+// ApplySchedule updates the schedule for one account's tracker.
+func (m *TrackerManager) ApplySchedule(accountID int64, forceOffline bool, slots []db.ScheduleSlot) {
+	t := m.Get(accountID)
+	if t == nil {
+		slog.Warn("tracker manager: no tracker for account", "accountID", accountID)
+		return
+	}
+	t.ApplySchedule(forceOffline, slots)
+}
+
 // SubscribeContact delegates to the correct account's tracker.
 func (m *TrackerManager) SubscribeContact(ctx context.Context, c db.Contact) {
 	t := m.Get(c.AccountID)
@@ -117,6 +127,10 @@ type Tracker struct {
 
 	backoffMu    sync.RWMutex
 	backoffUntil time.Time
+
+	scheduleMu   sync.RWMutex
+	forceOffline bool
+	scheduleSlots []db.ScheduleSlot
 }
 
 func newTracker(accountID int64, d Deps) *Tracker {
@@ -164,6 +178,9 @@ func (t *Tracker) HandleEvent(evt any) {
 	case *events.PairSuccess:
 		slog.Log(t.ctx, config.LevelAudit, "tracker: pair success", "accountID", t.accountID, "jid", v.ID.String())
 
+	case *events.HistorySync:
+		go t.onHistorySync(v)
+
 	case *events.Presence:
 		t.onPresence(v)
 
@@ -194,10 +211,11 @@ func (t *Tracker) onConnected() {
 
 	if firstConnect {
 		slog.Info("tracker: starting workers", "accountID", t.accountID, "poll_interval", t.interval)
-		t.wg.Add(4)
+		t.wg.Add(5)
 		go t.runPictureLoop()
 		go t.runAboutLoop()
 		go t.runResubLoop()
+		go t.runScheduleLoop()
 		go func() {
 			defer t.wg.Done()
 			t.startSubscriptions()
@@ -592,6 +610,84 @@ func (t *Tracker) isRunning() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.running
+}
+
+// ApplySchedule updates the in-memory schedule for this tracker.
+// The schedule loop picks up the change on its next tick (≤1 min).
+func (t *Tracker) ApplySchedule(forceOffline bool, slots []db.ScheduleSlot) {
+	t.scheduleMu.Lock()
+	t.forceOffline = forceOffline
+	t.scheduleSlots = slots
+	t.scheduleMu.Unlock()
+	slog.Info("tracker: schedule updated", "accountID", t.accountID, "forceOffline", forceOffline, "slots", len(slots))
+}
+
+// runScheduleLoop checks every minute whether the connection should be up or down.
+// Rules (evaluated in order):
+//  1. forceOffline=true  → always disconnect
+//  2. no slots defined   → always stay connected
+//  3. slots defined      → connect only when the current time falls in a slot
+func (t *Tracker) runScheduleLoop() {
+	defer t.wg.Done()
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-tick.C:
+			t.applyScheduleNow()
+		}
+	}
+}
+
+func (t *Tracker) applyScheduleNow() {
+	t.scheduleMu.RLock()
+	forceOffline := t.forceOffline
+	slots := t.scheduleSlots
+	t.scheduleMu.RUnlock()
+
+	shouldConnect := scheduleAllowsConnect(forceOffline, slots)
+	connected := t.wa.IsConnected()
+
+	switch {
+	case shouldConnect && !connected:
+		slog.Info("tracker: schedule: reconnecting", "accountID", t.accountID)
+		if err := t.wa.Connect(t.ctx); err != nil {
+			slog.Warn("tracker: schedule: reconnect failed", "accountID", t.accountID, "err", err)
+		}
+	case !shouldConnect && connected:
+		slog.Info("tracker: schedule: disconnecting", "accountID", t.accountID, "forceOffline", forceOffline, "slots", len(slots))
+		t.wa.SoftDisconnect()
+	}
+}
+
+// scheduleAllowsConnect returns true if the connection should be active right now.
+func scheduleAllowsConnect(forceOffline bool, slots []db.ScheduleSlot) bool {
+	if forceOffline {
+		return false
+	}
+	if len(slots) == 0 {
+		return true
+	}
+	now := time.Now()
+	minuteOfDay := now.Hour()*60 + now.Minute()
+	for _, s := range slots {
+		if slotContains(s.StartMin, s.EndMin, minuteOfDay) {
+			return true
+		}
+	}
+	return false
+}
+
+// slotContains reports whether minuteOfDay falls within [startMin, endMin).
+// Overnight slots (startMin >= endMin) wrap around midnight.
+func slotContains(startMin, endMin, minuteOfDay int) bool {
+	if startMin < endMin {
+		return minuteOfDay >= startMin && minuteOfDay < endMin
+	}
+	// Overnight: e.g. 22:00–06:00
+	return minuteOfDay >= startMin || minuteOfDay < endMin
 }
 
 func equalIntPtr(a, b *int64) bool {

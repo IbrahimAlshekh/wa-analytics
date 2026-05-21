@@ -1,10 +1,12 @@
 import type {
   Account,
+  AccountSchedule,
   AnalyticsRange,
   AnalyticsReport,
   Contact,
   ContactsPage,
   Message,
+  ScheduleSlot,
   StatsSummary,
   TimelineResponse,
 } from "./types";
@@ -133,6 +135,12 @@ export const api = {
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/analytics?range=${range}`,
     ),
+
+  // Schedule (per-account)
+  getSchedule: (accountId: number) =>
+    request<AccountSchedule>("GET", `/accounts/${accountId}/schedule`),
+  putSchedule: (accountId: number, forceOffline: boolean, slots: ScheduleSlot[]) =>
+    request<AccountSchedule>("PUT", `/accounts/${accountId}/schedule`, { forceOffline, slots }),
 
   sendMessage: (accountId: number, contactId: number, text: string, file?: File) => {
     if (!file) {

@@ -182,6 +182,17 @@ export interface AnalyticsReport {
   };
 }
 
+export interface ScheduleSlot {
+  id: number;
+  startMin: number;
+  endMin: number;
+}
+
+export interface AccountSchedule {
+  forceOffline: boolean;
+  slots: ScheduleSlot[];
+}
+
 export type WSEnvelope =
   | { type: "auth.qr"; code: string }
   | { type: "auth.linked"; accountID: number; ownJID: string }
@@ -222,4 +233,5 @@ export type WSEnvelope =
       mediaType?: string;
       mediaPath?: string;
       timestamp: number;
-    };
+    }
+  | { type: "history_sync"; accountId: number };

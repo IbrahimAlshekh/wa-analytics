@@ -99,7 +99,14 @@ func (c *Client) Connect(ctx context.Context) error {
 	if c.cli.IsConnected() {
 		return nil
 	}
+	c.cli.EnableAutoReconnect = true
 	return c.cli.Connect()
+}
+
+// SoftDisconnect disconnects without triggering whatsmeow's auto-reconnect.
+func (c *Client) SoftDisconnect() {
+	c.cli.EnableAutoReconnect = false
+	c.cli.Disconnect()
 }
 
 func (c *Client) StartQRFlow(ctx context.Context) (<-chan string, error) {

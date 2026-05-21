@@ -53,6 +53,15 @@ export default function App() {
           }
           break;
         }
+        case "history_sync": {
+          const { accountId } = msg;
+          qc.invalidateQueries({ queryKey: ["messages", accountId] });
+          qc.invalidateQueries({ queryKey: ["timeline", accountId] });
+          qc.invalidateQueries({ queryKey: ["analytics", accountId] });
+          qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
+          qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+          break;
+        }
       }
     });
     return off;

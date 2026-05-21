@@ -18,9 +18,10 @@ import (
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 )
 
-// Tracker is the interface the API uses to subscribe contacts to presence.
+// Tracker is the interface the API uses to subscribe contacts to presence and manage scheduling.
 type Tracker interface {
 	SubscribeContact(ctx context.Context, c db.Contact)
+	ApplySchedule(accountID int64, forceOffline bool, slots []db.ScheduleSlot)
 }
 
 // Config holds runtime configuration for the API server.
@@ -133,6 +134,10 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/accounts/{id}/contacts/sync", apiAuth(s.handleSyncContacts))
 	s.mux.Handle("PATCH /api/accounts/{id}/contacts/{cid}", apiAuth(s.handlePatchContact))
 	s.mux.Handle("DELETE /api/accounts/{id}/contacts/{cid}", apiAuth(s.handleDeleteContact))
+
+	// Schedule (per-account)
+	s.mux.Handle("GET /api/accounts/{id}/schedule", apiAuth(s.handleGetSchedule))
+	s.mux.Handle("PUT /api/accounts/{id}/schedule", apiAuth(s.handlePutSchedule))
 
 	// Timeline / Stats / Messages / Analytics (per-contact)
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/timeline", apiAuth(s.handleTimeline))

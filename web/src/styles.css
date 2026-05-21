@@ -919,3 +919,59 @@ h1, h2, h3, h4 {
     overflow: hidden;
   }
 }
+
+/* ── Schedule panel ─────────────────────────────────────────────── */
+
+.schedule-panel {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.schedule-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.schedule-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: default;
+}
+
+.schedule-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-slots-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 2px;
+}
+
+.schedule-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.schedule-slot-row input[type="time"] {
+  color-scheme: dark;
+}
+
+.schedule-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
