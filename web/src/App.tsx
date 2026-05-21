@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import logoSrc from "./assets/wa_analytics_logo_512.png";
 import { useQueryClient } from "@tanstack/react-query";
 import { ws } from "./lib/ws";
 import { useStore } from "./lib/store";
@@ -106,7 +107,7 @@ export default function App() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header className="app-bar">
         <Link to="/" className="app-logo">
-          <div className="app-logo-mark">W</div>
+          <img src={logoSrc} className="app-logo-mark" alt="WA Analytics" />
           {!isLogin && <span>WA Tracker</span>}
         </Link>
         <div className="app-bar-fill" />

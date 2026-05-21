@@ -114,16 +114,9 @@ h1, h2, h3, h4 {
 .app-logo-mark {
   width: 28px;
   height: 28px;
-  background: var(--accent);
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 14px;
-  font-weight: 800;
   flex-shrink: 0;
-  letter-spacing: 0;
+  object-fit: contain;
 }
 
 .app-bar-fill { flex: 1; }
