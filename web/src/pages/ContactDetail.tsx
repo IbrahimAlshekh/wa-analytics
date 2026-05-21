@@ -265,7 +265,7 @@ export default function ContactDetail() {
       {tab === "presence" && (
         <>
           <StatsStrip accountId={accountId} contactId={cid} />
-          <PresencePanel entries={allEntries} />
+          <PresencePanel entries={allEntries} contact={c} />
         </>
       )}
 

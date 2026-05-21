@@ -354,6 +354,7 @@ type PictureRecord struct {
 	PictureID  string `json:"pictureId,omitempty"`
 	URL        string `json:"url,omitempty"`
 	SHA256     string `json:"sha256,omitempty"`
+	MediaPath  string `json:"mediaPath,omitempty"`
 	CapturedAt int64  `json:"capturedAt"`
 }
 
@@ -367,12 +368,12 @@ type AboutRecord struct {
 
 func (db *DB) LatestPicture(ctx context.Context, contactID int64) (PictureRecord, error) {
 	var p PictureRecord
-	var pid, url, sha sql.NullString
+	var pid, url, sha, mp sql.NullString
 	err := db.QueryRowContext(ctx,
-		`SELECT id, contact_id, picture_id, url, sha256, captured_at
+		`SELECT id, contact_id, picture_id, url, sha256, COALESCE(media_path,''), captured_at
 		   FROM profile_picture_history WHERE contact_id=?
 		   ORDER BY captured_at DESC LIMIT 1`, contactID).
-		Scan(&p.ID, &p.ContactID, &pid, &url, &sha, &p.CapturedAt)
+		Scan(&p.ID, &p.ContactID, &pid, &url, &sha, &mp, &p.CapturedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PictureRecord{}, nil
 	}
@@ -382,18 +383,19 @@ func (db *DB) LatestPicture(ctx context.Context, contactID int64) (PictureRecord
 	p.PictureID = pid.String
 	p.URL = url.String
 	p.SHA256 = sha.String
+	p.MediaPath = mp.String
 	return p, nil
 }
 
-func (db *DB) InsertPicture(ctx context.Context, contactID int64, pictureID, url, sha256 string, capturedAt int64) (PictureRecord, error) {
+func (db *DB) InsertPicture(ctx context.Context, contactID int64, pictureID, url, sha256, mediaPath string, capturedAt int64) (PictureRecord, error) {
 	res, err := db.ExecContext(ctx,
-		`INSERT INTO profile_picture_history (contact_id, picture_id, url, sha256, captured_at)
-		 VALUES (?, ?, ?, ?, ?)`, contactID, nullStr(pictureID), nullStr(url), nullStr(sha256), capturedAt)
+		`INSERT INTO profile_picture_history (contact_id, picture_id, url, sha256, media_path, captured_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`, contactID, nullStr(pictureID), nullStr(url), nullStr(sha256), nullStr(mediaPath), capturedAt)
 	if err != nil {
 		return PictureRecord{}, err
 	}
 	id, _ := res.LastInsertId()
-	return PictureRecord{ID: id, ContactID: contactID, PictureID: pictureID, URL: url, SHA256: sha256, CapturedAt: capturedAt}, nil
+	return PictureRecord{ID: id, ContactID: contactID, PictureID: pictureID, URL: url, SHA256: sha256, MediaPath: mediaPath, CapturedAt: capturedAt}, nil
 }
 
 func (db *DB) LatestAbout(ctx context.Context, contactID int64) (AboutRecord, error) {
@@ -614,7 +616,7 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	pres.Close()
 
 	pics, err := db.QueryContext(ctx,
-		`SELECT picture_id, url, captured_at FROM profile_picture_history
+		`SELECT picture_id, url, COALESCE(media_path,''), captured_at FROM profile_picture_history
 		   WHERE contact_id=? AND captured_at>=?
 		   ORDER BY captured_at`, contactID, since)
 	if err != nil {
@@ -623,13 +625,14 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	for pics.Next() {
 		var e TimelineEntry
 		e.Kind = KindPicture
-		var pid, url sql.NullString
-		if err := pics.Scan(&pid, &url, &e.At); err != nil {
+		var pid, url, mp sql.NullString
+		if err := pics.Scan(&pid, &url, &mp, &e.At); err != nil {
 			pics.Close()
 			return nil, err
 		}
 		e.PictureID = pid.String
 		e.URL = url.String
+		e.MediaPath = mp.String
 		out = append(out, e)
 	}
 	pics.Close()

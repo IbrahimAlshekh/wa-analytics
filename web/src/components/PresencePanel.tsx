@@ -3,13 +3,20 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import type { TimelineEntry } from "../lib/types";
+import type { Contact, TimelineEntry } from "../lib/types";
+
+function getMediaUrl(path: string) {
+  const token = localStorage.getItem("wt_bearer");
+  if (!token) return `/media/${path}`;
+  return `/media/${path}?token=${encodeURIComponent(token)}`;
+}
 
 interface Props {
   entries: TimelineEntry[];
+  contact?: Contact;
 }
 
-export default function PresencePanel({ entries }: Props) {
+export default function PresencePanel({ entries, contact }: Props) {
   const safeEntries = entries ?? [];
   const hourlyData    = computePeakHours(safeEntries);
   const weekdayData   = computeWeekdayActivity(safeEntries);
@@ -30,7 +37,7 @@ export default function PresencePanel({ entries }: Props) {
   const patternSummary = computeOnlinePatternSummary(hourlyData);
 
   const aboutHistory   = safeEntries.filter((e) => e.kind === "about").sort((a, b) => b.at - a.at);
-  const pictureHistory = safeEntries.filter((e) => e.kind === "picture" && e.url).sort((a, b) => b.at - a.at);
+  const pictureHistory = safeEntries.filter((e) => e.kind === "picture" && (e.mediaPath || e.url)).sort((a, b) => b.at - a.at);
 
   const hasPresence = hourlyData.some((d) => d.minutes > 0);
   if (!hasPresence) return null;
@@ -155,48 +162,120 @@ export default function PresencePanel({ entries }: Props) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          Section: History
-          — about text changes, profile picture changes
+          Section: Profile Picture History
       ══════════════════════════════════════════════════════════ */}
       <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">History</div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>About History</div>
-            {aboutHistory.length === 0 ? (
-              <div className="muted">No about changes recorded.</div>
-            ) : (
-              <div className="col" style={{ gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                {aboutHistory.map((e, i) => (
-                  <div key={i} style={{ borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
-                    <div className="muted" style={{ fontSize: 11, marginBottom: 2 }}>{formatDatetime(e.at)}</div>
-                    <div style={{ fontSize: 13 }}>{e.text || <em className="muted">(empty)</em>}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Profile Picture History</div>
-            {pictureHistory.length === 0 ? (
-              <div className="muted">No profile pictures recorded.</div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                {pictureHistory.map((e, i) => (
-                  <a key={i} href={e.url} target="_blank" rel="noreferrer"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                    <img src={e.url} alt={formatDatetime(e.at)}
-                      style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }} />
-                    <span className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</span>
+        <div className="section-label">Profile Picture History</div>
+        <div className="card">
+          {pictureHistory.length === 0 ? (
+            <div className="muted" style={{ fontSize: 13 }}>No profile pictures recorded yet.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 12 }}>
+              {pictureHistory.map((e, i) => {
+                const src = e.mediaPath ? getMediaUrl(e.mediaPath) : e.url;
+                const href = e.mediaPath ? getMediaUrl(e.mediaPath) : e.url;
+                return (
+                  <a key={i} href={href} target="_blank" rel="noreferrer"
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
+                    <img
+                      src={src}
+                      alt={formatDatetime(e.at)}
+                      style={{
+                        width: "100%",
+                        aspectRatio: "1",
+                        objectFit: "cover",
+                        borderRadius: 10,
+                        border: i === 0 ? "2px solid var(--accent)" : "1px solid var(--border)",
+                      }}
+                    />
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: i === 0 ? "var(--accent)" : "var(--fg)" }}>
+                        {i === 0 ? "Latest" : `#${pictureHistory.length - i}`}
+                      </div>
+                      <div className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</div>
+                    </div>
                   </a>
-                ))}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          Section: Status (About) History
+      ══════════════════════════════════════════════════════════ */}
+      <div className="col" style={{ gap: 12 }}>
+        <div className="section-label">Status History</div>
+        <div className="card">
+          {aboutHistory.length === 0 ? (
+            <div className="muted" style={{ fontSize: 13 }}>No status changes recorded yet.</div>
+          ) : (
+            <div className="col" style={{ gap: 0 }}>
+              {aboutHistory.map((e, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    padding: "10px 0",
+                    borderBottom: i < aboutHistory.length - 1 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: i === 0 ? "var(--accent)" : "var(--border)",
+                      marginTop: 5,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div className="col" style={{ gap: 2, flex: 1 }}>
+                    <div style={{ fontSize: 13 }}>
+                      {e.text ? e.text : <em className="muted" style={{ fontSize: 12 }}>(cleared)</em>}
+                    </div>
+                    <div className="muted" style={{ fontSize: 11 }}>{formatDatetime(e.at)}</div>
+                  </div>
+                  {i === 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", flexShrink: 0, paddingTop: 2 }}>
+                      Current
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          Section: Other Information
+      ══════════════════════════════════════════════════════════ */}
+      {contact && (
+        <div className="col" style={{ gap: 12 }}>
+          <div className="section-label">Other Information</div>
+          <div className="card">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+              <InfoRow label="Phone" value={contact.phone} />
+              <InfoRow label="JID" value={contact.jid} mono />
+              <InfoRow label="Display Name" value={contact.displayName || "—"} />
+              <InfoRow label="Tracking" value={contact.trackingEnabled ? "Active" : "Paused"} />
+              <InfoRow label="Added" value={formatDatetime(contact.addedAt)} />
+              {firstSeen && <InfoRow label="First seen" value={formatDatetime(firstSeen)} />}
+              {lastSeen && <InfoRow label="Last seen" value={formatDatetime(lastSeen)} />}
+              {pictureHistory.length > 0 && (
+                <InfoRow label="Picture changes" value={`${pictureHistory.length} recorded`} />
+              )}
+              {aboutHistory.length > 0 && (
+                <InfoRow label="Status changes" value={`${aboutHistory.length} recorded`} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Export ── */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -209,6 +288,15 @@ export default function PresencePanel({ entries }: Props) {
 
 // ---------------------------------------------------------------------------
 // Sub-components
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className="muted" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ fontSize: 13, fontFamily: mono ? "monospace" : undefined, wordBreak: "break-all" }}>{value}</div>
+    </div>
+  );
+}
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (

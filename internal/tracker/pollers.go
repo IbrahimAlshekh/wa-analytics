@@ -3,7 +3,12 @@ package tracker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -153,7 +158,8 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 		return
 	}
 	now := time.Now().Unix()
-	rec, err := t.db.InsertPicture(ctx, c.ID, info.ID, info.URL, bytesHex(info.Hash), now)
+	mediaPath := t.downloadPicture(ctx, info.ID, info.URL)
+	rec, err := t.db.InsertPicture(ctx, c.ID, info.ID, info.URL, bytesHex(info.Hash), mediaPath, now)
 	if err != nil {
 		slog.Error("tracker: insert picture failed", "jid", c.JID, "contact_id", c.ID, "err", err)
 		return
@@ -164,6 +170,7 @@ func (t *Tracker) checkPicture(ctx context.Context, c db.Contact) {
 		"jid":        c.JID,
 		"pictureId":  rec.PictureID,
 		"url":        rec.URL,
+		"mediaPath":  rec.MediaPath,
 		"capturedAt": rec.CapturedAt,
 	})
 }
@@ -186,6 +193,39 @@ func (t *Tracker) processAbout(ctx context.Context, c db.Contact, text string) {
 		"text":       rec.Text,
 		"capturedAt": rec.CapturedAt,
 	})
+}
+
+// downloadPicture fetches the WhatsApp CDN URL and saves it to mediaDir.
+// Returns the relative filename (e.g. "pic_12345.jpg") or "" on failure.
+func (t *Tracker) downloadPicture(_ context.Context, pictureID, url string) string {
+	if url == "" || t.mediaDir == "" {
+		return ""
+	}
+	filename := fmt.Sprintf("pic_%s.jpg", pictureID)
+	destPath := filepath.Join(t.mediaDir, filename)
+	if _, err := os.Stat(destPath); err == nil {
+		return filename // already downloaded
+	}
+	resp, err := http.Get(url) //nolint:noctx
+	if err != nil {
+		slog.Warn("tracker: picture download failed", "pictureID", pictureID, "err", err)
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("tracker: picture download bad status", "pictureID", pictureID, "status", resp.StatusCode)
+		return ""
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Warn("tracker: picture read body failed", "pictureID", pictureID, "err", err)
+		return ""
+	}
+	if err := os.WriteFile(destPath, data, 0o644); err != nil {
+		slog.Warn("tracker: picture write failed", "pictureID", pictureID, "err", err)
+		return ""
+	}
+	return filename
 }
 
 func isRateLimit(err error) bool {
