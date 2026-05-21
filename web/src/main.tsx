@@ -7,7 +7,6 @@ import { Toaster } from "@/components/ui/sonner";
 import App from "./App";
 import "./i18n/index";
 import "./index.css";
-import "./styles.css";
 
 const qc = new QueryClient({
   defaultOptions: {

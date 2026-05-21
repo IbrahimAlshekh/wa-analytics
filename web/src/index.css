@@ -111,3 +111,10 @@
     @apply font-sans;
   }
 }
+
+/* Offset the fixed sidebar container below the app header (h-14 = 3.5rem).
+   Unlayered CSS wins over @layer utilities so no !important needed. */
+[data-slot="sidebar-container"] {
+  top: 3.5rem;
+  height: calc(100svh - 3.5rem);
+}

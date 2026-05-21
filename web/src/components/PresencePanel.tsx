@@ -6,7 +6,14 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Contact, TimelineEntry } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
-import { InfoTooltip } from "./InfoTooltip";
+import { Info } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip as ShadTooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Props {
   entries: TimelineEntry[];
@@ -42,122 +49,130 @@ export default function PresencePanel({ entries, contact }: Props) {
   if (!hasPresence) return null;
 
   return (
-    <div className="col" style={{ gap: 20 }}>
+    <div className="flex flex-col gap-5">
 
       {/* ── Presence stat cards ── */}
-      <div className="card" style={{ padding: "14px 16px" }}>
-        <div style={{ marginBottom: 12 }}>
-          <div className="muted" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", display: "flex", alignItems: "center" }}>
-            {t("presence.sectionTitle")}
-            <InfoTooltip text={t("presence.sectionTooltip")} />
+      <Card>
+        <CardContent className="pt-4">
+          <div className="mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              {t("presence.sectionTitle")}
+              <InfoIcon text={t("presence.sectionTooltip")} />
+            </p>
+            <div className="text-xs text-muted-foreground mt-0.5 leading-snug opacity-80">
+              {t("presence.sectionDesc")}
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 3, lineHeight: 1.45, opacity: 0.8 }}>
-            {t("presence.sectionDesc")}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {avgSession != null && (
+              <StatCard
+                label={t("presence.avgSession")}
+                value={formatDuration(avgSession)}
+                description={t("presence.avgSessionDesc")}
+                info={t("presence.avgSessionTooltip")}
+              />
+            )}
+            {longestSess != null && (
+              <StatCard
+                label={t("presence.longestSession")}
+                value={formatDuration(longestSess)}
+                description={t("presence.longestSessionDesc")}
+                info={t("presence.longestSessionTooltip")}
+              />
+            )}
+            {avgOnlineSec != null && (
+              <StatCard
+                label={t("presence.dailyAvg")}
+                value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")}
+                description={t("presence.dailyAvgDesc")}
+                info={t("presence.dailyAvgTooltip")}
+              />
+            )}
+            {streak != null && (
+              <StatCard
+                label={streak.online ? t("presence.onlineStreak") : t("presence.offlineFor")}
+                value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)}
+                description={streak.online ? t("presence.onlineStreakDesc") : t("presence.offlineForDesc")}
+                info={streak.online ? t("presence.onlineStreakTooltip") : t("presence.offlineForTooltip")}
+              />
+            )}
+            {longestOffline != null && (
+              <StatCard
+                label={t("presence.longestOffline")}
+                value={`${longestOffline}d`}
+                description={t("presence.longestOfflineDesc")}
+                info={t("presence.longestOfflineTooltip")}
+              />
+            )}
+            {nightOwlPct != null && (
+              <StatCard
+                label={t("presence.nightOwl")}
+                value={`${nightOwlPct}%`}
+                description={t("presence.nightOwlDesc")}
+                info={t("presence.nightOwlTooltip")}
+              />
+            )}
+            {consistency != null && (
+              <StatCard
+                label={t("presence.consistency")}
+                value={`${consistency}/100`}
+                description={t("presence.consistencyDesc")}
+                info={t("presence.consistencyTooltip")}
+              />
+            )}
+            {picFreqDays != null && (
+              <StatCard
+                label={t("presence.picChanges")}
+                value={t("presence.picFreqValue", { n: picFreqDays })}
+                description={t("presence.picChangesDesc")}
+                info={t("presence.picChangesTooltip")}
+              />
+            )}
           </div>
-        </div>
-        <div className="stats" style={{ marginBottom: 0 }}>
-          {avgSession != null && (
-            <StatCard
-              label={t("presence.avgSession")}
-              value={formatDuration(avgSession)}
-              description={t("presence.avgSessionDesc")}
-              info={t("presence.avgSessionTooltip")}
-            />
-          )}
-          {longestSess != null && (
-            <StatCard
-              label={t("presence.longestSession")}
-              value={formatDuration(longestSess)}
-              description={t("presence.longestSessionDesc")}
-              info={t("presence.longestSessionTooltip")}
-            />
-          )}
-          {avgOnlineSec != null && (
-            <StatCard
-              label={t("presence.dailyAvg")}
-              value={formatDuration(avgOnlineSec) + (trendPct != null ? `  ${trendPct > 0 ? "▲" : "▼"}${Math.abs(trendPct)}%` : "")}
-              description={t("presence.dailyAvgDesc")}
-              info={t("presence.dailyAvgTooltip")}
-            />
-          )}
-          {streak != null && (
-            <StatCard
-              label={streak.online ? t("presence.onlineStreak") : t("presence.offlineFor")}
-              value={streak.online ? `${streak.days}d` : formatDuration(streak.seconds)}
-              description={streak.online ? t("presence.onlineStreakDesc") : t("presence.offlineForDesc")}
-              info={streak.online ? t("presence.onlineStreakTooltip") : t("presence.offlineForTooltip")}
-            />
-          )}
-          {longestOffline != null && (
-            <StatCard
-              label={t("presence.longestOffline")}
-              value={`${longestOffline}d`}
-              description={t("presence.longestOfflineDesc")}
-              info={t("presence.longestOfflineTooltip")}
-            />
-          )}
-          {nightOwlPct != null && (
-            <StatCard
-              label={t("presence.nightOwl")}
-              value={`${nightOwlPct}%`}
-              description={t("presence.nightOwlDesc")}
-              info={t("presence.nightOwlTooltip")}
-            />
-          )}
-          {consistency != null && (
-            <StatCard
-              label={t("presence.consistency")}
-              value={`${consistency}/100`}
-              description={t("presence.consistencyDesc")}
-              info={t("presence.consistencyTooltip")}
-            />
-          )}
-          {picFreqDays != null && (
-            <StatCard
-              label={t("presence.picChanges")}
-              value={t("presence.picFreqValue", { n: picFreqDays })}
-              description={t("presence.picChangesDesc")}
-              info={t("presence.picChangesTooltip")}
-            />
-          )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* ── Info banners ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {patternSummary && (
-          <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              {t("presence.peakHours")}
-              <InfoTooltip text={t("presence.peakHoursTooltip")} />
-            </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.peakHoursDesc")}</div>
-            <div style={{ marginTop: 6, fontWeight: 600, color: "var(--accent)" }}>{patternSummary}</div>
-          </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("presence.peakHours")}
+                <InfoIcon text={t("presence.peakHoursTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 opacity-70">{t("presence.peakHoursDesc")}</div>
+              <div className="mt-1.5 font-semibold text-primary">{patternSummary}</div>
+            </CardContent>
+          </Card>
         )}
         {sleepWindow && (
-          <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              {t("presence.sleepWindow")}
-              <InfoTooltip text={t("presence.sleepWindowTooltip")} />
-            </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.sleepWindowDesc")}</div>
-            <div style={{ marginTop: 6, fontWeight: 600 }}>{sleepWindow}</div>
-          </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("presence.sleepWindow")}
+                <InfoIcon text={t("presence.sleepWindowTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 opacity-70">{t("presence.sleepWindowDesc")}</div>
+              <div className="mt-1.5 font-semibold">{sleepWindow}</div>
+            </CardContent>
+          </Card>
         )}
         {firstSeen && (
-          <div className="card" style={{ padding: "12px 16px" }}>
-            <div className="muted" style={{ fontSize: 11, display: "flex", alignItems: "center" }}>
-              {t("presence.trackingPeriod")}
-              <InfoTooltip text={t("presence.trackingPeriodTooltip")} />
-            </div>
-            <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 2, opacity: 0.7 }}>{t("presence.trackingPeriodDesc")}</div>
-            <div style={{ marginTop: 6, fontSize: 13 }}>
-              <span>{formatDate(firstSeen)}</span>
-              <span className="muted"> → </span>
-              <span>{formatDate(lastSeen!)}</span>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {t("presence.trackingPeriod")}
+                <InfoIcon text={t("presence.trackingPeriodTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 opacity-70">{t("presence.trackingPeriodDesc")}</div>
+              <div className="mt-1.5 text-sm">
+                <span>{formatDate(firstSeen)}</span>
+                <span className="text-muted-foreground"> → </span>
+                <span>{formatDate(lastSeen!)}</span>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -165,207 +180,210 @@ export default function PresencePanel({ entries, contact }: Props) {
           Section: Presence & Activity
           — hourly pattern, weekday pattern, heatmap, 30-day trend
       ══════════════════════════════════════════════════════════ */}
-      <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">{t("presence.presenceActivity")}</div>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("presence.presenceActivity")}</p>
 
         {/* Hourly + Weekday patterns side-by-side */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              {t("presence.peakHoursChart")}
-              <InfoTooltip text={t("presence.peakHoursChartTooltip")} />
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.peakHoursChartDesc")}</div>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer>
-                <BarChart data={hourlyData} barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                  <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} />
-                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
-                  <Bar dataKey="minutes" fill="var(--accent)" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <div className="font-semibold text-sm flex items-center gap-1">
+                {t("presence.peakHoursChart")}
+                <InfoIcon text={t("presence.peakHoursChartTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground">{t("presence.peakHoursChartDesc")}</div>
+            </CardHeader>
+            <CardContent>
+              <div style={{ width: "100%", height: 180 }}>
+                <ResponsiveContainer>
+                  <BarChart data={hourlyData} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
+                    <Bar dataKey="minutes" fill="var(--primary)" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              {t("presence.mostActiveDays")}
-              <InfoTooltip text={t("presence.mostActiveDaysTooltip")} />
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.mostActiveDaysDesc")}</div>
-            <div style={{ width: "100%", height: 180 }}>
-              <ResponsiveContainer>
-                <BarChart data={weekdayData} barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "var(--accent-dim)" }} />
-                  <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
-                    {weekdayData.map((d, i) => (
-                      <Cell key={i} fill={d.weekend ? "var(--offline)" : "var(--accent)"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="font-semibold text-sm flex items-center gap-1">
+                {t("presence.mostActiveDays")}
+                <InfoIcon text={t("presence.mostActiveDaysTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground">{t("presence.mostActiveDaysDesc")}</div>
+            </CardHeader>
+            <CardContent>
+              <div style={{ width: "100%", height: 180 }}>
+                <ResponsiveContainer>
+                  <BarChart data={weekdayData} barCategoryGap="20%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
+                    <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
+                      {weekdayData.map((d, i) => (
+                        <Cell key={i} fill={d.weekend ? "var(--muted-foreground)" : "var(--primary)"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Activity Heatmap — full width */}
         {heatmapData.length > 0 && (
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              {t("presence.heatmap")}
-              <InfoTooltip text={t("presence.heatmapTooltip")} />
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 14 }}>{t("presence.heatmapDesc")}</div>
-            <Heatmap data={heatmapData} />
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="font-semibold text-sm flex items-center gap-1">
+                {t("presence.heatmap")}
+                <InfoIcon text={t("presence.heatmapTooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground">{t("presence.heatmapDesc")}</div>
+            </CardHeader>
+            <CardContent>
+              <Heatmap data={heatmapData} />
+            </CardContent>
+          </Card>
         )}
 
         {/* 30-Day Trend — full width */}
         {trend30.length > 1 && (
-          <div className="card">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, display: "flex", alignItems: "center" }}>
-              {t("presence.trend30")}
-              <InfoTooltip text={t("presence.trend30Tooltip")} />
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t("presence.trend30Desc")}</div>
-            <div style={{ width: "100%", height: 190 }}>
-              <ResponsiveContainer>
-                <LineChart data={trend30}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={4} />
-                  <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
-                  <Line type="monotone" dataKey="minutes" stroke="var(--accent)" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="font-semibold text-sm flex items-center gap-1">
+                {t("presence.trend30")}
+                <InfoIcon text={t("presence.trend30Tooltip")} />
+              </div>
+              <div className="text-xs text-muted-foreground">{t("presence.trend30Desc")}</div>
+            </CardHeader>
+            <CardContent>
+              <div style={{ width: "100%", height: 190 }}>
+                <ResponsiveContainer>
+                  <LineChart data={trend30}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={4} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
+                    <Line type="monotone" dataKey="minutes" stroke="var(--primary)" dot={false} strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
       {/* ══════════════════════════════════════════════════════════
           Section: Profile Picture History
       ══════════════════════════════════════════════════════════ */}
-      <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">{t("presence.picHistoryTitle")}</div>
-        <div className="card">
-          {pictureHistory.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>{t("presence.picHistoryEmpty")}</div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 12 }}>
-              {pictureHistory.map((e, i) => {
-                const src = getMediaUrl(e.mediaPath!);
-                return (
-                  <a key={i} href={src} target="_blank" rel="noreferrer"
-                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
-                    <img
-                      src={src}
-                      alt={formatDatetime(e.at)}
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1",
-                        objectFit: "cover",
-                        borderRadius: 10,
-                        border: i === 0 ? "2px solid var(--accent)" : "1px solid var(--border)",
-                      }}
-                    />
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: i === 0 ? "var(--accent)" : "var(--fg)" }}>
-                        {i === 0 ? t("presence.picLatest") : t("presence.picNumber", { n: pictureHistory.length - i })}
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("presence.picHistoryTitle")}</p>
+        <Card>
+          <CardContent className="pt-4">
+            {pictureHistory.length === 0 ? (
+              <div className="text-muted-foreground text-sm">{t("presence.picHistoryEmpty")}</div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
+                {pictureHistory.map((e, i) => {
+                  const src = getMediaUrl(e.mediaPath!);
+                  return (
+                    <a key={i} href={src} target="_blank" rel="noreferrer"
+                      className="flex flex-col items-center gap-1.5 no-underline">
+                      <img
+                        src={src}
+                        alt={formatDatetime(e.at)}
+                        className={`w-full aspect-square object-cover rounded-[10px] ${i === 0 ? "border-2 border-primary" : "border border-border"}`}
+                      />
+                      <div className="text-center">
+                        <div className={`text-xs font-semibold ${i === 0 ? "text-primary" : "text-foreground"}`}>
+                          {i === 0 ? t("presence.picLatest") : t("presence.picNumber", { n: pictureHistory.length - i })}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{formatDate(e.at)}</div>
                       </div>
-                      <div className="muted" style={{ fontSize: 10 }}>{formatDate(e.at)}</div>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
           Section: Status (About) History
       ══════════════════════════════════════════════════════════ */}
-      <div className="col" style={{ gap: 12 }}>
-        <div className="section-label">{t("presence.statusHistoryTitle")}</div>
-        <div className="card">
-          {aboutHistory.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13 }}>{t("presence.statusHistoryEmpty")}</div>
-          ) : (
-            <div className="col" style={{ gap: 0 }}>
-              {aboutHistory.map((e, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "flex-start",
-                    padding: "10px 0",
-                    borderBottom: i < aboutHistory.length - 1 ? "1px solid var(--border)" : "none",
-                  }}
-                >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("presence.statusHistoryTitle")}</p>
+        <Card>
+          <CardContent className="pt-4">
+            {aboutHistory.length === 0 ? (
+              <div className="text-muted-foreground text-sm">{t("presence.statusHistoryEmpty")}</div>
+            ) : (
+              <div className="flex flex-col divide-y divide-border">
+                {aboutHistory.map((e, i) => (
                   <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: i === 0 ? "var(--accent)" : "var(--border)",
-                      marginTop: 5,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div className="col" style={{ gap: 2, flex: 1 }}>
-                    <div style={{ fontSize: 13 }}>
-                      {e.text ? e.text : <em className="muted" style={{ fontSize: 12 }}>{t("presence.aboutCleared")}</em>}
+                    key={i}
+                    className="flex gap-3 items-start py-2.5"
+                  >
+                    <div
+                      className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${i === 0 ? "bg-primary" : "bg-border"}`}
+                    />
+                    <div className="flex flex-col gap-0.5 flex-1">
+                      <div className="text-sm">
+                        {e.text ? e.text : <em className="text-muted-foreground not-italic text-xs">{t("presence.aboutCleared")}</em>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{formatDatetime(e.at)}</div>
                     </div>
-                    <div className="muted" style={{ fontSize: 11 }}>{formatDatetime(e.at)}</div>
+                    {i === 0 && (
+                      <span className="text-xs font-semibold text-primary shrink-0 pt-0.5">
+                        {t("presence.currentStatus")}
+                      </span>
+                    )}
                   </div>
-                  {i === 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 600, color: "var(--accent)", flexShrink: 0, paddingTop: 2 }}>
-                      {t("presence.currentStatus")}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
           Section: Other Information
       ══════════════════════════════════════════════════════════ */}
       {contact && (
-        <div className="col" style={{ gap: 12 }}>
-          <div className="section-label">{t("presence.otherInfo")}</div>
-          <div className="card">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
-              <InfoRow label={t("presence.phone")} value={contact.phone} />
-              <InfoRow label={t("presence.jid")} value={contact.jid} mono />
-              <InfoRow label={t("presence.displayName")} value={contact.displayName || "—"} />
-              <InfoRow label={t("presence.tracking")} value={contact.trackingEnabled ? t("presence.trackingActive") : t("presence.trackingPaused")} />
-              <InfoRow label={t("presence.added")} value={formatDatetime(contact.addedAt)} />
-              {firstSeen && <InfoRow label={t("presence.firstSeen")} value={formatDatetime(firstSeen)} />}
-              {lastSeen && <InfoRow label={t("presence.lastSeen")} value={formatDatetime(lastSeen)} />}
-              {pictureHistory.length > 0 && (
-                <InfoRow label={t("presence.pictureChanges")} value={t("presence.pictureChangesValue", { count: pictureHistory.length })} />
-              )}
-              {aboutHistory.length > 0 && (
-                <InfoRow label={t("presence.statusChanges")} value={t("presence.statusChangesValue", { count: aboutHistory.length })} />
-              )}
-            </div>
-          </div>
+        <div className="flex flex-col gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("presence.otherInfo")}</p>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-0">
+                <InfoRow label={t("presence.phone")} value={contact.phone} />
+                <InfoRow label={t("presence.jid")} value={contact.jid} mono />
+                <InfoRow label={t("presence.displayName")} value={contact.displayName || "—"} />
+                <InfoRow label={t("presence.tracking")} value={contact.trackingEnabled ? t("presence.trackingActive") : t("presence.trackingPaused")} />
+                <InfoRow label={t("presence.added")} value={formatDatetime(contact.addedAt)} />
+                {firstSeen && <InfoRow label={t("presence.firstSeen")} value={formatDatetime(firstSeen)} />}
+                {lastSeen && <InfoRow label={t("presence.lastSeen")} value={formatDatetime(lastSeen)} />}
+                {pictureHistory.length > 0 && (
+                  <InfoRow label={t("presence.pictureChanges")} value={t("presence.pictureChangesValue", { count: pictureHistory.length })} />
+                )}
+                {aboutHistory.length > 0 && (
+                  <InfoRow label={t("presence.statusChanges")} value={t("presence.statusChangesValue", { count: aboutHistory.length })} />
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* ── Export ── */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn" onClick={() => exportCSV(safeEntries)}>{t("presence.exportCsv")}</button>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => exportCSV(safeEntries)}>{t("presence.exportCsv")}</Button>
       </div>
 
     </div>
@@ -375,30 +393,35 @@ export default function PresencePanel({ entries, contact }: Props) {
 // ---------------------------------------------------------------------------
 // Sub-components
 
+function InfoIcon({ text }: { text: string }) {
+  return (
+    <ShadTooltip>
+      <TooltipTrigger asChild>
+        <Info className="size-3 text-muted-foreground/60 cursor-help" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-56 text-xs">{text}</TooltipContent>
+    </ShadTooltip>
+  );
+}
+
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 2 }}>
-      <div className="muted" style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div style={{ fontSize: 13, fontFamily: mono ? "monospace" : undefined, wordBreak: "break-all" }}>{value}</div>
+    <div className="py-2 border-b border-border flex flex-col gap-0.5">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`text-sm break-all ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );
 }
 
 function StatCard({ label, value, description, info }: { label: string; value: string; description?: string; info?: string }) {
   return (
-    <div className="stat-card">
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
-        <div className="label" style={{ display: "flex", alignItems: "center" }}>
-          {label}
-          {info && <InfoTooltip text={info} />}
-        </div>
-        {description && (
-          <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
-            {description}
-          </div>
-        )}
+    <div className="flex flex-col gap-0.5 min-w-24">
+      <div className="text-xs text-muted-foreground flex items-center gap-1">
+        {label}
+        {info && <InfoIcon text={info} />}
       </div>
-      <div className="value" style={{ fontSize: "1.1rem" }}>{value}</div>
+      {description && <p className="text-xs text-muted-foreground/60">{description}</p>}
+      <span className="text-lg font-bold">{value}</span>
     </div>
   );
 }
@@ -424,7 +447,7 @@ function Heatmap({ data }: { data: { date: string; minutes: number }[] }) {
   const maxMin = Math.max(...data.map((d) => d.minutes), 1);
   const cellColor = (min: number) => {
     if (min < 0) return "transparent";
-    if (min === 0) return "var(--border)";
+    if (min === 0) return "oklch(0.225 0.013 255)";
     const intensity = Math.min(min / maxMin, 1);
     return `rgba(22,163,74,${0.15 + intensity * 0.85})`;
   };
@@ -511,11 +534,7 @@ function Heatmap({ data }: { data: { date: string; minutes: number }[] }) {
       </div>
 
       {tooltip && (
-        <div style={{
-          position: "fixed", left: tooltip.x, top: tooltip.y,
-          background: "var(--card)", border: "1px solid var(--border)",
-          borderRadius: 4, padding: "2px 8px", fontSize: 11, pointerEvents: "none", zIndex: 999,
-        }}>
+        <div className="fixed bg-card border border-border rounded text-xs pointer-events-none z-[999] px-2 py-0.5" style={{ left: tooltip.x, top: tooltip.y }}>
           {tooltip.text}
         </div>
       )}

@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Paperclip, Send, X, MessageSquare } from "lucide-react";
 import { api } from "../lib/api";
 import type { Message, MessageEvent } from "../lib/types";
 import { ws } from "../lib/ws";
 import { getMediaUrl } from "../lib/media";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
-// "open" means more WA history may exist; "exhausted" means WA returned nothing new
 type WAFetchState = "idle" | "loading" | "open" | "exhausted";
 
 export default function Messages() {
@@ -17,15 +20,13 @@ export default function Messages() {
   const accountId = Number(accountIdStr);
   const cid = Number(cidStr);
 
-  // When true, getNextPageParam allows one more page even if last page < 50 items
   const allowExtraPageRef = useRef(false);
   const [, forceRender] = useState(0);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
     useInfiniteQuery({
       queryKey: ["messages", accountId, cid],
-      queryFn: ({ pageParam }) =>
-        api.messages(accountId, cid, pageParam as number, 50),
+      queryFn: ({ pageParam }) => api.messages(accountId, cid, pageParam as number, 50),
       initialPageParam: 0,
       getNextPageParam: (lastPage) => {
         const msgs = lastPage?.messages;
@@ -46,14 +47,10 @@ export default function Messages() {
   const msgs: Message[] = useMemo(() => {
     const all = (data?.pages ?? []).flatMap((p) => p.messages);
     return [...all]
-      // Filter out content-less rows — these are protocol/system messages
-      // (edit notifications, ephemeral acks, etc.) that were stored before
-      // the tracker learned to skip them. They have no displayable content.
       .filter((m) => m.text || m.mediaType || m.mediaPath || m.quotedMessageId)
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [data]);
 
-  // Events: server returns all events for the contact on every response; use last page.
   const events: MessageEvent[] = useMemo(() => {
     const pages = data?.pages ?? [];
     if (pages.length === 0) return [];
@@ -70,35 +67,29 @@ export default function Messages() {
     return map;
   }, [events]);
 
-  // Index messages by messageId for reply-to lookups.
   const msgById = useMemo(() => {
     const map = new Map<string, Message>();
     for (const m of msgs) map.set(m.messageId, m);
     return map;
   }, [msgs]);
 
-  // ── WA history fetch state ───────────────────────────────────────────────
   const [waState, setWAState] = useState<WAFetchState>("idle");
   const waFetchingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const savedScrollHeightRef = useRef(0);
 
-  // When WA history sync arrives, unlock one extra page and fetch it
   useEffect(() => {
     return ws.on((msg) => {
       if (msg.type !== "history_sync") return;
       if (msg.accountId !== accountId) return;
       if (!waFetchingRef.current) return;
       waFetchingRef.current = false;
-      // Save scroll height before new messages are prepended
       if (listRef.current) savedScrollHeightRef.current = listRef.current.scrollHeight;
-      // Allow getNextPageParam to return a cursor even if last page was partial
       allowExtraPageRef.current = true;
-      forceRender((n) => n + 1); // re-render so hasNextPage updates
+      forceRender((n) => n + 1);
     });
   }, [accountId]);
 
-  // After render where hasNextPage flipped to true (due to allowExtraPageRef), fetch
   useEffect(() => {
     if (allowExtraPageRef.current && hasNextPage && !isFetchingNextPage) {
       allowExtraPageRef.current = false;
@@ -110,7 +101,6 @@ export default function Messages() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Preserve scroll position when older messages are prepended
   useEffect(() => {
     const list = listRef.current;
     if (!list || savedScrollHeightRef.current === 0) return;
@@ -124,12 +114,8 @@ export default function Messages() {
     waFetchingRef.current = true;
     try {
       await api.fetchMessageHistory(accountId, cid);
-      // Response arrives via history_sync WS event — set a 15s timeout fallback
       setTimeout(() => {
-        if (waFetchingRef.current) {
-          waFetchingRef.current = false;
-          setWAState("exhausted");
-        }
+        if (waFetchingRef.current) { waFetchingRef.current = false; setWAState("exhausted"); }
       }, 15_000);
     } catch {
       waFetchingRef.current = false;
@@ -137,95 +123,76 @@ export default function Messages() {
     }
   }
 
-  // Scroll-position preservation for local DB pagination (load older from DB)
   function handleLoadOlderLocal() {
     if (listRef.current) savedScrollHeightRef.current = listRef.current.scrollHeight;
     fetchNextPage();
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        className="row"
-        style={{
-          justifyContent: "space-between",
-          flexShrink: 0,
-          padding: "12px 20px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--card)",
-        }}
-      >
-        <div className="breadcrumb">
-          <Link to={`/accounts/${accountId}/contacts/${cid}`}>{t("messages.back")}</Link>
-          <span className="breadcrumb-sep">/</span>
-          <span>{t("messages.title")}</span>
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-1.5 text-sm">
+          <Link
+            to={`/accounts/${accountId}/contacts/${cid}`}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {t("messages.back")}
+          </Link>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="font-medium">{t("messages.title")}</span>
         </div>
-        <span className="muted" style={{ fontSize: 12 }}>
+        <span className="text-xs text-muted-foreground">
           {t("messages.loaded", { count: msgs.length })}
         </span>
       </div>
 
       {isLoading && (
-        <div className="muted" style={{ textAlign: "center", padding: "32px 0" }}>
-          {t("messages.loading")}
-        </div>
+        <div className="text-sm text-muted-foreground text-center py-8">{t("messages.loading")}</div>
       )}
-      {error && <div className="error" style={{ padding: "8px 20px" }}>{(error as Error).message}</div>}
+      {error && (
+        <div className="text-sm text-destructive px-5 py-2">{(error as Error).message}</div>
+      )}
 
       {/* Messages list */}
       <div
         ref={listRef}
-        className="messages-list"
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          padding: "8px 20px",
-        }}
+        className="flex-1 overflow-y-auto flex flex-col px-4 py-2"
       >
         {msgs.length === 0 && !isLoading && (
-          <div className="empty-state">
-            <div className="empty-state-icon">💬</div>
-            <div style={{ fontWeight: 500 }}>{t("messages.emptyTitle")}</div>
-            <div className="muted">{t("messages.emptyDesc")}</div>
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <MessageSquare className="size-10 text-muted-foreground/50" />
+            <p className="font-medium text-sm">{t("messages.emptyTitle")}</p>
+            <p className="text-sm text-muted-foreground">{t("messages.emptyDesc")}</p>
           </div>
         )}
 
-        {/* Local DB pagination */}
         {hasNextPage && (
-          <div style={{ textAlign: "center", padding: "16px 0", flexShrink: 0 }}>
-            <button
-              className="btn btn-sm"
-              onClick={handleLoadOlderLocal}
-              disabled={isFetchingNextPage}
-            >
+          <div className="text-center py-4 shrink-0">
+            <Button variant="ghost" size="sm" onClick={handleLoadOlderLocal} disabled={isFetchingNextPage}>
               {isFetchingNextPage ? t("messages.loadingOlder") : t("messages.loadOlder")}
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* WhatsApp history fetch — shown when local DB is exhausted and we have a cursor */}
         {!hasNextPage && msgs.length > 0 && waState !== "exhausted" && (
-          <div style={{ textAlign: "center", padding: "16px 0", flexShrink: 0 }}>
+          <div className="text-center py-4 shrink-0">
             {waState === "loading" ? (
-              <span className="muted" style={{ fontSize: 13 }}>{t("messages.fetchingWhatsApp")}</span>
+              <span className="text-xs text-muted-foreground">{t("messages.fetchingWhatsApp")}</span>
             ) : (
-              <button className="btn btn-ghost btn-sm" onClick={handleFetchFromWA}>
+              <Button variant="ghost" size="sm" onClick={handleFetchFromWA}>
                 {waState === "open" ? t("messages.loadMoreWhatsApp") : t("messages.fetchOlderWhatsApp")}
-              </button>
+              </Button>
             )}
           </div>
         )}
         {!hasNextPage && msgs.length > 0 && waState === "exhausted" && (
-          <div style={{ textAlign: "center", padding: "12px 0", flexShrink: 0 }}>
-            <span className="muted" style={{ fontSize: 12 }}>{t("messages.noMore")}</span>
+          <div className="text-center py-3 shrink-0">
+            <span className="text-xs text-muted-foreground">{t("messages.noMore")}</span>
           </div>
         )}
 
-        <div style={{ flexGrow: 1 }} />
+        <div className="flex-1" />
         {msgs.map((m) => (
           <MessageBubble
             key={m.id}
@@ -237,29 +204,20 @@ export default function Messages() {
       </div>
 
       {/* Input bar */}
-      <div
-        style={{
-          flexShrink: 0,
-          padding: "12px 20px",
-          borderTop: "1px solid var(--border)",
-          background: "var(--card)",
-        }}
-      >
+      <div className="shrink-0 px-4 py-3 border-t border-border bg-card">
         <MessageInput
           onSend={(text, file) => sendMutation.mutate({ text, file })}
           disabled={sendMutation.isPending}
         />
         {sendMutation.error && (
-          <div className="error" style={{ marginTop: 8 }}>
-            {sendMutation.error.message}
-          </div>
+          <p className="text-xs text-destructive mt-1.5">{sendMutation.error.message}</p>
         )}
       </div>
     </div>
   );
 }
 
-function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File) => void, disabled: boolean }) {
+function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File) => void; disabled: boolean }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -275,49 +233,48 @@ function MessageInput({ onSend, disabled }: { onSend: (text: string, file?: File
   };
 
   return (
-    <form className="row" style={{ gap: 8, alignItems: "flex-end" }} onSubmit={handleSubmit}>
-      <div className="col" style={{ flexGrow: 1, gap: 4 }}>
+    <form className="flex items-end gap-2" onSubmit={handleSubmit}>
+      <div className="flex-1 flex flex-col gap-1.5">
         {file && (
-          <div className="row" style={{ gap: 8, alignItems: "center", background: "var(--bg-muted, #f5f5f5)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
-            <span style={{ flexGrow: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              📎 {file.name}
-            </span>
-            <button type="button" className="btn-close" onClick={() => setFile(null)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 16 }}>×</button>
+          <div className="flex items-center gap-2 bg-muted rounded px-2 py-1 text-xs">
+            <span className="flex-1 truncate">📎 {file.name}</span>
+            <button type="button" onClick={() => setFile(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
           </div>
         )}
-        <input
-          type="text"
-          className="input"
+        <Input
           placeholder={t("messages.placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={disabled}
-          style={{ width: "100%" }}
         />
       </div>
       <input
         type="file"
         ref={fileInputRef}
-        style={{ display: "none" }}
+        className="hidden"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
-      <button
+      <Button
         type="button"
-        className="btn btn-ghost"
+        variant="ghost"
+        size="icon"
+        className="size-9"
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled}
         title={t("messages.attachFile")}
-        style={{ padding: "8px 12px" }}
       >
-        📎
-      </button>
-      <button
+        <Paperclip className="size-4" />
+      </Button>
+      <Button
         type="submit"
-        className="btn btn-primary"
+        size="icon"
+        className="size-9"
         disabled={disabled || (!text.trim() && !file)}
       >
-        {t("messages.send")}
-      </button>
+        <Send className="size-4" />
+      </Button>
     </form>
   );
 }
@@ -333,13 +290,9 @@ function MessageBubble({
 }) {
   const { t } = useTranslation();
   const ts = new Date(msg.timestamp * 1000).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 
-  // Reactions: last-wins per actor, filter out removals (empty emoji)
   const reactionsByActor = new Map<string, MessageEvent>();
   for (const ev of annotations) {
     if (ev.kind === "reaction") reactionsByActor.set(ev.actorJid, ev);
@@ -347,20 +300,20 @@ function MessageBubble({
   const activeReactions = [...reactionsByActor.values()].filter((ev) => ev.emoji);
 
   const isDeleted = annotations.some((ev) => ev.kind === "delete");
-  const edits = annotations
-    .filter((ev) => ev.kind === "edit")
-    .sort((a, b) => b.observedAt - a.observedAt);
+  const edits = annotations.filter((ev) => ev.kind === "edit").sort((a, b) => b.observedAt - a.observedAt);
   const latestEdit = edits[0];
-
   const displayText = latestEdit?.newText || msg.text;
 
   return (
-    <div className={`message-bubble ${msg.isFromMe ? "message-me" : "message-them"}`}>
+    <div className={cn(
+      "flex flex-col mb-2 max-w-[75%]",
+      msg.isFromMe ? "self-end items-end" : "self-start items-start",
+    )}>
       {/* Reply context */}
       {quotedMsg && (
-        <div className="message-reply-preview">
-          <span className="message-reply-icon">↩</span>
-          <span className="message-reply-text">
+        <div className="text-xs bg-muted/50 border-s-2 border-primary px-2 py-1 rounded mb-1 max-w-full">
+          <span className="text-muted-foreground">↩ </span>
+          <span className="text-muted-foreground">
             {quotedMsg.text
               ? quotedMsg.text.slice(0, 80) + (quotedMsg.text.length > 80 ? "…" : "")
               : quotedMsg.mediaType
@@ -370,44 +323,49 @@ function MessageBubble({
         </div>
       )}
       {!quotedMsg && msg.quotedMessageId && (
-        <div className="message-reply-preview message-reply-unknown">
-          <span className="message-reply-icon">↩</span>
-          <span className="message-reply-text muted">{t("messages.replyFallback")}</span>
+        <div className="text-xs bg-muted/30 border-s-2 border-muted-foreground/30 px-2 py-1 rounded mb-1">
+          <span className="text-muted-foreground">↩ {t("messages.replyFallback")}</span>
         </div>
       )}
 
-      {/* Body — always show original content; overlay deleted style if needed */}
-      <div className={`message-body${isDeleted ? " message-body-deleted" : ""}`}>
+      {/* Bubble */}
+      <div className={cn(
+        "rounded-2xl px-3 py-2 text-sm",
+        msg.isFromMe
+          ? "bg-primary text-primary-foreground rounded-se-sm"
+          : "bg-card border border-border rounded-ss-sm",
+        isDeleted && "opacity-60 line-through",
+      )}>
         {msg.mediaPath ? (
-          <div className="col" style={{ gap: 8 }}>
+          <div className="flex flex-col gap-2">
             <MediaPreview type={msg.mediaType} path={msg.mediaPath} />
             {displayText && <span>{displayText}</span>}
           </div>
         ) : displayText ? (
           <span>{displayText}</span>
         ) : msg.mediaType ? (
-          <span className="muted">[{msg.mediaType}]</span>
+          <span className="opacity-70">[{msg.mediaType}]</span>
         ) : null}
       </div>
 
-      {/* Footer row: badges + time */}
-      <div className="message-footer">
+      {/* Footer */}
+      <div className="flex items-center gap-1.5 mt-0.5 px-1">
         {isDeleted && (
-          <span className="message-deleted-badge">🗑 {t("messages.deleted")}</span>
+          <span className="text-xs text-muted-foreground">🗑 {t("messages.deleted")}</span>
         )}
         {latestEdit && !isDeleted && (
-          <span className="message-edited-badge">✏ {t("messages.edited")}</span>
+          <span className="text-xs text-muted-foreground">✏ {t("messages.edited")}</span>
         )}
-        <time className="message-time">{ts}</time>
+        <time className="text-xs text-muted-foreground">{ts}</time>
       </div>
 
       {/* Reactions */}
       {activeReactions.length > 0 && (
-        <div className="message-reactions">
+        <div className="flex gap-1 mt-0.5 flex-wrap">
           {activeReactions.map((ev) => (
             <span
               key={ev.actorJid}
-              className="message-reaction"
+              className="text-base rounded-full bg-card border border-border px-1"
               title={ev.isFromMe ? t("messages.you") : ev.actorJid}
             >
               {ev.emoji}
@@ -426,45 +384,31 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
   if (type === "image") {
     return (
       <a href={url} target="_blank" rel="noreferrer">
-        <img
-          src={url}
-          alt={t("messages.mediaAlt")}
-          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }}
-        />
+        <img src={url} alt={t("messages.mediaAlt")} className="max-w-full max-h-72 rounded object-cover block" />
       </a>
     );
   }
 
   if (type === "video") {
-    return (
-      <video
-        src={url}
-        controls
-        style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }}
-      />
-    );
+    return <video src={url} controls className="max-w-full max-h-72 rounded block" />;
   }
 
   if (type === "audio") {
-    return <audio src={url} controls style={{ maxWidth: "100%" }} />;
+    return <audio src={url} controls className="max-w-full" />;
   }
 
   if (type === "sticker") {
-    return (
-      <img
-        src={url}
-        alt={t("messages.sticker")}
-        style={{ width: 120, height: 120, objectFit: "contain", display: "block" }}
-      />
-    );
+    return <img src={url} alt={t("messages.sticker")} className="size-28 object-contain block" />;
   }
 
   return (
-    <div className="row" style={{ gap: 8, alignItems: "center", padding: "8px 12px", background: "rgba(0,0,0,0.05)", borderRadius: 4 }}>
-      <span style={{ fontSize: 20 }}>📄</span>
-      <div className="col">
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{type || t("messages.file")}</span>
-        <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>{t("messages.messageFallback")}</a>
+    <div className="flex items-center gap-2 px-3 py-2 bg-black/10 rounded">
+      <span className="text-xl">📄</span>
+      <div className="flex flex-col">
+        <span className="text-sm font-medium">{type || t("messages.file")}</span>
+        <a href={url} target="_blank" rel="noreferrer" className="text-xs underline">
+          {t("messages.messageFallback")}
+        </a>
       </div>
     </div>
   );

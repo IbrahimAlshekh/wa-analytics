@@ -2,37 +2,29 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { MessageSquare, Pause, Play, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { AnalyticsRange, TimelineEntry } from "../lib/types";
 import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
 import PresencePanel from "../components/PresencePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
-import ContactAvatar from "../components/ContactAvatar";
 import StoriesPanel from "../components/StoriesPanel";
 import { useStore, wsKey } from "../lib/store";
-
-function formatRelative(unix: number): string {
-  const diff = Math.max(0, Math.floor(Date.now() / 1000 - unix));
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getMediaUrl } from "@/lib/media";
+import { getInitials, formatRelative, formatDuration } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 function formatTime(unix: number): string {
   return new Date(unix * 1000).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function formatDuration(sec: number): string {
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m`;
-  return `${m}m`;
 }
 
 function formatElapsed(startAt: number): string {
@@ -43,8 +35,6 @@ function formatElapsed(startAt: number): string {
   if (h > 0) return `${h}h ${m % 60}m`;
   return `${m}m`;
 }
-
-type MainTab = "status" | "presence" | "stories" | "analytics";
 
 export default function ContactDetail() {
   const { t } = useTranslation();
@@ -60,14 +50,6 @@ export default function ContactDetail() {
     { value: "all", label: t("contactDetail.rangeGeneral") },
   ];
 
-  const MAIN_TABS: { value: MainTab; label: string }[] = [
-    { value: "status", label: t("contactDetail.tabStatus") },
-    { value: "presence", label: t("contactDetail.tabPresence") },
-    { value: "stories", label: t("contactDetail.tabStories") },
-    { value: "analytics", label: t("contactDetail.tabAnalytics") },
-  ];
-
-  const [tab, setTab] = useState<MainTab>("status");
   const [range, setRange] = useState<AnalyticsRange>("week");
 
   const { upsertContact, removeContact, addWsEntry, pruneWsEntries, setLastPresence } = useStore();
@@ -94,8 +76,6 @@ export default function ContactDetail() {
     },
   });
 
-  // Trigger a fresh profile-picture check whenever the contact page is opened.
-  // The backend throttles this to once per 5 minutes per contact.
   useEffect(() => {
     api.refreshPicture(accountId, cid).catch(() => {});
   }, [accountId, cid]);
@@ -106,12 +86,10 @@ export default function ContactDetail() {
     refetchInterval: 30_000,
   });
 
-  // Seed the store whenever the timeline query returns a (possibly updated) contact
   useEffect(() => {
     if (tl.data?.contact) upsertContact(tl.data.contact);
   }, [tl.data?.contact, upsertContact]);
 
-  // Seed lastPresence from the timeline so the sidebar always has a value
   useEffect(() => {
     if (!tl.data?.entries) return;
     const latest = [...tl.data.entries]
@@ -120,7 +98,6 @@ export default function ContactDetail() {
     if (latest?.state) setLastPresence(accountId, cid, latest.state, latest.at, latest.lastSeen);
   }, [tl.data?.entries, accountId, cid, setLastPresence]);
 
-  // Prune WS entries that the server has now absorbed
   useEffect(() => {
     if (!tl.data) return;
     const serverKeys = new Set(
@@ -129,12 +106,8 @@ export default function ContactDetail() {
     pruneWsEntries(accountId, cid, serverKeys);
   }, [tl.data, accountId, cid, pruneWsEntries]);
 
-  // The global App.tsx WS handler already calls addWsEntry for every presence
-  // event. We only need a local listener for events that arrive while this page
-  // is mounted and App.tsx may have already fired — dedup is handled in the store.
   useEffect(() => {
-    // Nothing extra needed: App.tsx calls addWsEntry globally.
-    // This effect exists as documentation of the data-flow.
+    // App.tsx calls addWsEntry globally — no extra listener needed.
   }, [accountId, cid, addWsEntry]);
 
   const analyticsQ = useQuery({
@@ -143,7 +116,6 @@ export default function ContactDetail() {
     staleTime: 60_000,
   });
 
-  // Merge server + WS entries, dedup by kind:at:state
   const allEntries = useMemo<TimelineEntry[]>(() => {
     const base = tl.data?.entries ?? [];
     const seen = new Set<string>();
@@ -159,11 +131,16 @@ export default function ContactDetail() {
     return merged;
   }, [tl.data?.entries, wsEntries]);
 
-  if (tl.isLoading) return <div className="muted" style={{ padding: "48px 0", textAlign: "center" }}>{t("contactDetail.loading")}</div>;
-  if (tl.error) return <div className="error">{(tl.error as Error).message}</div>;
+  if (tl.isLoading) return (
+    <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+      {t("contactDetail.loading")}
+    </div>
+  );
+  if (tl.error) return (
+    <div className="p-4 text-destructive text-sm">{(tl.error as Error).message}</div>
+  );
   if (!tl.data) return null;
 
-  // Use store contact (most up-to-date) falling back to query data
   const c = contact ?? tl.data.contact;
   const displayName = c.displayName || c.phone;
 
@@ -173,7 +150,6 @@ export default function ContactDetail() {
   const lastPresence = presenceEntries[presenceEntries.length - 1];
   const isOnline = lastPresence?.state === "available";
 
-  // Find start of the current session (earliest contiguous "available" from the end)
   let sessionStart: number | null = null;
   if (isOnline) {
     for (let i = presenceEntries.length - 1; i >= 0; i--) {
@@ -186,41 +162,54 @@ export default function ContactDetail() {
   }
 
   return (
-    <div className="col" style={{ gap: 20 }}>
+    <div className="flex flex-col gap-5 p-4 md:p-6 max-w-4xl mx-auto">
       {/* Hero */}
-      <div className="contact-hero">
-        <ContactAvatar name={displayName} picturePath={c.latestPicturePath} size="lg" />
-        <div className="contact-hero-info">
-          <div className="contact-hero-name">{displayName}</div>
-          <div className="contact-hero-phone">{c.phone}</div>
-          <div className="row" style={{ gap: 6 }}>
-            <span className={`badge ${isOnline ? "badge-online" : "badge-offline"}`}>
-              <span className={`dot ${isOnline ? "online" : ""}`} style={{ width: 6, height: 6 }} />
+      <div className="flex items-start gap-4 flex-wrap">
+        <Avatar size="lg" className="shrink-0">
+          {c.latestPicturePath && (
+            <AvatarImage src={getMediaUrl(c.latestPicturePath)} alt={displayName} />
+          )}
+          <AvatarFallback className="text-base font-semibold">
+            {getInitials(displayName)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-bold tracking-tight truncate">{displayName}</h2>
+          <p className="text-sm text-muted-foreground">{c.phone}</p>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <Badge
+              variant={isOnline ? "default" : "secondary"}
+              className={cn("gap-1", isOnline && "bg-primary text-primary-foreground")}
+            >
+              <span className={cn("size-1.5 rounded-full", isOnline ? "bg-primary-foreground" : "bg-muted-foreground")} />
               {isOnline ? t("contactDetail.badgeOnline") : t("contactDetail.badgeOffline")}
-            </span>
-            <span className={`badge ${c.trackingEnabled ? "badge-tracking" : "badge-paused"}`}>
+            </Badge>
+            <Badge variant={c.trackingEnabled ? "default" : "secondary"}>
               {c.trackingEnabled ? t("contactDetail.badgeTracking") : t("contactDetail.badgePaused")}
-            </span>
+            </Badge>
           </div>
         </div>
-        <div className="contact-hero-actions">
-          <Link to={`/accounts/${accountId}/contacts/${cid}/messages`} className="btn">
-            {t("contactDetail.messages")}
-          </Link>
-          <button
-            className="btn btn-ghost"
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/accounts/${accountId}/contacts/${cid}/messages`}>
+              <MessageSquare className="size-3.5 me-1.5" />
+              {t("contactDetail.messages")}
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             disabled={toggleTracking.isPending}
             onClick={() => toggleTracking.mutate(!c.trackingEnabled)}
-            title={c.trackingEnabled ? t("contactDetail.pauseTracking") : t("contactDetail.resumeTracking")}
           >
-            {toggleTracking.isPending
-              ? "…"
-              : c.trackingEnabled
-              ? t("contactDetail.pauseTracking")
-              : t("contactDetail.resumeTracking")}
-          </button>
-          <button
-            className="btn btn-danger"
+            {c.trackingEnabled
+              ? <><Pause className="size-3.5 me-1.5" />{t("contactDetail.pauseTracking")}</>
+              : <><Play className="size-3.5 me-1.5" />{t("contactDetail.resumeTracking")}</>}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
             disabled={deleteContactMutation.isPending}
             onClick={() => {
               if (confirm(t("contactDetail.deleteConfirm", { name: displayName }))) {
@@ -228,80 +217,81 @@ export default function ContactDetail() {
               }
             }}
           >
+            <Trash2 className="size-3.5 me-1.5" />
             {deleteContactMutation.isPending ? t("contactDetail.deleting") : t("contactDetail.delete")}
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Top-level tab bar */}
-      <div className="tabs contact-main-tabs">
-        {MAIN_TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            className="btn"
-            aria-current={tab === value}
-            onClick={() => setTab(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Main tabs */}
+      <Tabs defaultValue="status">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="status">{t("contactDetail.tabStatus")}</TabsTrigger>
+          <TabsTrigger value="presence">{t("contactDetail.tabPresence")}</TabsTrigger>
+          <TabsTrigger value="stories">{t("contactDetail.tabStories")}</TabsTrigger>
+          <TabsTrigger value="analytics">{t("contactDetail.tabAnalytics")}</TabsTrigger>
+        </TabsList>
 
-      {/* Tab: Status */}
-      {tab === "status" && (
-        <>
+        <TabsContent value="status" className="mt-4 flex flex-col gap-4">
           <LiveStatusCard
             entries={allEntries}
             isOnline={isOnline}
             sessionStart={sessionStart}
             lastPresence={lastPresence}
           />
-          <div className="card">
-            <div style={{ marginBottom: 16 }}>
-              <span className="section-label">{t("contactDetail.activityTimeline")}</span>
-            </div>
-            <SessionTimeline entries={allEntries} />
-          </div>
-        </>
-      )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("contactDetail.activityTimeline")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SessionTimeline entries={allEntries} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Tab: Presence */}
-      {tab === "presence" && (
-        <>
+        <TabsContent value="presence" className="mt-4 flex flex-col gap-4">
           <StatsStrip accountId={accountId} contactId={cid} />
           <PresencePanel entries={allEntries} contact={c} />
-        </>
-      )}
+        </TabsContent>
 
-      {/* Tab: Stories */}
-      {tab === "stories" && (
-        <StoriesPanel accountId={accountId} contactId={cid} />
-      )}
+        <TabsContent value="stories" className="mt-4">
+          <StoriesPanel accountId={accountId} contactId={cid} />
+        </TabsContent>
 
-      {/* Tab: Analytics */}
-      {tab === "analytics" && (
-        <>
-          <div className="card" style={{ padding: "10px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
-                {t("contactDetail.rangeLabel")}
-              </span>
-              <div className="tabs">
-                {RANGE_LABELS.map(({ value, label }) => (
-                  <button key={value} className="btn" aria-current={range === value} onClick={() => setRange(value)}>
-                    {label}
-                  </button>
-                ))}
+        <TabsContent value="analytics" className="mt-4 flex flex-col gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("contactDetail.rangeLabel")}
+                </span>
+                <div className="flex gap-1">
+                  {RANGE_LABELS.map(({ value, label }) => (
+                    <Button
+                      key={value}
+                      variant={range === value ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setRange(value)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
           {analyticsQ.data ? (
             <AnalyticsPanel report={analyticsQ.data} />
           ) : analyticsQ.isLoading ? (
-            <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>{t("contactDetail.loadingAnalytics")}</div>
+            <div className="text-sm text-muted-foreground text-center py-8">
+              {t("contactDetail.loadingAnalytics")}
+            </div>
           ) : null}
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -334,7 +324,6 @@ function buildRecentSessions(entries: TimelineEntry[]): Session[] {
     sessions.push({ startAt: start, endAt: null, durationSec: null });
   }
 
-  // Merge sessions with gap < 120s (same as Timeline.tsx)
   const merged: Session[] = [];
   for (const s of sessions) {
     const prev = merged[merged.length - 1];
@@ -346,7 +335,6 @@ function buildRecentSessions(entries: TimelineEntry[]): Session[] {
     }
   }
 
-  // Last 8, newest first
   return merged.slice(-8).reverse();
 }
 
@@ -381,49 +369,61 @@ function LiveStatusCard({
   const elapsed = isOnline && sessionStart != null ? formatElapsed(sessionStart) : null;
 
   return (
-    <div className={`card live-status-card${isOnline ? " live-status-online" : " live-status-offline"}`}>
-      <div className="live-status-main">
-        <div className="live-status-indicator">
-          <span
-            className={`dot${isOnline ? " online" : ""}`}
-            style={{ width: 14, height: 14, flexShrink: 0 }}
-          />
-          <div>
-            <div className="live-status-label">{isOnline ? t("contactDetail.online") : t("contactDetail.offline")}</div>
-            {elapsed && <div className="live-status-sub">{t("contactDetail.onlineFor", { elapsed })}</div>}
-            {lastSeenText && <div className="live-status-sub">{lastSeenText}</div>}
-          </div>
-        </div>
-        {isOnline && sessionStart != null && (
-          <div className="live-status-since">{t("contactDetail.onlineSince", { time: formatTime(sessionStart) })}</div>
-        )}
-      </div>
-
-      {recentSessions.length > 0 && (
-        <div className="live-status-sessions">
-          <div className="live-status-sessions-label">{t("contactDetail.recentSessions")}</div>
-          {recentSessions.map((s, i) => (
-            <div key={i} className="live-status-session-row">
-              <span
-                className="dot"
-                style={{
-                  width: 6,
-                  height: 6,
-                  flexShrink: 0,
-                  background: s.endAt == null ? "var(--accent)" : "var(--offline)",
-                }}
-              />
-              <span className="live-session-time">
-                {formatTime(s.startAt)}
-                {s.endAt ? ` – ${formatTime(s.endAt)}` : ` – ${t("contactDetail.nowLabel")}`}
-              </span>
-              {s.durationSec != null && (
-                <span className="live-session-dur">{formatDuration(s.durationSec)}</span>
+    <Card className={cn(
+      "border",
+      isOnline ? "border-primary/30 bg-primary/5" : "border-border",
+    )}>
+      <CardContent className="pt-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              "size-3.5 rounded-full shrink-0",
+              isOnline ? "bg-primary shadow-[0_0_0_4px_oklch(0.723_0.173_145/0.2)]" : "bg-muted-foreground/40",
+            )} />
+            <div>
+              <p className="font-semibold text-sm">
+                {isOnline ? t("contactDetail.online") : t("contactDetail.offline")}
+              </p>
+              {elapsed && (
+                <p className="text-xs text-muted-foreground">
+                  {t("contactDetail.onlineFor", { elapsed })}
+                </p>
+              )}
+              {lastSeenText && (
+                <p className="text-xs text-muted-foreground">{lastSeenText}</p>
               )}
             </div>
-          ))}
+          </div>
+          {isOnline && sessionStart != null && (
+            <span className="text-xs text-primary font-medium">
+              {t("contactDetail.onlineSince", { time: formatTime(sessionStart) })}
+            </span>
+          )}
         </div>
-      )}
-    </div>
+
+        {recentSessions.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("contactDetail.recentSessions")}
+            </p>
+            {recentSessions.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className={cn(
+                  "size-1.5 rounded-full shrink-0",
+                  s.endAt == null ? "bg-primary" : "bg-muted-foreground/50",
+                )} />
+                <span className="text-foreground">
+                  {formatTime(s.startAt)}
+                  {s.endAt ? ` – ${formatTime(s.endAt)}` : ` – ${t("contactDetail.nowLabel")}`}
+                </span>
+                {s.durationSec != null && (
+                  <span className="text-muted-foreground ms-auto">{formatDuration(s.durationSec)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

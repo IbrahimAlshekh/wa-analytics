@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { Link, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import logoSrc from "./assets/wa_analytics_logo_512.png";
+import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ws } from "./lib/ws";
 import { useStore } from "./lib/store";
+import AppHeader from "./components/layout/AppHeader";
 import AccountLayout from "./components/AccountLayout";
 import Accounts from "./pages/Accounts";
 import ContactDetail from "./pages/ContactDetail";
@@ -18,12 +18,8 @@ export default function App() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, i18n } = useTranslation();
-  const { token, setToken, backupState, setBackupState, addWsEntry, setLastPresence } = useStore();
-
-  function toggleLanguage() {
-    i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar");
-  }
+  const { t } = useTranslation();
+  const { token, addWsEntry, setLastPresence } = useStore();
 
   useEffect(() => {
     if (!token && !publicPaths.includes(location.pathname)) {
@@ -93,71 +89,9 @@ export default function App() {
     return off;
   }, [qc]);
 
-  async function triggerBackup() {
-    if (backupState === "loading") return;
-    setBackupState("loading");
-    try {
-      const res = await fetch("/api/backup", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `backup_${new Date().toISOString().slice(0, 10)}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setBackupState("idle");
-    } catch {
-      setBackupState("error");
-      setTimeout(() => setBackupState("idle"), 3000);
-    }
-  }
-
-  const isLogin = publicPaths.includes(location.pathname);
-  const authed = Boolean(token);
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <header className="app-bar">
-        <Link to="/" className="app-logo">
-          <img src={logoSrc} className="app-logo-mark" alt="WA Analytics" />
-          {!isLogin && <span>{t("app.name")}</span>}
-        </Link>
-        <div className="app-bar-fill" />
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={toggleLanguage}
-          title={t("lang.switchTo")}
-          style={{ fontFamily: "inherit", letterSpacing: 0 }}
-        >
-          {i18n.language === "ar" ? t("lang.en") : t("lang.ar")}
-        </button>
-        {authed && (
-          <>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={triggerBackup}
-              disabled={backupState === "loading"}
-              title={t("app.backupTitle")}
-            >
-              {backupState === "loading" ? t("app.backingUp") : backupState === "error" ? t("app.backupFailed") : t("app.backup")}
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setToken(null);
-                navigate("/login");
-              }}
-            >
-              {t("app.logout")}
-            </button>
-          </>
-        )}
-      </header>
+    <div className="flex flex-col h-screen overflow-hidden">
+      <AppHeader />
 
       <Routes>
         {/* Public */}
@@ -168,7 +102,7 @@ export default function App() {
         <Route
           path="/"
           element={
-            <div className="container">
+            <div className="max-w-3xl mx-auto px-4 py-8">
               <Accounts />
             </div>
           }
@@ -179,14 +113,10 @@ export default function App() {
           <Route
             index
             element={
-              <div className="main-empty">
-                <div className="main-empty-icon">👤</div>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>
-                  {t("app.selectContact")}
-                </div>
-                <div className="muted">
-                  {t("app.selectContactDesc")}
-                </div>
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-8">
+                <span className="text-4xl">👤</span>
+                <div className="font-semibold text-sm">{t("app.selectContact")}</div>
+                <div className="text-sm text-muted-foreground">{t("app.selectContactDesc")}</div>
               </div>
             }
           />

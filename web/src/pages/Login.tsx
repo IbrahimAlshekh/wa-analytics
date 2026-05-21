@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -16,7 +20,7 @@ export default function Login() {
   useEffect(() => {
     api.setupStatus().then(({ hasUsers }) => {
       if (!hasUsers) navigate("/register", { replace: true });
-    }).catch(() => {/* ignore — server may be starting */});
+    }).catch(() => {});
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,56 +39,52 @@ export default function Login() {
   };
 
   return (
-    <div className="login-wrap">
-      <div className="login-box">
-        <div className="login-brand">
-          <div className="login-brand-mark">W</div>
-          <div className="login-brand-title">{t("auth.brand")}</div>
-          <div className="login-brand-sub">{t("auth.login.subtitle")}</div>
+    <div className="flex flex-col items-center justify-center min-h-full px-4 py-16">
+      <div className="w-full max-w-sm flex flex-col gap-6">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+            W
+          </div>
+          <h1 className="text-xl font-bold tracking-tight">{t("auth.brand")}</h1>
+          <p className="text-sm text-muted-foreground">{t("auth.login.subtitle")}</p>
         </div>
-        <div className="card">
-          <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
-            <div className="form-field">
-              <label className="form-label" htmlFor="login-user">{t("auth.login.username")}</label>
-              <input
-                id="login-user"
-                className="input"
-                placeholder={t("auth.login.usernamePlaceholder")}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus
-                autoComplete="username"
-              />
-            </div>
-            <div className="form-field">
-              <label className="form-label" htmlFor="login-pass">{t("auth.login.password")}</label>
-              <input
-                id="login-pass"
-                className="input"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={loading}
-              style={{ marginTop: 4 }}
-            >
-              {loading ? t("auth.login.submitting") : t("auth.login.submit")}
-            </button>
-          </form>
-          {error && (
-            <div className="error" style={{ marginTop: 12 }}>
-              {error}
-            </div>
-          )}
-        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="login-user">{t("auth.login.username")}</Label>
+                <Input
+                  id="login-user"
+                  placeholder={t("auth.login.usernamePlaceholder")}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="username"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="login-pass">{t("auth.login.password")}</Label>
+                <Input
+                  id="login-pass"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+              <Button type="submit" className="w-full mt-1" disabled={loading}>
+                {loading ? t("auth.login.submitting") : t("auth.login.submit")}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

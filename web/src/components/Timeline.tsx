@@ -13,18 +13,18 @@ function MediaPreview({ type, path }: { type?: string; path: string }) {
 
   if (type === "image") {
     return (
-      <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 4 }}>
+      <a href={url} target="_blank" rel="noreferrer" className="block mt-1">
         <img
           src={url}
           alt="WhatsApp Media"
-          style={{ maxWidth: 200, maxHeight: 150, borderRadius: 4, display: "block" }}
+          className="max-w-48 max-h-36 rounded object-cover block mt-1"
         />
       </a>
     );
   }
 
   return (
-    <a href={url} target="_blank" rel="noreferrer" style={{ fontSize: 12, display: "inline-block", marginTop: 4 }}>
+    <a href={url} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">
       {t("timeline.viewMedia", { type: type || "media" })}
     </a>
   );
@@ -55,7 +55,7 @@ export default function SessionTimeline({ entries }: Props) {
   const { t } = useTranslation();
 
   if (!entries?.length) {
-    return <div className="muted">{t("timeline.noEvents")}</div>;
+    return <div className="text-sm text-muted-foreground">{t("timeline.noEvents")}</div>;
   }
 
   const messages = entries
@@ -67,21 +67,21 @@ export default function SessionTimeline({ entries }: Props) {
   const blocks = buildBlocks(statusEntries);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="flex flex-col gap-6">
       <div>
-        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>{t("timeline.recentMessages")}</h4>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t("timeline.recentMessages")}</p>
         {messages.length === 0 ? (
-          <div className="muted">{t("timeline.noMessages")}</div>
+          <div className="text-sm text-muted-foreground">{t("timeline.noMessages")}</div>
         ) : (
-          <div className="session-timeline">
+          <div className="flex flex-col gap-1.5">
             {messages.map((e, i) => (
-              <div key={i} className="session-event">
-                <time className="session-time">{formatTime(e.at)}</time>
-                <div style={{ display: "flex", flexDirection: "column" }}>
+              <div key={i} className="flex items-start gap-2 py-1 text-sm">
+                <time className="text-xs text-muted-foreground shrink-0 min-w-12">{formatTime(e.at)}</time>
+                <div className="flex flex-col">
                   <span>
                     {e.isFromMe ? t("timeline.sent") : t("timeline.received")}:{" "}
-                    <em style={{ fontStyle: "normal", color: "var(--fg)" }}>
-                      {e.text || (e.mediaPath ? "" : <span className="muted">[{e.mediaType || "media"}]</span>)}
+                    <em className="not-italic text-foreground">
+                      {e.text || (e.mediaPath ? "" : <span className="text-muted-foreground">[{e.mediaType || "media"}]</span>)}
                     </em>
                   </span>
                   {e.mediaPath && <MediaPreview type={e.mediaType} path={e.mediaPath} />}
@@ -93,11 +93,11 @@ export default function SessionTimeline({ entries }: Props) {
       </div>
 
       <div>
-        <h4 style={{ margin: "0 0 8px", color: "var(--fg-muted, #888)" }}>{t("timeline.statusSection")}</h4>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t("timeline.statusSection")}</p>
         {blocks.length === 0 ? (
-          <div className="muted">{t("timeline.noSessions")}</div>
+          <div className="text-sm text-muted-foreground">{t("timeline.noSessions")}</div>
         ) : (
-          <div className="session-timeline">
+          <div className="flex flex-col gap-1.5">
             {blocks.map((b, i) => {
               if (b.type === "session") return <SessionBlock key={i} session={b.session} />;
               if (b.type === "offline-gap") return <GapBlock key={i} fromAt={b.fromAt} toAt={b.toAt} />;
@@ -121,19 +121,19 @@ function SessionBlock({ session }: { session: Session }) {
       : null;
 
   return (
-    <div className="session-block session-online">
-      <div className="session-header">
-        <span className="session-dot session-dot-online" />
-        <span className="session-label">
+    <div className="flex items-start gap-2 py-1.5 px-3 rounded-md bg-primary/5 border border-primary/10">
+      <span className="size-2 rounded-full bg-primary mt-1.5 shrink-0" />
+      <div className="flex flex-col">
+        <span className="text-sm">
           {t("timeline.onlineSession", { start, end })}
-          {dur ? <span className="session-duration">({dur})</span> : null}
+          {dur ? <span className="text-xs text-muted-foreground ms-1">({dur})</span> : null}
         </span>
+        {lastSeenDiff != null && lastSeenDiff > 0 && (
+          <p className="text-xs text-muted-foreground mt-0.5 ms-4">
+            {t("timeline.lastActivity", { duration: formatDuration(lastSeenDiff) })}
+          </p>
+        )}
       </div>
-      {lastSeenDiff != null && lastSeenDiff > 0 && (
-        <div className="session-meta">
-          {t("timeline.lastActivity", { duration: formatDuration(lastSeenDiff) })}
-        </div>
-      )}
     </div>
   );
 }
@@ -142,9 +142,9 @@ function GapBlock({ fromAt, toAt }: { fromAt: number; toAt: number }) {
   const { t } = useTranslation();
   const dur = formatDuration(toAt - fromAt);
   return (
-    <div className="session-block session-offline">
-      <span className="session-dot session-dot-offline" />
-      <span className="session-label session-muted">{t("timeline.offlineGap", { duration: dur })}</span>
+    <div className="flex items-center gap-2 py-1 px-3 text-muted-foreground">
+      <span className="size-2 rounded-full bg-muted-foreground/40 shrink-0" />
+      <span className="text-sm text-muted-foreground">{t("timeline.offlineGap", { duration: dur })}</span>
     </div>
   );
 }
@@ -152,13 +152,13 @@ function GapBlock({ fromAt, toAt }: { fromAt: number; toAt: number }) {
 function EventBlock({ ev }: { ev: NonPresence }) {
   const { t } = useTranslation();
   return (
-    <div className="session-event">
-      <time className="session-time">{formatTime(ev.at)}</time>
+    <div className="flex items-start gap-2 py-1 text-sm">
+      <time className="text-xs text-muted-foreground shrink-0 min-w-12">{formatTime(ev.at)}</time>
       {ev.kind === "picture" ? (
         <span>
           {t("timeline.picChanged")}
           {ev.mediaPath ? (
-            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer">{t("timeline.view")}</a></>
+            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">{t("timeline.view")}</a></>
           ) : null}
         </span>
       ) : (

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useTranslation } from "react-i18next";
+import { RefreshCw, QrCode } from "lucide-react";
 import { api } from "../lib/api";
 import { ws } from "../lib/ws";
+import { Button } from "@/components/ui/button";
 
 export default function QRView() {
   const { t } = useTranslation();
@@ -30,21 +32,25 @@ export default function QRView() {
   }, []);
 
   return (
-    <div className="col" style={{ alignItems: "center" }}>
-      <p className="muted">
-        {t("qr.instruction")}
-      </p>
-      {code ? (
-        <div className="qr">
+    <div className="flex flex-col items-center gap-4">
+      <p className="text-sm text-muted-foreground text-center">{t("qr.instruction")}</p>
+      <div className="size-64 flex items-center justify-center rounded-xl border border-border bg-white p-3">
+        {code ? (
           <QRCodeSVG value={code} size={232} level="M" />
-        </div>
-      ) : (
-        <div className="qr" style={{ width: 264, height: 264 }} />
-      )}
-      <button className="btn btn-primary" onClick={start} disabled={starting}>
-        {code ? t("qr.refresh") : t("qr.generate")}
-      </button>
-      {error && <div className="error">{error}</div>}
+        ) : (
+          <QrCode className="size-16 text-muted-foreground/30" />
+        )}
+      </div>
+      <Button onClick={start} disabled={starting}>
+        {starting ? (
+          <><RefreshCw className="size-3.5 me-1.5 animate-spin" />{t("qr.generate")}</>
+        ) : code ? (
+          <><RefreshCw className="size-3.5 me-1.5" />{t("qr.refresh")}</>
+        ) : (
+          t("qr.generate")
+        )}
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

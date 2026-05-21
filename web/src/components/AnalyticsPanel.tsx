@@ -1,15 +1,14 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
+import { BarChart2, Clock, TrendingUp, MessageSquare, CalendarDays, Smile, Languages } from "lucide-react";
 import type { AnalyticsReport, AnalyticsVolumeSide, AnalyticsEmotionCounts, TokenCount, MonthRow } from "../lib/types";
-import { InfoTooltip } from "./InfoTooltip";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Info } from "lucide-react";
+import { formatCount, formatDuration } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface Props {
   report: AnalyticsReport;
@@ -31,14 +30,16 @@ export default function AnalyticsPanel({ report }: Props) {
   const totalMsgs = volume.me.messages + volume.them.messages;
   if (totalMsgs === 0) {
     return (
-      <div className="card" style={{ padding: "24px 16px", textAlign: "center" }}>
-        <span className="muted" style={{ fontSize: 13 }}>{t("analytics.noMessages")}</span>
-      </div>
+      <Card>
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          {t("analytics.noMessages")}
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="col" style={{ gap: 20 }}>
+    <div className="flex flex-col gap-4">
       <TimelineCard timeline={timeline} />
       <VolumeCard me={volume.me} them={volume.them} />
       <InitiationCard initiation={initiation} />
@@ -53,95 +54,158 @@ export default function AnalyticsPanel({ report }: Props) {
   );
 }
 
+function SectionHeader({ title, description, info, icon: Icon }: {
+  title: string;
+  description?: string;
+  info?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {title}
+          {info && (
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <Info className="size-3 text-muted-foreground/60 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-56 text-xs">{info}</TooltipContent>
+            </UITooltip>
+          )}
+        </div>
+        {description && (
+          <p className="text-xs text-muted-foreground opacity-75 leading-tight">{description}</p>
+        )}
+      </div>
+      {Icon && <Icon className="size-4 text-muted-foreground shrink-0 mt-0.5" />}
+    </div>
+  );
+}
+
+function StatItem({ label, value, description, info }: {
+  label: string;
+  value: string;
+  description?: string;
+  info?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 min-w-24">
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        {label}
+        {info && (
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Info className="size-2.5 text-muted-foreground/50 cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-56 text-xs">{info}</TooltipContent>
+          </UITooltip>
+        )}
+      </div>
+      {description && (
+        <p className="text-xs text-muted-foreground/60 leading-tight">{description}</p>
+      )}
+      <span className="text-lg font-bold tracking-tight">{value}</span>
+    </div>
+  );
+}
+
+function BalanceBar({ mePct, meLabel, themLabel }: { mePct: number; meLabel: string; themLabel: string }) {
+  return (
+    <div className="mb-4">
+      <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+        <span>{meLabel}</span>
+        <span>{themLabel}</span>
+      </div>
+      <Progress value={mePct} className="h-2" />
+    </div>
+  );
+}
+
 function TimelineCard({ timeline }: { timeline: AnalyticsReport["timeline"] }) {
   const { t } = useTranslation();
   if (!timeline.firstMsgUnix) return null;
   const fmt = (unix: number) => new Date(unix * 1000).toLocaleDateString();
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.timeline.description")}
-        info={t("analytics.timeline.tooltip")}
-      >Timeline</SectionLabel>
-      <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label={t("analytics.timeline.firstMessage")} value={fmt(timeline.firstMsgUnix)} />
-        <StatCard label={t("analytics.timeline.lastMessage")} value={fmt(timeline.lastMsgUnix)} />
-        <StatCard label={t("analytics.timeline.span")} value={`${timeline.spanDays}d`} />
-        <StatCard label={t("analytics.timeline.activeDays")} value={String(timeline.daysWithComms)} />
-        <StatCard
-          label={t("analytics.timeline.longestStreak")}
-          value={`${timeline.longestStreakDays}d`}
-          description={t("analytics.timeline.longestStreakDesc")}
-          info={t("analytics.timeline.longestStreakTooltip")}
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Timeline"
+          description={t("analytics.timeline.description")}
+          info={t("analytics.timeline.tooltip")}
+          icon={CalendarDays}
         />
-        {timeline.highestVolumeDayDate && (
-          <StatCard
-            label={t("analytics.timeline.busiestDay")}
-            value={`${timeline.highestVolumeDayDate} (${timeline.highestVolumeDayCount})`}
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatItem label={t("analytics.timeline.firstMessage")} value={fmt(timeline.firstMsgUnix)} />
+          <StatItem label={t("analytics.timeline.lastMessage")} value={fmt(timeline.lastMsgUnix)} />
+          <StatItem label={t("analytics.timeline.span")} value={`${timeline.spanDays}d`} />
+          <StatItem label={t("analytics.timeline.activeDays")} value={String(timeline.daysWithComms)} />
+          <StatItem
+            label={t("analytics.timeline.longestStreak")}
+            value={`${timeline.longestStreakDays}d`}
+            description={t("analytics.timeline.longestStreakDesc")}
+            info={t("analytics.timeline.longestStreakTooltip")}
           />
-        )}
-      </div>
-    </div>
+          {timeline.highestVolumeDayDate && (
+            <StatItem
+              label={t("analytics.timeline.busiestDay")}
+              value={`${timeline.highestVolumeDayDate} (${timeline.highestVolumeDayCount})`}
+            />
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiation"] }) {
   const { t } = useTranslation();
   if (initiation.sessions === 0) return null;
-
   const mePct = initiation.initiationMeSharePct;
-
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.initiation.description")}
-        info={t("analytics.initiation.tooltip")}
-      >Initiation &amp; Response</SectionLabel>
-
-      {/* Session initiation balance bar */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--fg-muted)", marginBottom: 4 }}>
-          <span>{t("analytics.initiation.youStarted", { pct: mePct.toFixed(1) })}</span>
-          <span>{t("analytics.initiation.themPct", { pct: (100 - mePct).toFixed(1) })}</span>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Initiation & Response"
+          description={t("analytics.initiation.description")}
+          info={t("analytics.initiation.tooltip")}
+          icon={TrendingUp}
+        />
+      </CardHeader>
+      <CardContent className="pt-0">
+        <BalanceBar
+          mePct={mePct}
+          meLabel={t("analytics.initiation.youStarted", { pct: mePct.toFixed(1) })}
+          themLabel={t("analytics.initiation.themPct", { pct: (100 - mePct).toFixed(1) })}
+        />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatItem label={t("analytics.initiation.sessions")} value={String(initiation.sessions)} />
+          <StatItem label={t("analytics.initiation.avgMsgsPerSession")} value={initiation.avgSessionMsgs.toFixed(1)} />
+          {initiation.avgRespMeSec > 0 && <StatItem label={t("analytics.initiation.avgReplyYou")} value={formatDuration(initiation.avgRespMeSec)} />}
+          {initiation.avgRespThemSec > 0 && <StatItem label={t("analytics.initiation.avgReplyThem")} value={formatDuration(initiation.avgRespThemSec)} />}
+          {initiation.medianRespMeSec > 0 && <StatItem label={t("analytics.initiation.medianReplyYou")} value={formatDuration(initiation.medianRespMeSec)} />}
+          {initiation.medianRespThemSec > 0 && <StatItem label={t("analytics.initiation.medianReplyThem")} value={formatDuration(initiation.medianRespThemSec)} />}
+          {initiation.longestSilenceSec > 0 && (
+            <StatItem
+              label={t("analytics.initiation.longestSilence")}
+              value={formatDuration(initiation.longestSilenceSec)}
+              description={t("analytics.initiation.longestSilenceDesc")}
+              info={t("analytics.initiation.longestSilenceTooltip")}
+            />
+          )}
+          {initiation.avgSilenceSec > 0 && (
+            <StatItem
+              label={t("analytics.initiation.avgSilence")}
+              value={formatDuration(initiation.avgSilenceSec)}
+              description={t("analytics.initiation.avgSilenceDesc")}
+              info={t("analytics.initiation.avgSilenceTooltip")}
+            />
+          )}
         </div>
-        <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${mePct}%`, background: "var(--accent)", borderRadius: 4 }} />
-        </div>
-      </div>
-
-      <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label={t("analytics.initiation.sessions")} value={String(initiation.sessions)} />
-        <StatCard label={t("analytics.initiation.avgMsgsPerSession")} value={initiation.avgSessionMsgs.toFixed(1)} />
-        {initiation.avgRespMeSec > 0 && (
-          <StatCard label={t("analytics.initiation.avgReplyYou")} value={fmtDur(initiation.avgRespMeSec)} />
-        )}
-        {initiation.avgRespThemSec > 0 && (
-          <StatCard label={t("analytics.initiation.avgReplyThem")} value={fmtDur(initiation.avgRespThemSec)} />
-        )}
-        {initiation.medianRespMeSec > 0 && (
-          <StatCard label={t("analytics.initiation.medianReplyYou")} value={fmtDur(initiation.medianRespMeSec)} />
-        )}
-        {initiation.medianRespThemSec > 0 && (
-          <StatCard label={t("analytics.initiation.medianReplyThem")} value={fmtDur(initiation.medianRespThemSec)} />
-        )}
-        {initiation.longestSilenceSec > 0 && (
-          <StatCard
-            label={t("analytics.initiation.longestSilence")}
-            value={fmtDur(initiation.longestSilenceSec)}
-            description={t("analytics.initiation.longestSilenceDesc")}
-            info={t("analytics.initiation.longestSilenceTooltip")}
-          />
-        )}
-        {initiation.avgSilenceSec > 0 && (
-          <StatCard
-            label={t("analytics.initiation.avgSilence")}
-            value={fmtDur(initiation.avgSilenceSec)}
-            description={t("analytics.initiation.avgSilenceDesc")}
-            info={t("analytics.initiation.avgSilenceTooltip")}
-          />
-        )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -149,30 +213,28 @@ function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolu
   const { t } = useTranslation();
   const total = me.messages + them.messages;
   const meBar = total > 0 ? (me.messages / total) * 100 : 50;
-
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.volume.description")}
-        info={t("analytics.volume.tooltip")}
-      >Volume</SectionLabel>
-
-      {/* Message balance bar */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--fg-muted)", marginBottom: 4 }}>
-          <span>{t("analytics.volume.youPct", { pct: me.sharePct.toFixed(1) })}</span>
-          <span>{t("analytics.volume.themPct", { pct: them.sharePct.toFixed(1) })}</span>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Volume"
+          description={t("analytics.volume.description")}
+          info={t("analytics.volume.tooltip")}
+          icon={MessageSquare}
+        />
+      </CardHeader>
+      <CardContent className="pt-0">
+        <BalanceBar
+          mePct={meBar}
+          meLabel={t("analytics.volume.youPct", { pct: me.sharePct.toFixed(1) })}
+          themLabel={t("analytics.volume.themPct", { pct: them.sharePct.toFixed(1) })}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <VolumeSideBox label={t("analytics.you")} side={me} accent="text-primary" />
+          <VolumeSideBox label={t("analytics.them")} side={them} accent="text-muted-foreground" />
         </div>
-        <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${meBar}%`, background: "var(--accent)", borderRadius: 4 }} />
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <VolumeSideBox label={t("analytics.you")} side={me} accent="var(--accent)" />
-        <VolumeSideBox label={t("analytics.them")} side={them} accent="var(--fg-muted)" />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -180,20 +242,29 @@ function VolumeSideBox({ label, side, accent }: { label: string; side: Analytics
   const { t } = useTranslation();
   const media = side.voiceNotes + side.photos + side.videos + side.stickers + side.documents;
   return (
-    <div style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 12px" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: accent, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div className="stats" style={{ marginBottom: 0, gap: 6 }}>
-        <MiniStat label={t("analytics.volume.messages")} value={fmt(side.messages)} />
-        <MiniStat label={t("analytics.volume.words")} value={fmt(side.words)} />
+    <div className="rounded-lg bg-muted/40 p-3 flex flex-col gap-2">
+      <span className={cn("text-xs font-bold uppercase tracking-wider", accent)}>{label}</span>
+      <div className="flex flex-col gap-1.5">
+        <MiniStat label={t("analytics.volume.messages")} value={formatCount(side.messages)} />
+        <MiniStat label={t("analytics.volume.words")} value={formatCount(side.words)} />
         <MiniStat label={t("analytics.volume.avgWords")} value={side.avgWordsPerMsg.toFixed(1)} />
-        {side.voiceNotes > 0 && <MiniStat label={t("analytics.volume.voiceNotes")} value={fmt(side.voiceNotes)} />}
-        {side.photos > 0 && <MiniStat label={t("analytics.volume.photos")} value={fmt(side.photos)} />}
-        {side.videos > 0 && <MiniStat label={t("analytics.volume.videos")} value={fmt(side.videos)} />}
-        {side.stickers > 0 && <MiniStat label={t("analytics.volume.stickers")} value={fmt(side.stickers)} />}
-        {side.documents > 0 && <MiniStat label={t("analytics.volume.docs")} value={fmt(side.documents)} />}
-        {side.links > 0 && <MiniStat label={t("analytics.volume.links")} value={fmt(side.links)} />}
-        {media > 0 && <MiniStat label={t("analytics.volume.totalMedia")} value={fmt(media)} />}
+        {side.voiceNotes > 0 && <MiniStat label={t("analytics.volume.voiceNotes")} value={formatCount(side.voiceNotes)} />}
+        {side.photos > 0 && <MiniStat label={t("analytics.volume.photos")} value={formatCount(side.photos)} />}
+        {side.videos > 0 && <MiniStat label={t("analytics.volume.videos")} value={formatCount(side.videos)} />}
+        {side.stickers > 0 && <MiniStat label={t("analytics.volume.stickers")} value={formatCount(side.stickers)} />}
+        {side.documents > 0 && <MiniStat label={t("analytics.volume.docs")} value={formatCount(side.documents)} />}
+        {side.links > 0 && <MiniStat label={t("analytics.volume.links")} value={formatCount(side.links)} />}
+        {media > 0 && <MiniStat label={t("analytics.volume.totalMedia")} value={formatCount(media)} />}
       </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold tabular-nums">{value}</span>
     </div>
   );
 }
@@ -208,29 +279,31 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
   }));
   const hasData = data.some((d) => d.me > 0 || d.them > 0);
   if (!hasData) return null;
-
   return (
-    <div className="card">
-      <SectionLabel
-        description={t("analytics.hourly.description")}
-        info={t("analytics.hourly.tooltip")}
-      >Messages by hour</SectionLabel>
-      <div style={{ width: "100%", height: 180 }}>
-        <ResponsiveContainer>
-          <BarChart data={data} barCategoryGap="20%" barGap={2}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={2} />
-            <YAxis tick={{ fontSize: 10, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
-            <Tooltip
-              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-              cursor={{ fill: "var(--accent-dim)" }}
-            />
-            <Bar dataKey="me" name={t("analytics.you")} fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="them" name={t("analytics.them")} fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Messages by hour"
+          description={t("analytics.hourly.description")}
+          info={t("analytics.hourly.tooltip")}
+          icon={BarChart2}
+        />
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="w-full h-44">
+          <ResponsiveContainer>
+            <BarChart data={data} barCategoryGap="20%" barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval={2} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
+              <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="them" name={t("analytics.them")} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -243,45 +316,53 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
   }));
   const hasData = data.some((d) => d.me > 0 || d.them > 0);
   if (!hasData) return null;
-
   return (
-    <div className="card">
-      <SectionLabel
-        description={t("analytics.weekday.description")}
-        info={t("analytics.weekday.tooltip")}
-      >Messages by weekday</SectionLabel>
-      <div style={{ width: "100%", height: 160 }}>
-        <ResponsiveContainer>
-          <BarChart data={data} barCategoryGap="25%" barGap={2}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
-            <Tooltip
-              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
-              cursor={{ fill: "var(--accent-dim)" }}
-            />
-            <Bar dataKey="me" name={t("analytics.you")} fill="var(--accent)" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="them" name={t("analytics.them")} fill="var(--fg-muted)" radius={[3, 3, 0, 0]} opacity={0.6} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Messages by weekday"
+          description={t("analytics.weekday.description")}
+          info={t("analytics.weekday.tooltip")}
+          icon={CalendarDays}
+        />
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="w-full h-40">
+          <ResponsiveContainer>
+            <BarChart data={data} barCategoryGap="25%" barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
+              <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="them" name={t("analytics.them")} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 function TemporalMetaCard({ temporal }: { temporal: AnalyticsReport["temporal"] }) {
   const { t } = useTranslation();
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.temporal.description")}
-        info={t("analytics.temporal.tooltip")}
-      >Temporal patterns</SectionLabel>
-      <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard label={t("analytics.temporal.nightYou")} value={`${temporal.nightPctMe.toFixed(1)}%`} />
-        <StatCard label={t("analytics.temporal.nightThem")} value={`${temporal.nightPctThem.toFixed(1)}%`} />
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Temporal patterns"
+          description={t("analytics.temporal.description")}
+          info={t("analytics.temporal.tooltip")}
+          icon={Clock}
+        />
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 gap-3">
+          <StatItem label={t("analytics.temporal.nightYou")} value={`${temporal.nightPctMe.toFixed(1)}%`} />
+          <StatItem label={t("analytics.temporal.nightThem")} value={`${temporal.nightPctThem.toFixed(1)}%`} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -290,59 +371,56 @@ function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
   const hasEmotion = EMOTION_KEYS.some(
     (k) => (emotion.countsMe[k] ?? 0) > 0 || (emotion.countsThem[k] ?? 0) > 0,
   );
-
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.emotion.description")}
-        info={t("analytics.emotion.tooltip")}
-      >Emotion fingerprint</SectionLabel>
-
-      <div className="stats" style={{ marginBottom: 12 }}>
-        {emotion.laughterMsgsMe + emotion.laughterMsgsThem > 0 && (
-          <>
-            <StatCard label={t("analytics.emotion.laughsYou")} value={fmt(emotion.laughterMsgsMe)} />
-            <StatCard label={t("analytics.emotion.laughsThem")} value={fmt(emotion.laughterMsgsThem)} />
-          </>
-        )}
-        {emotion.questionsMe + emotion.questionsThem > 0 && (
-          <>
-            <StatCard label={t("analytics.emotion.questionsYou")} value={fmt(emotion.questionsMe)} />
-            <StatCard label={t("analytics.emotion.questionsThem")} value={fmt(emotion.questionsThem)} />
-          </>
-        )}
-      </div>
-
-      {hasEmotion && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {EMOTION_KEYS.map((k) => {
-            const me = emotion.countsMe[k] ?? 0;
-            const them = emotion.countsThem[k] ?? 0;
-            if (me === 0 && them === 0) return null;
-            return (
-              <EmotionRow key={k} icon={EMOTION_ICONS[k]} label={k} me={me} them={them} />
-            );
-          })}
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Emotion fingerprint"
+          description={t("analytics.emotion.description")}
+          info={t("analytics.emotion.tooltip")}
+          icon={Smile}
+        />
+      </CardHeader>
+      <CardContent className="pt-0 flex flex-col gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {emotion.laughterMsgsMe + emotion.laughterMsgsThem > 0 && (
+            <>
+              <StatItem label={t("analytics.emotion.laughsYou")} value={formatCount(emotion.laughterMsgsMe)} />
+              <StatItem label={t("analytics.emotion.laughsThem")} value={formatCount(emotion.laughterMsgsThem)} />
+            </>
+          )}
+          {emotion.questionsMe + emotion.questionsThem > 0 && (
+            <>
+              <StatItem label={t("analytics.emotion.questionsYou")} value={formatCount(emotion.questionsMe)} />
+              <StatItem label={t("analytics.emotion.questionsThem")} value={formatCount(emotion.questionsThem)} />
+            </>
+          )}
         </div>
-      )}
-    </div>
+        {hasEmotion && (
+          <div className="flex flex-col gap-2">
+            {EMOTION_KEYS.map((k) => {
+              const me = emotion.countsMe[k] ?? 0;
+              const them = emotion.countsThem[k] ?? 0;
+              if (me === 0 && them === 0) return null;
+              return <EmotionRow key={k} icon={EMOTION_ICONS[k]} label={k} me={me} them={them} />;
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function EmotionRow({
-  icon, label, me, them,
-}: { icon: string; label: string; me: number; them: number }) {
+function EmotionRow({ icon, label, me, them }: { icon: string; label: string; me: number; them: number }) {
   const total = me + them;
   const mePct = total > 0 ? (me / total) * 100 : 50;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: 20, textAlign: "center", fontSize: 14 }}>{icon}</span>
-      <span style={{ width: 72, fontSize: 11, color: "var(--fg-muted)", textTransform: "capitalize" }}>{label}</span>
-      <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--border)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${mePct}%`, background: "var(--accent)", borderRadius: 3 }} />
-      </div>
-      <span style={{ fontSize: 11, color: "var(--fg-muted)", minWidth: 70, textAlign: "right" }}>
-        {fmt(me)} / {fmt(them)}
+    <div className="flex items-center gap-2">
+      <span className="w-5 text-center text-sm">{icon}</span>
+      <span className="w-20 text-xs text-muted-foreground capitalize shrink-0">{label}</span>
+      <Progress value={mePct} className="flex-1 h-1.5" />
+      <span className="text-xs text-muted-foreground min-w-16 text-end tabular-nums">
+        {formatCount(me)} / {formatCount(them)}
       </span>
     </div>
   );
@@ -364,113 +442,91 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
   if (!hasEmojis && !hasWords && !hasDomains) return null;
 
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.language.description")}
-        info={t("analytics.language.tooltip")}
-      >Language fingerprint</SectionLabel>
-
-      {hasEmojis && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topEmojis")}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.you")}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topEmojisMe.map((tc) => (
-                  <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
-                ))}
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Language fingerprint"
+          description={t("analytics.language.description")}
+          info={t("analytics.language.tooltip")}
+          icon={Languages}
+        />
+      </CardHeader>
+      <CardContent className="pt-0 flex flex-col gap-5">
+        {hasEmojis && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">{t("analytics.language.topEmojis")}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-primary font-bold uppercase mb-2">{t("analytics.you")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {topEmojisMe.map((tc) => <TokenPill key={tc.token} {...tc} />)}
+                </div>
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.them")}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topEmojisThem.map((tc) => (
-                  <EmojiPill key={tc.token} token={tc.token} count={tc.count} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {hasWords && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topWords")}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <WordList label={t("analytics.you")} tokens={topWordsMe} accent="var(--accent)" />
-            <WordList label={t("analytics.them")} tokens={topWordsThem} accent="var(--fg-muted)" />
-          </div>
-        </div>
-      )}
-
-      {hasDomains && (
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", marginBottom: 8 }}>{t("analytics.language.topDomains")}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.you")}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topDomainsMe.map((tc) => (
-                  <DomainPill key={tc.token} token={tc.token} count={tc.count} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{t("analytics.them")}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topDomainsThem.map((tc) => (
-                  <DomainPill key={tc.token} token={tc.token} count={tc.count} />
-                ))}
+              <div>
+                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{t("analytics.them")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {topEmojisThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {hasWords && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">{t("analytics.language.topWords")}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <WordList label={t("analytics.you")} tokens={topWordsMe} accent="text-primary" />
+              <WordList label={t("analytics.them")} tokens={topWordsThem} accent="text-muted-foreground" />
+            </div>
+          </div>
+        )}
+
+        {hasDomains && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">{t("analytics.language.topDomains")}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-primary font-bold uppercase mb-2">{t("analytics.you")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {topDomainsMe.map((tc) => <TokenPill key={tc.token} {...tc} />)}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{t("analytics.them")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {topDomainsThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function EmojiPill({ token, count }: TokenCount) {
+function TokenPill({ token, count }: TokenCount) {
   return (
-    <div style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      background: "var(--bg)", borderRadius: 12, padding: "2px 8px",
-      border: "1px solid var(--border)", fontSize: 13,
-    }}>
+    <Badge variant="outline" className="gap-1 text-xs font-normal">
       <span>{token}</span>
-      <span style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 600 }}>{fmt(count)}</span>
-    </div>
-  );
-}
-
-function DomainPill({ token, count }: TokenCount) {
-  return (
-    <div style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      background: "var(--bg)", borderRadius: 12, padding: "2px 8px",
-      border: "1px solid var(--border)", fontSize: 11,
-    }}>
-      <span style={{ color: "var(--fg)" }}>{token}</span>
-      <span style={{ fontSize: 10, color: "var(--fg-muted)", fontWeight: 600 }}>{fmt(count)}</span>
-    </div>
+      <span className="text-muted-foreground font-semibold">{formatCount(count)}</span>
+    </Badge>
   );
 }
 
 function WordList({ label, tokens, accent }: { label: string; tokens: TokenCount[]; accent: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{label}</div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          {tokens.map((tc) => (
-            <tr key={tc.token} style={{ borderBottom: "1px solid var(--border)" }}>
-              <td style={{ fontSize: 12, padding: "3px 0" }}>{tc.token}</td>
-              <td style={{ fontSize: 11, color: "var(--fg-muted)", textAlign: "right", padding: "3px 0" }}>{fmt(tc.count)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <p className={cn("text-xs font-bold uppercase mb-2", accent)}>{label}</p>
+      <div className="flex flex-col divide-y divide-border">
+        {tokens.map((tc) => (
+          <div key={tc.token} className="flex items-baseline justify-between gap-2 py-1">
+            <span className="text-xs">{tc.token}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{formatCount(tc.count)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -478,53 +534,54 @@ function WordList({ label, tokens, accent }: { label: string; tokens: TokenCount
 function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
   const { t } = useTranslation();
   if (!months || months.length < 2) return null;
-
   const recent3 = new Set(months.slice(-3).map((m) => m.month));
-
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.monthly.description")}
-        info={t("analytics.monthly.tooltip")}
-      >Monthly evolution</SectionLabel>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Monthly evolution"
+          description={t("analytics.monthly.description")}
+          info={t("analytics.monthly.tooltip")}
+          icon={TrendingUp}
+        />
+      </CardHeader>
+      <CardContent className="pt-0 overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
           <thead>
             <tr>
               {[
-                { key: "month", label: t("analytics.monthly.month") },
-                { key: "you", label: t("analytics.monthly.you") },
-                { key: "them", label: t("analytics.monthly.them") },
-                { key: "total", label: t("analytics.monthly.total") },
-                { key: "yourPct", label: t("analytics.monthly.yourPct") },
+                { key: "month", label: t("analytics.monthly.month"), align: "left" },
+                { key: "you", label: t("analytics.monthly.you"), align: "right" },
+                { key: "them", label: t("analytics.monthly.them"), align: "right" },
+                { key: "total", label: t("analytics.monthly.total"), align: "right" },
+                { key: "yourPct", label: t("analytics.monthly.yourPct"), align: "right" },
               ].map((h) => (
-                <th key={h.key} style={{ textAlign: h.key === "month" ? "left" : "right", padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border)" }}>
+                <th
+                  key={h.key}
+                  className={cn(
+                    "py-1.5 px-2 text-muted-foreground font-semibold uppercase tracking-wider border-b border-border",
+                    h.align === "right" ? "text-end" : "text-start",
+                  )}
+                >
                   {h.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {months.map((m) => {
-              const isBold = recent3.has(m.month);
-              const style: React.CSSProperties = {
-                fontWeight: isBold ? 700 : 400,
-                borderBottom: "1px solid var(--border)",
-              };
-              return (
-                <tr key={m.month} style={style}>
-                  <td style={{ padding: "5px 8px" }}>{m.month}</td>
-                  <td style={{ padding: "5px 8px", textAlign: "right" }}>{fmt(m.me)}</td>
-                  <td style={{ padding: "5px 8px", textAlign: "right" }}>{fmt(m.them)}</td>
-                  <td style={{ padding: "5px 8px", textAlign: "right" }}>{fmt(m.total)}</td>
-                  <td style={{ padding: "5px 8px", textAlign: "right" }}>{m.meSharePct.toFixed(1)}%</td>
-                </tr>
-              );
-            })}
+            {months.map((m) => (
+              <tr key={m.month} className={cn("border-b border-border", recent3.has(m.month) && "font-bold")}>
+                <td className="py-1.5 px-2">{m.month}</td>
+                <td className="py-1.5 px-2 text-end tabular-nums">{formatCount(m.me)}</td>
+                <td className="py-1.5 px-2 text-end tabular-nums">{formatCount(m.them)}</td>
+                <td className="py-1.5 px-2 text-end tabular-nums">{formatCount(m.total)}</td>
+                <td className="py-1.5 px-2 text-end tabular-nums">{m.meSharePct.toFixed(1)}%</td>
+              </tr>
+            ))}
           </tbody>
         </table>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -538,135 +595,81 @@ function IndicatorCard({ indicators }: { indicators: AnalyticsReport["indicators
       : t("analytics.indicators.shareTrendDown");
 
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
-      <SectionLabel
-        description={t("analytics.indicators.description")}
-        info={t("analytics.indicators.tooltip")}
-      >Indicators</SectionLabel>
-      <div className="stats" style={{ marginBottom: 0 }}>
-        <StatCard
-          label={t("analytics.indicators.msgBalance")}
-          value={`${indicators.msgBalancePct.toFixed(1)}%`}
-          description={t("analytics.indicators.msgBalanceDesc")}
-          info={t("analytics.indicators.msgBalanceTooltip")}
+    <Card>
+      <CardHeader className="pb-2">
+        <SectionHeader
+          title="Indicators"
+          description={t("analytics.indicators.description")}
+          info={t("analytics.indicators.tooltip")}
+          icon={TrendingUp}
         />
-        <StatCard
-          label={t("analytics.indicators.wordBalance")}
-          value={`${indicators.wordBalancePct.toFixed(1)}%`}
-          description={t("analytics.indicators.wordBalanceDesc")}
-          info={t("analytics.indicators.wordBalanceTooltip")}
-        />
-        <StatCard
-          label={t("analytics.indicators.activeDaysPct")}
-          value={`${indicators.dailyConsistencyPct.toFixed(1)}%`}
-          description={t("analytics.indicators.activeDaysPctDesc")}
-          info={t("analytics.indicators.activeDaysPctTooltip")}
-        />
-        {indicators.medianRespAllSec > 0 && (
-          <StatCard
-            label={t("analytics.indicators.medianReply")}
-            value={fmtDur(indicators.medianRespAllSec)}
-            description={t("analytics.indicators.medianReplyDesc")}
-            info={t("analytics.indicators.medianReplyTooltip")}
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatItem
+            label={t("analytics.indicators.msgBalance")}
+            value={`${indicators.msgBalancePct.toFixed(1)}%`}
+            description={t("analytics.indicators.msgBalanceDesc")}
+            info={t("analytics.indicators.msgBalanceTooltip")}
           />
-        )}
-        <StatCard
-          label={t("analytics.indicators.initiationYou")}
-          value={`${indicators.initiationMePct.toFixed(1)}%`}
-          description={t("analytics.indicators.initiationYouDesc")}
-          info={t("analytics.indicators.initiationYouTooltip")}
-        />
-        {indicators.syncLaughDays > 0 && (
-          <StatCard
-            label={t("analytics.indicators.syncLaughDays")}
-            value={String(indicators.syncLaughDays)}
-            description={t("analytics.indicators.syncLaughDaysDesc")}
-            info={t("analytics.indicators.syncLaughDaysTooltip")}
+          <StatItem
+            label={t("analytics.indicators.wordBalance")}
+            value={`${indicators.wordBalancePct.toFixed(1)}%`}
+            description={t("analytics.indicators.wordBalanceDesc")}
+            info={t("analytics.indicators.wordBalanceTooltip")}
           />
-        )}
-        {indicators.totalQuestions > 0 && (
-          <StatCard
-            label={t("analytics.indicators.totalQuestions")}
-            value={fmt(indicators.totalQuestions)}
-            description={t("analytics.indicators.totalQuestionsDesc")}
+          <StatItem
+            label={t("analytics.indicators.activeDaysPct")}
+            value={`${indicators.dailyConsistencyPct.toFixed(1)}%`}
+            description={t("analytics.indicators.activeDaysPctDesc")}
+            info={t("analytics.indicators.activeDaysPctTooltip")}
           />
-        )}
-        {indicators.totalLaughter > 0 && (
-          <StatCard
-            label={t("analytics.indicators.totalLaughter")}
-            value={fmt(indicators.totalLaughter)}
-            description={t("analytics.indicators.totalLaughterDesc")}
+          {indicators.medianRespAllSec > 0 && (
+            <StatItem
+              label={t("analytics.indicators.medianReply")}
+              value={formatDuration(indicators.medianRespAllSec)}
+              description={t("analytics.indicators.medianReplyDesc")}
+              info={t("analytics.indicators.medianReplyTooltip")}
+            />
+          )}
+          <StatItem
+            label={t("analytics.indicators.initiationYou")}
+            value={`${indicators.initiationMePct.toFixed(1)}%`}
+            description={t("analytics.indicators.initiationYouDesc")}
+            info={t("analytics.indicators.initiationYouTooltip")}
           />
-        )}
-        {trend !== 0 && (
-          <StatCard
-            label={trendLabel}
-            value={`${Math.abs(trend).toFixed(1)}%`}
-            description={t("analytics.indicators.shareTrendDesc")}
-            info={t("analytics.indicators.shareTrendTooltip")}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// --- helpers ---
-
-function SectionLabel({ children, description, info }: { children: React.ReactNode; description?: string; info?: string }) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "flex", alignItems: "center" }}>
-        {children}
-        {info && <InfoTooltip text={info} />}
-      </div>
-      {description && (
-        <div style={{ fontSize: 11, color: "var(--fg-muted)", marginTop: 3, lineHeight: 1.45, opacity: 0.8 }}>
-          {description}
+          {indicators.syncLaughDays > 0 && (
+            <StatItem
+              label={t("analytics.indicators.syncLaughDays")}
+              value={String(indicators.syncLaughDays)}
+              description={t("analytics.indicators.syncLaughDaysDesc")}
+              info={t("analytics.indicators.syncLaughDaysTooltip")}
+            />
+          )}
+          {indicators.totalQuestions > 0 && (
+            <StatItem
+              label={t("analytics.indicators.totalQuestions")}
+              value={formatCount(indicators.totalQuestions)}
+              description={t("analytics.indicators.totalQuestionsDesc")}
+            />
+          )}
+          {indicators.totalLaughter > 0 && (
+            <StatItem
+              label={t("analytics.indicators.totalLaughter")}
+              value={formatCount(indicators.totalLaughter)}
+              description={t("analytics.indicators.totalLaughterDesc")}
+            />
+          )}
+          {trend !== 0 && (
+            <StatItem
+              label={trendLabel}
+              value={`${Math.abs(trend).toFixed(1)}%`}
+              description={t("analytics.indicators.shareTrendDesc")}
+              info={t("analytics.indicators.shareTrendTooltip")}
+            />
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
-}
-
-function StatCard({ label, value, description, info }: { label: string; value: string; description?: string; info?: string }) {
-  return (
-    <div className="stat-card">
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, marginBottom: 2 }}>
-        <div className="label" style={{ display: "flex", alignItems: "center" }}>
-          {label}
-          {info && <InfoTooltip text={info} />}
-        </div>
-        {description && (
-          <div style={{ fontSize: 9, color: "var(--fg-muted)", lineHeight: 1.35, opacity: 0.75 }}>
-            {description}
-          </div>
-        )}
-      </div>
-      <div className="value">{value}</div>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", minWidth: 60 }}>
-      <span style={{ fontSize: 10, color: "var(--fg-muted)" }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 600 }}>{value}</span>
-    </div>
-  );
-}
-
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
-function fmtDur(sec: number): string {
-  if (sec < 60) return `${Math.round(sec)}s`;
-  if (sec < 3600) return `${Math.round(sec / 60)}m`;
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
