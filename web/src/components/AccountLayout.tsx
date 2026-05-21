@@ -40,6 +40,13 @@ export default function AccountLayout() {
   const activeCid = activeCidStr ? Number(activeCidStr) : null;
   const isMessages = Boolean(messagesMatch);
 
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Auto-close drawer when navigating to a contact
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [activeCid]);
+
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounce(searchInput, 300);
   const [showAdd, setShowAdd] = useState(false);
@@ -93,7 +100,11 @@ export default function AccountLayout() {
 
   return (
     <div className="account-layout">
-      <aside className="sidebar">
+      {sidebarOpen && (
+        <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar${sidebarOpen ? " sidebar-open" : ""}`}>
         {/* Header */}
         <div className="sidebar-header">
           <span className="sidebar-title">Contacts</span>
@@ -114,6 +125,13 @@ export default function AccountLayout() {
               }}
             >
               {showAdd ? "✕" : "+"}
+            </button>
+            <button
+              className="sidebar-close-btn btn btn-ghost btn-sm"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close contacts"
+            >
+              ✕
             </button>
           </div>
         </div>
@@ -239,7 +257,20 @@ export default function AccountLayout() {
       </aside>
 
       <main className={`main-content${isMessages ? " main-content-messages" : ""}`}>
-        <Outlet />
+        <div className="mobile-nav-bar">
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open contacts"
+            style={{ padding: "6px 8px" }}
+          >
+            ☰
+          </button>
+          <span>Contacts</span>
+        </div>
+        <div className={`page-content${isMessages ? " page-content-fill" : ""}`}>
+          <Outlet />
+        </div>
       </main>
     </div>
   );
