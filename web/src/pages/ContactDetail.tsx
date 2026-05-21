@@ -65,7 +65,7 @@ export default function ContactDetail() {
 
   const { upsertContact, removeContact, addWsEntry, pruneWsEntries } = useStore();
   const contact = useStore((s) => s.contacts[cid]);
-  const wsEntries = useStore((s) => s.wsEntries[wsKey(accountId, cid)] ?? []);
+  const wsEntries = useStore((s) => s.wsEntries[wsKey(accountId, cid)]) ?? [];
 
   const toggleTracking = useMutation({
     mutationFn: (enabled: boolean) =>

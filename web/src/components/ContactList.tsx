@@ -35,7 +35,9 @@ export default function ContactList({ accountId }: Props) {
 
   useEffect(() => { setPage(1); }, [search]);
 
-  const { upsertContacts, upsertContact, removeContact } = useStore();
+  const upsertContacts = useStore((s) => s.upsertContacts);
+  const upsertContact  = useStore((s) => s.upsertContact);
+  const removeContact  = useStore((s) => s.removeContact);
 
   const contacts = useQuery({
     queryKey: ["contacts", accountId, page, search],
@@ -295,7 +297,7 @@ function ContactRow({
 }) {
   // Read entirely from store — updates from any component are reflected here
   const contact = useStore((s) => s.contacts[contactId]);
-  const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contactId}`] ?? []);
+  const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contactId}`]) ?? [];
 
   if (!contact) return null;
 

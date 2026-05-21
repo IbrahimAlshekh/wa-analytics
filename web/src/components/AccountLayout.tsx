@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useMatch, useParams } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
@@ -41,7 +41,10 @@ export default function AccountLayout() {
   const activeCid = activeCidStr ? Number(activeCidStr) : null;
   const isMessages = Boolean(messagesMatch);
 
-  const { sidebarOpen, setSidebarOpen, upsertContacts, upsertContact } = useStore();
+  const sidebarOpen    = useStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useStore((s) => s.setSidebarOpen);
+  const upsertContacts = useStore((s) => s.upsertContacts);
+  const upsertContact  = useStore((s) => s.upsertContact);
 
   // Auto-close drawer when navigating to a contact
   useEffect(() => {
@@ -71,7 +74,10 @@ export default function AccountLayout() {
     refetchInterval: 30_000,
   });
 
-  const allContacts = contactsQ.data?.pages.flatMap((p) => p.contacts ?? []) ?? [];
+  const allContacts = useMemo(
+    () => contactsQ.data?.pages.flatMap((p) => p.contacts ?? []) ?? [],
+    [contactsQ.data],
+  );
   const total = contactsQ.data?.pages[0]?.total ?? 0;
 
   // Seed the store with fresh contact data from the sidebar query
@@ -296,10 +302,7 @@ function SidebarContact({
   const storeContact = useStore((s) => s.contacts[contactProp.id]);
   const contact = storeContact ?? contactProp;
 
-  const wsEntries = useStore((s) => {
-    const key = `${accountId}:${contact.id}`;
-    return s.wsEntries[key] ?? [];
-  });
+  const wsEntries = useStore((s) => s.wsEntries[`${accountId}:${contact.id}`]) ?? [];
 
   const displayName = contact.displayName || contact.phone;
 
