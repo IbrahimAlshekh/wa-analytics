@@ -54,6 +54,14 @@ function formatElapsed(startAt: number): string {
   return `${m}m`;
 }
 
+type MainTab = "status" | "presence" | "analytics";
+
+const MAIN_TABS: { value: MainTab; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "presence", label: "Presence" },
+  { value: "analytics", label: "Analytics" },
+];
+
 export default function ContactDetail() {
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
@@ -61,6 +69,7 @@ export default function ContactDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const [tab, setTab] = useState<MainTab>("status");
   const [range, setRange] = useState<AnalyticsRange>("week");
 
   const { upsertContact, removeContact, addWsEntry, pruneWsEntries } = useStore();
@@ -211,46 +220,70 @@ export default function ContactDetail() {
         </div>
       </div>
 
-      {/* Live Status — first thing after hero */}
-      <LiveStatusCard
-        entries={allEntries}
-        isOnline={isOnline}
-        sessionStart={sessionStart}
-        lastPresence={lastPresence}
-      />
+      {/* Top-level tab bar */}
+      <div className="tabs contact-main-tabs">
+        {MAIN_TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            className="btn"
+            aria-current={tab === value}
+            onClick={() => setTab(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <StatsStrip accountId={accountId} contactId={cid} />
-
-      {/* Analytics */}
-      <div className="card" style={{ padding: "10px 16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
-            Analytics
-          </span>
-          <div className="tabs">
-            {RANGE_LABELS.map(({ value, label }) => (
-              <button key={value} className="btn" aria-current={range === value} onClick={() => setRange(value)}>
-                {label}
-              </button>
-            ))}
+      {/* Tab: Status */}
+      {tab === "status" && (
+        <>
+          <LiveStatusCard
+            entries={allEntries}
+            isOnline={isOnline}
+            sessionStart={sessionStart}
+            lastPresence={lastPresence}
+          />
+          <div className="card">
+            <div style={{ marginBottom: 16 }}>
+              <span className="section-label">Activity Timeline</span>
+            </div>
+            <SessionTimeline entries={allEntries} />
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
-      {analyticsQ.data ? (
-        <AnalyticsPanel report={analyticsQ.data} />
-      ) : analyticsQ.isLoading ? (
-        <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>Loading analytics…</div>
-      ) : null}
+      {/* Tab: Presence */}
+      {tab === "presence" && (
+        <>
+          <StatsStrip accountId={accountId} contactId={cid} />
+          <PresencePanel entries={allEntries} />
+        </>
+      )}
 
-      <PresencePanel entries={allEntries} />
-
-      <div className="card">
-        <div style={{ marginBottom: 16 }}>
-          <span className="section-label">Activity Timeline</span>
-        </div>
-        <SessionTimeline entries={allEntries} />
-      </div>
+      {/* Tab: Analytics */}
+      {tab === "analytics" && (
+        <>
+          <div className="card" style={{ padding: "10px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
+                Range
+              </span>
+              <div className="tabs">
+                {RANGE_LABELS.map(({ value, label }) => (
+                  <button key={value} className="btn" aria-current={range === value} onClick={() => setRange(value)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {analyticsQ.data ? (
+            <AnalyticsPanel report={analyticsQ.data} />
+          ) : analyticsQ.isLoading ? (
+            <div className="muted" style={{ textAlign: "center", padding: "16px 0" }}>Loading analytics…</div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
