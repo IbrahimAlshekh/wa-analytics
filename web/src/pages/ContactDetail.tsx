@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { AnalyticsRange, TimelineEntry } from "../lib/types";
 import SessionTimeline from "../components/Timeline";
@@ -58,9 +58,25 @@ export default function ContactDetail() {
   const { id: accountIdStr, cid: cidStr } = useParams<{ id: string; cid: string }>();
   const accountId = Number(accountIdStr);
   const cid = Number(cidStr);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const [range, setRange] = useState<AnalyticsRange>("week");
   const [wsEntries, setWsEntries] = useState<TimelineEntry[]>([]);
+
+  const toggleTracking = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.updateContact(accountId, cid, { trackingEnabled: enabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["timeline", accountId, cid] }),
+  });
+
+  const deleteContact = useMutation({
+    mutationFn: () => api.deleteContact(accountId, cid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contacts", accountId] });
+      navigate(`/accounts/${accountId}/contacts`);
+    },
+  });
 
   useEffect(() => {
     return ws.on((msg) => {
@@ -164,6 +180,29 @@ export default function ContactDetail() {
           <Link to={`/accounts/${accountId}/contacts/${cid}/messages`} className="btn">
             Messages
           </Link>
+          <button
+            className="btn btn-ghost"
+            disabled={toggleTracking.isPending}
+            onClick={() => toggleTracking.mutate(!contact.trackingEnabled)}
+            title={contact.trackingEnabled ? "Pause tracking" : "Resume tracking"}
+          >
+            {toggleTracking.isPending
+              ? "…"
+              : contact.trackingEnabled
+              ? "Pause tracking"
+              : "Resume tracking"}
+          </button>
+          <button
+            className="btn btn-danger"
+            disabled={deleteContact.isPending}
+            onClick={() => {
+              if (confirm(`Delete ${displayName}? This cannot be undone.`)) {
+                deleteContact.mutate();
+              }
+            }}
+          >
+            {deleteContact.isPending ? "Deleting…" : "Delete"}
+          </button>
         </div>
       </div>
 
