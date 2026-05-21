@@ -762,6 +762,76 @@ h1, h2, h3, h4 {
 }
 .main-empty-icon { font-size: 40px; opacity: 0.25; margin-bottom: 4px; }
 
+/* ── Live Status Card ────────────────────────────────────────────────── */
+.live-status-card {
+  border-left: 3px solid var(--offline);
+  padding: 16px 20px;
+}
+.live-status-online {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+.live-status-offline {
+  border-left-color: var(--offline);
+}
+.live-status-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.live-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.live-status-label {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.live-status-sub {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.live-status-since {
+  font-size: 13px;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.live-status-sessions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.live-status-sessions-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--fg-muted);
+  margin-bottom: 6px;
+}
+.live-status-session-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+.live-session-time {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.live-session-dur {
+  margin-left: auto;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+
 /* ── Legacy shims (keep existing references working) ────────────────── */
 .header {
   display: flex;
