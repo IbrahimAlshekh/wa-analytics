@@ -7,14 +7,8 @@ import SessionTimeline from "../components/Timeline";
 import StatsStrip from "../components/StatsStrip";
 import PresencePanel from "../components/PresencePanel";
 import AnalyticsPanel from "../components/AnalyticsPanel";
+import ContactAvatar from "../components/ContactAvatar";
 import { useStore, wsKey } from "../lib/store";
-
-function getInitials(name: string): string {
-  if (name.startsWith("+")) return name.slice(1, 3);
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
   { value: "day", label: "Daily" },
@@ -185,7 +179,7 @@ export default function ContactDetail() {
     <div className="col" style={{ gap: 20 }}>
       {/* Hero */}
       <div className="contact-hero">
-        <div className="avatar avatar-lg">{getInitials(displayName)}</div>
+        <ContactAvatar name={displayName} picturePath={c.latestPicturePath} size="lg" />
         <div className="contact-hero-info">
           <div className="contact-hero-name">{displayName}</div>
           <div className="contact-hero-phone">{c.phone}</div>

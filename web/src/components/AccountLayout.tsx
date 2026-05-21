@@ -4,13 +4,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { api } from "../lib/api";
 import type { Contact } from "../lib/types";
 import { useStore } from "../lib/store";
-
-function getInitials(name: string): string {
-  if (name.startsWith("+")) return name.slice(1, 3);
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
+import ContactAvatar from "./ContactAvatar";
 
 function useDebounce(value: string, delay: number): string {
   const [d, setD] = useState(value);
@@ -323,11 +317,12 @@ function SidebarContact({
       to={`/accounts/${accountId}/contacts/${contact.id}`}
       className={`sidebar-contact${active ? " sidebar-contact-active" : ""}`}
     >
-      <div
-        className="avatar avatar-sm"
-        style={{ position: "relative", flexShrink: 0 }}
-      >
-        {getInitials(displayName)}
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <ContactAvatar
+          name={displayName}
+          picturePath={contact.latestPicturePath}
+          size="sm"
+        />
         <span
           className={`dot ${online ? "online" : ""}`}
           style={{

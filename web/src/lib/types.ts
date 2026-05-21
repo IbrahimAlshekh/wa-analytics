@@ -14,6 +14,7 @@ export interface Contact {
   displayName: string;
   addedAt: number;
   trackingEnabled: boolean;
+  latestPicturePath?: string;
 }
 
 export interface ContactsPage {

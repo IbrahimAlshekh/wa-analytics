@@ -4,12 +4,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { api } from "../lib/api";
 import type { Message, MessageEvent } from "../lib/types";
 import { ws } from "../lib/ws";
-
-function getMediaUrl(path: string) {
-  const token = localStorage.getItem("wt_bearer");
-  if (!token) return `/media/${path}`;
-  return `/media/${path}?token=${encodeURIComponent(token)}`;
-}
+import { getMediaUrl } from "../lib/media";
 
 // "open" means more WA history may exist; "exhausted" means WA returned nothing new
 type WAFetchState = "idle" | "loading" | "open" | "exhausted";

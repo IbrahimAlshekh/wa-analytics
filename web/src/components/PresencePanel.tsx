@@ -4,12 +4,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import type { Contact, TimelineEntry } from "../lib/types";
-
-function getMediaUrl(path: string) {
-  const token = localStorage.getItem("wt_bearer");
-  if (!token) return `/media/${path}`;
-  return `/media/${path}?token=${encodeURIComponent(token)}`;
-}
+import { getMediaUrl } from "../lib/media";
 
 interface Props {
   entries: TimelineEntry[];
@@ -37,7 +32,8 @@ export default function PresencePanel({ entries, contact }: Props) {
   const patternSummary = computeOnlinePatternSummary(hourlyData);
 
   const aboutHistory   = safeEntries.filter((e) => e.kind === "about").sort((a, b) => b.at - a.at);
-  const pictureHistory = safeEntries.filter((e) => e.kind === "picture" && (e.mediaPath || e.url)).sort((a, b) => b.at - a.at);
+  // Only show pictures stored locally — never serve from external WhatsApp CDN URLs
+  const pictureHistory = safeEntries.filter((e) => e.kind === "picture" && e.mediaPath).sort((a, b) => b.at - a.at);
 
   const hasPresence = hourlyData.some((d) => d.minutes > 0);
   if (!hasPresence) return null;
@@ -172,10 +168,9 @@ export default function PresencePanel({ entries, contact }: Props) {
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 12 }}>
               {pictureHistory.map((e, i) => {
-                const src = e.mediaPath ? getMediaUrl(e.mediaPath) : e.url;
-                const href = e.mediaPath ? getMediaUrl(e.mediaPath) : e.url;
+                const src = getMediaUrl(e.mediaPath!);
                 return (
-                  <a key={i} href={href} target="_blank" rel="noreferrer"
+                  <a key={i} href={src} target="_blank" rel="noreferrer"
                     style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textDecoration: "none" }}>
                     <img
                       src={src}

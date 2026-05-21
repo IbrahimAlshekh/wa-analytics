@@ -126,22 +126,24 @@ func (db *DB) BackfillAccountID(ctx context.Context, accountID int64) error {
 // --- Contact ----------------------------------------------------------------
 
 type Contact struct {
-	ID              int64  `json:"id"`
-	AccountID       int64  `json:"-"`
-	JID             string `json:"jid"`
-	LID             string `json:"-"`
-	Phone           string `json:"phone"`
-	DisplayName     string `json:"displayName"`
-	AddedAt         int64  `json:"addedAt"`
-	TrackingEnabled bool   `json:"trackingEnabled"`
+	ID                int64  `json:"id"`
+	AccountID         int64  `json:"-"`
+	JID               string `json:"jid"`
+	LID               string `json:"-"`
+	Phone             string `json:"phone"`
+	DisplayName       string `json:"displayName"`
+	AddedAt           int64  `json:"addedAt"`
+	TrackingEnabled   bool   `json:"trackingEnabled"`
+	LatestPicturePath string `json:"latestPicturePath,omitempty"`
 }
 
-const contactCols = `id, COALESCE(account_id,0), jid, COALESCE(lid,''), phone, COALESCE(display_name,''), added_at, tracking_enabled`
+const contactCols = `id, COALESCE(account_id,0), jid, COALESCE(lid,''), phone, COALESCE(display_name,''), added_at, tracking_enabled,
+	COALESCE((SELECT media_path FROM profile_picture_history WHERE contact_id=contacts.id AND media_path IS NOT NULL AND media_path!='' ORDER BY captured_at DESC LIMIT 1),'')`
 
 func scanContact(row interface{ Scan(...any) error }) (Contact, error) {
 	var c Contact
 	var enabled int
-	if err := row.Scan(&c.ID, &c.AccountID, &c.JID, &c.LID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled); err != nil {
+	if err := row.Scan(&c.ID, &c.AccountID, &c.JID, &c.LID, &c.Phone, &c.DisplayName, &c.AddedAt, &enabled, &c.LatestPicturePath); err != nil {
 		return Contact{}, err
 	}
 	c.TrackingEnabled = enabled == 1
