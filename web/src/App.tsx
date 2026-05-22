@@ -43,10 +43,18 @@ export default function App() {
             state: msg.state,
             lastSeen: msg.lastSeen,
           });
-          setLastPresence(accountId, contactId, msg.state, msg.observedAt, msg.lastSeen);
+          setLastPresence(
+            accountId,
+            contactId,
+            msg.state,
+            msg.observedAt,
+            msg.lastSeen,
+          );
           qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
           qc.invalidateQueries({ queryKey: ["contacts", accountId] });
-          qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
+          qc.invalidateQueries({
+            queryKey: ["timeline", accountId, contactId],
+          });
           break;
         }
         case "picture":
@@ -56,9 +64,15 @@ export default function App() {
         case "message": {
           const { accountId, contactId } = msg;
           if (contactId != null) {
-            qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
-            qc.invalidateQueries({ queryKey: ["timeline", accountId, contactId] });
-            qc.invalidateQueries({ queryKey: ["analytics", accountId, contactId] });
+            qc.invalidateQueries({
+              queryKey: ["messages", accountId, contactId],
+            });
+            qc.invalidateQueries({
+              queryKey: ["timeline", accountId, contactId],
+            });
+            qc.invalidateQueries({
+              queryKey: ["analytics", accountId, contactId],
+            });
             qc.invalidateQueries({ queryKey: ["contacts-sidebar", accountId] });
             qc.invalidateQueries({ queryKey: ["contacts", accountId] });
           }
@@ -66,7 +80,9 @@ export default function App() {
         }
         case "message_event": {
           const { accountId, contactId } = msg;
-          qc.invalidateQueries({ queryKey: ["messages", accountId, contactId] });
+          qc.invalidateQueries({
+            queryKey: ["messages", accountId, contactId],
+          });
           break;
         }
         case "story": {
@@ -89,9 +105,11 @@ export default function App() {
     return off;
   }, [qc]);
 
+  const isAuthPage = publicPaths.includes(location.pathname);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <AppHeader />
+      {!isAuthPage && <AppHeader />}
 
       <Routes>
         {/* Public */}
@@ -115,8 +133,12 @@ export default function App() {
             element={
               <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-8">
                 <span className="text-4xl">👤</span>
-                <div className="font-semibold text-sm">{t("app.selectContact")}</div>
-                <div className="text-sm text-muted-foreground">{t("app.selectContactDesc")}</div>
+                <div className="font-semibold text-sm">
+                  {t("app.selectContact")}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {t("app.selectContactDesc")}
+                </div>
               </div>
             }
           />

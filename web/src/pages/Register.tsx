@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Globe } from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import logo from "../assets/wa_analytics_logo_512.png";
 
 export default function Register() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -46,6 +47,10 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  function toggleLanguage() {
+    i18n.changeLanguage(i18n.language === "ar" ? "en" : "ar");
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full px-4 py-16">
@@ -111,11 +116,26 @@ export default function Register() {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[300px] mx-auto">
-          <p className="font-semibold uppercase tracking-wider text-[9px]">
-            {t("auth.disclaimer.title")}
-          </p>
-          <p>{t("auth.disclaimer.text")}</p>
+        <div className="flex flex-col gap-4 items-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleLanguage}
+            title={t("lang.switchTo")}
+            className="gap-1.5 text-muted-foreground hover:text-foreground h-8"
+          >
+            <Globe className="size-3.5" />
+            <span className="text-xs font-medium">
+              {i18n.language === "ar" ? t("lang.en") : t("lang.ar")}
+            </span>
+          </Button>
+
+          <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[300px] mx-auto">
+            <p className="font-semibold uppercase tracking-wider text-[9px]">
+              {t("auth.disclaimer.title")}
+            </p>
+            <p>{t("auth.disclaimer.text")}</p>
+          </div>
         </div>
       </div>
     </div>
