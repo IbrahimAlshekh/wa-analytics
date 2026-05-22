@@ -55,7 +55,6 @@
         state: reloaded
 
   tasks:
-
     # ── System packages ───────────────────────────────────────────────────────
 
     # This server has a broken mixed-release state: sources.list is fully
@@ -147,7 +146,7 @@
     - name: Add Go to system PATH
       copy:
         dest: /etc/profile.d/golang.sh
-        content: 'export PATH=$PATH:/usr/local/go/bin'
+        content: "export PATH=$PATH:/usr/local/go/bin"
         mode: "0644"
 
     # ── Node.js & pnpm ────────────────────────────────────────────────────────
@@ -183,7 +182,7 @@
         home: "{{ service_home }}"
         create_home: yes
         system: yes
-        password: "!"   # locked — no password login possible
+        password: "!" # locked — no password login possible
 
     - name: Harden service home directory (no world access)
       file:
@@ -241,7 +240,7 @@
         msg:
           - "======================================================================"
           - "NEW DEPLOY KEY GENERATED — add it to your GitHub repository:"
-          - "https://github.com/IbrahimAlshekh/wa-insights/settings/keys/new"
+          - "https://github.com/IbrahimAlshekh/wa-analytics/settings/keys/new"
           - ""
           - "{{ deploy_key.public_key }}"
           - ""
