@@ -126,6 +126,7 @@ export default function Register() {
             onClick={toggleLanguage}
             title={t("lang.switchTo")}
             className="gap-1.5 text-muted-foreground hover:text-foreground h-8"
+            dir="ltr"
           >
             <Globe className="size-3.5" />
             <span className="text-xs font-medium">
