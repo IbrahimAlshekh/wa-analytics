@@ -115,10 +115,16 @@ function BalanceBar({ mePct, meLabel, themLabel }: { mePct: number; meLabel: str
   return (
     <div className="mb-4">
       <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-        <span>{meLabel}</span>
-        <span>{themLabel}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 rounded-full bg-primary shrink-0" />
+          {meLabel}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {themLabel}
+          <span className="size-2 rounded-full bg-contact shrink-0" />
+        </span>
       </div>
-      <Progress value={mePct} className="h-2" />
+      <Progress value={mePct} className="h-2" dual />
     </div>
   );
 }
@@ -412,7 +418,7 @@ function EmotionCard({ emotion, contactName, totalMsgsMe, totalMsgsThem }: {
 
         {(hasLaughs || hasQuestions) && (
           <div className="flex flex-col gap-1.5">
-            <EmotionSubHeader title={t("analytics.emotion.humor")} contactName={contactName} />
+            <EmotionSubHeader title={t("analytics.emotion.humor")} />
             {hasLaughs && (
               <EmotionRow icon="😂" label={t("analytics.emotion.laughsLabel")} me={emotion.laughterMsgsMe} them={emotion.laughterMsgsThem} />
             )}
@@ -424,7 +430,7 @@ function EmotionCard({ emotion, contactName, totalMsgsMe, totalMsgsThem }: {
 
         {hasEmotion && (
           <div className="flex flex-col gap-1.5">
-            <EmotionSubHeader title={t("analytics.emotion.tone")} contactName={contactName} />
+            <EmotionSubHeader title={t("analytics.emotion.tone")} />
             {EMOTION_KEYS.map((k) => {
               const me = emotion.countsMe[k] ?? 0;
               const them = emotion.countsThem[k] ?? 0;
@@ -438,15 +444,18 @@ function EmotionCard({ emotion, contactName, totalMsgsMe, totalMsgsThem }: {
   );
 }
 
-function EmotionSubHeader({ title, contactName }: { title: string; contactName: string }) {
-  const { t } = useTranslation();
+function EmotionSubHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2 mt-1">
       <span className="w-5 shrink-0" />
       <span className="flex-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
-      <span className="text-xs text-muted-foreground/60 w-8 text-end shrink-0">{t("analytics.you")}</span>
+      <span className="w-8 shrink-0 flex justify-end">
+        <span className="size-2 rounded-full bg-primary" />
+      </span>
       <span className="text-xs text-muted-foreground/40">|</span>
-      <span className="text-xs text-muted-foreground/60 w-8 shrink-0 truncate">{contactName}</span>
+      <span className="w-8 shrink-0 flex">
+        <span className="size-2 rounded-full bg-contact" />
+      </span>
     </div>
   );
 }
@@ -459,7 +468,7 @@ function EmotionRow({ icon, label, me, them }: { icon: string; label: string; me
       <span className="w-5 text-center text-sm shrink-0">{icon}</span>
       <div className="flex-1 flex items-center gap-2 min-w-0">
         <span className="w-20 text-xs text-muted-foreground shrink-0">{label}</span>
-        <Progress value={mePct} className="flex-1 h-1.5" />
+        <Progress value={mePct} className="flex-1 h-1.5" dual />
       </div>
       <span className="text-xs text-muted-foreground w-8 text-end tabular-nums shrink-0">{formatCount(me)}</span>
       <span className="text-xs text-muted-foreground/50">|</span>

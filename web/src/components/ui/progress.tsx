@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils"
 function Progress({
   className,
   value,
+  dual = false,
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+}: React.ComponentProps<typeof ProgressPrimitive.Root> & { dual?: boolean }) {
   const dir = DirectionPrimitive.useDirection();
   const offset = 100 - (value || 0);
   const translateX = dir === "rtl" ? `${offset}%` : `-${offset}%`;
@@ -16,7 +17,8 @@ function Progress({
     <ProgressPrimitive.Root
       data-slot="progress"
       className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
+        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full",
+        dual ? "bg-contact/50" : "bg-muted",
         className
       )}
       {...props}
