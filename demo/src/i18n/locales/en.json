@@ -16,6 +16,7 @@
   },
   "auth": {
     "brand": "WA Tracker",
+    "demoHint": "Demo: use any credentials",
     "disclaimer": {
       "title": "Legal Disclaimer",
       "text": "This software is for personal use and educational purposes only. It is a third-party tool that interacts with WhatsApp through the whatsmeow library (a non-official API implementation). Use of this software is entirely at your own risk. The developer is not affiliated with WhatsApp or Meta Inc. and assumes no responsibility for account bans, data loss, or legal issues resulting from its use. You are solely responsible for compliance with WhatsApp's Terms of Service."
@@ -51,6 +52,7 @@
     "phoneTab": "Phone code",
     "emptyTitle": "No accounts linked yet",
     "emptyDesc": "Click \"+ Add account\" to link your WhatsApp",
+    "demoInfo": "This is a live demo with simulated data. Accounts, contacts, and messages are generated locally in your browser. Feel free to add new contacts or accounts to see how the system handles them.",
     "tableAccount": "Account",
     "tableTracking": "Tracking",
     "removeConfirm": "Remove account {{name}}?",

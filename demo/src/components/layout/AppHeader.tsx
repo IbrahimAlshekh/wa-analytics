@@ -58,6 +58,9 @@ export default function AppHeader() {
         {!isPublic && (
           <span className="text-sm font-semibold">{t("app.name")}</span>
         )}
+        <div className="py-0.5 px-1.5 rounded bg-primary/10 text-primary text-[9px] font-bold uppercase tracking-tighter border border-primary/20">
+          Demo
+        </div>
       </Link>
 
       <div className="flex-1" />
@@ -90,8 +93,8 @@ export default function AppHeader() {
               {backupState === "loading"
                 ? t("app.backingUp")
                 : backupState === "error"
-                ? t("app.backupFailed")
-                : t("app.backup")}
+                  ? t("app.backupFailed")
+                  : t("app.backup")}
             </span>
           </Button>
 

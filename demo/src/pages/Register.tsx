@@ -63,6 +63,9 @@ export default function Register() {
           <p className="text-sm text-muted-foreground">
             {t("auth.register.subtitle")}
           </p>
+          <div className="mt-2 py-1 px-3 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+            {t("auth.demoHint")}
+          </div>
         </div>
 
         <Card>

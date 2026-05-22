@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export default function Accounts() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const {
     accounts: storeAccounts,
@@ -94,6 +94,22 @@ export default function Accounts() {
             </>
           )}
         </Button>
+      </div>
+
+      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-3 items-start">
+        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
+          ✨
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold text-primary">
+            {i18n.language === "ar"
+              ? "معلومات العرض التجريبي"
+              : "Demo Information"}
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("accounts.demoInfo")}
+          </p>
+        </div>
       </div>
 
       {showPair && (
