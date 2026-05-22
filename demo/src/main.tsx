@@ -31,7 +31,7 @@ function DirectionWrapper({ children }: { children: React.ReactNode }) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
-      <BrowserRouter>
+      <BrowserRouter basename="/wa-analytics">
         <DirectionWrapper>
           <TooltipProvider>
             <App />
