@@ -13,6 +13,7 @@ function Progress({
   const pct = value || 0;
   const offset = 100 - pct;
   const translateX = dir === "rtl" ? `${offset}%` : `-${offset}%`;
+  // dir / translateX still used by the single-color (non-dual) indicator path below
 
   return (
     <ProgressPrimitive.Root
@@ -25,17 +26,12 @@ function Progress({
       {...props}
     >
       {dual ? (
-        dir === "rtl" ? (
-          <>
-            <div className="h-full bg-contact transition-all" style={{ width: `${100 - pct}%` }} />
-            <div className="h-full flex-1 bg-primary transition-all" />
-          </>
-        ) : (
-          <>
-            <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-            <div className="h-full flex-1 bg-contact transition-all" />
-          </>
-        )
+        // LTR: primary(left, pct%) | contact(right, rest%)
+        // RTL: CSS direction:rtl reverses flex, so same DOM order yields contact(left) | primary(right)
+        <>
+          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full flex-1 bg-contact transition-all" />
+        </>
       ) : (
         <ProgressPrimitive.Indicator
           data-slot="progress-indicator"
