@@ -246,7 +246,7 @@ export default function ContactDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <SessionTimeline entries={allEntries} />
+              <SessionTimeline entries={allEntries} contactName={displayName} />
             </CardContent>
           </Card>
         </TabsContent>

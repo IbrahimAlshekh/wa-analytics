@@ -5,6 +5,7 @@ import { getMediaUrl } from "../lib/media";
 
 interface Props {
   entries: TimelineEntry[];
+  contactName: string;
 }
 
 function MediaPreview({ type, path }: { type?: string; path: string }) {
@@ -51,7 +52,7 @@ type Block =
   | { type: "offline-gap"; fromAt: number; toAt: number }
   | { type: "event"; ev: NonPresence };
 
-export default function SessionTimeline({ entries }: Props) {
+export default function SessionTimeline({ entries, contactName }: Props) {
   const { t } = useTranslation();
 
   if (!entries?.length) {
@@ -79,7 +80,7 @@ export default function SessionTimeline({ entries }: Props) {
                 <time className="text-xs text-muted-foreground shrink-0 min-w-12">{formatTime(e.at)}</time>
                 <div className="flex flex-col">
                   <span>
-                    {e.isFromMe ? t("timeline.sent") : t("timeline.received")}:{" "}
+                    {e.isFromMe ? t("analytics.you") : contactName}:{" "}
                     <em className="not-italic text-foreground">
                       {e.text || (e.mediaPath ? "" : <span className="text-muted-foreground">[{e.mediaType || "media"}]</span>)}
                     </em>
