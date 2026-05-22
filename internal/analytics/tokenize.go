@@ -8,7 +8,7 @@ import (
 )
 
 // laughterRE matches common laughter patterns in Arabic and English.
-var laughterRE = regexp.MustCompile(`(?i)(?:ha){2,}|haha|hehe|lol\b|lmao\b|كkkk|هه+|خخ+|هاها+`)
+var laughterRE = regexp.MustCompile(`(?i)(?:ha){2,}|haha|hehe|hihi|hoho|lol\b|lmao\b|كkkk|ككك+|هه+|خخ+|هاها+`)
 
 // laughEmojis contains emoji code points associated with laughter.
 var laughEmojis = map[string]bool{
@@ -16,6 +16,7 @@ var laughEmojis = map[string]bool{
 	"🤣": true, // rolling on the floor laughing
 	"😅": true, // grinning face with sweat (often used as laugh)
 	"😆": true, // grinning squinting face
+	"😹": true, // cat face with tears of joy
 }
 
 // isDiacritic reports whether r is an Arabic diacritic or tatweel that should

@@ -358,12 +358,30 @@
     },
     "emotion": {
       "title": "Emotion fingerprint",
-      "description": "Messages classified by emotional tone using keyword patterns. Bars show each side's share for each category.",
-      "tooltip": "Shows the distribution of emotional expression categories for each side. A significant skew in one category means one person uses those types of expressions more frequently than the other.",
+      "description": "Messages classified by emotional tone using keyword patterns. The index shows how often expressive content appears per message for each side.",
+      "tooltip": "The Expression Index is the percentage of messages that contain emotional keywords, laughter, or questions. Bars in each row show each side's share of that signal — left is you, right is the contact.",
+      "indexTitle": "Expression Index",
+      "indexYou": "You",
+      "indexThem": "{{name}}",
+      "indexCombined": "Combined",
+      "humor": "Humor & Questions",
+      "tone": "Emotional Tone",
+      "laughsLabel": "Laughter",
+      "questionsLabel": "Questions",
       "laughsYou": "Laughs (you)",
       "laughsThem": "Laughs ({{name}})",
       "questionsYou": "Questions (you)",
-      "questionsThem": "Questions ({{name}})"
+      "questionsThem": "Questions ({{name}})",
+      "categories": {
+        "love": "Love",
+        "miss": "Longing",
+        "happy": "Happy",
+        "sad": "Sad",
+        "care": "Care",
+        "encourage": "Encouragement",
+        "apology": "Apology",
+        "gratitude": "Gratitude"
+      }
     },
     "language": {
       "title": "Language fingerprint",

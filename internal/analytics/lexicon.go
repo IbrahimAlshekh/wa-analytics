@@ -21,18 +21,19 @@ var emotionKeywords = [NumCategories][]string{
 		// Arabic terms of love and endearment
 		"بحبك", "بحبكي", "بحبج", "حبيبي", "حبيبتي", "حبيبها", "حبيبه", "حبيب",
 		"حبيبة", "حبك", "حبها", "حبه", "عشقي", "عشقك", "عشقكي", "عشقتك",
-		"عشقتكي", "روحي", "ياعمري", "يا عمري", "حياتي", "قلبي", "قمري",
-		"نوري", "ضوئي", "ضيائي", "عيوني", "يا عيوني", "يا روحي", "يا قلبي",
+		"عشقتكي", "روحي", "ياعمري", "حياتي", "قلبي", "قمري",
+		"نوري", "ضوئي", "ضيائي", "عيوني", "احبك", "أحبك", "عزيزي", "عزيزتي",
 		// English
 		"love", "iloveyou", "loveyou", "darling", "sweetheart", "babe",
-		"baby", "honey", "dear",
+		"baby", "honey", "dear", "adore", "cherish", "luv", "ily", "xoxo",
 	},
 	CatMiss: {
 		// Arabic
 		"اشتقتلك", "اشتقتلكي", "وحشتني", "وحشتيني", "وحشك", "وحشكي",
 		"افتقدك", "افتقدكي", "اشتقت", "اشتاقتلك", "وحشة",
+		"مشتاق", "مشتاقة", "مشتاقلك", "مشتاقلكي",
 		// English
-		"miss", "missyou", "missing",
+		"miss", "missyou", "missing", "missed", "longing",
 	},
 	CatHappy: {
 		// Arabic
@@ -41,43 +42,46 @@ var emotionKeywords = [NumCategories][]string{
 		"تمام", "كويس", "كويسة", "زاكي", "زاكية",
 		// English
 		"happy", "happiness", "yay", "great", "wonderful", "amazing", "joy", "joyful",
+		"awesome", "excited", "thrilled", "fantastic", "brilliant", "incredible",
 	},
 	CatSad: {
 		// Arabic
 		"حزين", "حزينة", "زعلان", "زعلانة", "تعبان", "تعبانة",
 		"حزن", "زعل", "حزنان", "حزنانة", "مكسور", "مكسورة",
-		"اتاذيت", "تاذيت", "تاذى", "بكاء",
+		"اتاذيت", "تاذيت", "تاذى", "بكاء", "مكتئب", "مكتئبة",
 		// English
 		"sad", "sadness", "crying", "unhappy", "upset", "hurt", "pain", "broken",
+		"depressed", "disappointed", "heartbroken", "lonely", "miserable",
 	},
 	CatCare: {
 		// Arabic
 		"بهتم", "بهمني", "بهمك", "بهمكي", "اهتمامي", "اهتمامك",
 		"حريص", "حريصة", "بحرص",
 		// English
-		"care", "caring", "matter",
+		"care", "caring", "matter", "concern", "concerned", "worried", "worry",
 	},
 	CatEncourage: {
 		// Arabic
 		"شاطر", "شاطرة", "برافو", "ممتاز", "ممتازة", "رائع", "رائعة",
 		"بتقدر", "بتقدري", "تقدر", "تقدري", "بقدرتك", "بقدرتكي",
+		"بطل", "بطلة", "استمر", "استمري",
 		// English
-		"goodluck", "believe", "proud", "inspire", "bravo",
+		"goodluck", "believe", "proud", "inspire", "bravo", "champion", "strong",
 	},
 	CatApology: {
 		// Arabic — typed forms (without hamza normalization)
 		"اسف", "اسفة", "آسف", "آسفة", "أسف", "أسفة",
 		"اعتذر", "سامحني", "سامحيني", "معليش", "معلش",
-		"معزور", "معزورة",
+		"معزور", "معزورة", "عذرا", "عذرني",
 		// English
-		"sorry", "apologize", "forgive",
+		"sorry", "apologize", "forgive", "pardon",
 	},
 	CatGratitude: {
 		// Arabic
 		"شكرا", "يسلمو", "يسلم", "ممنون", "ممنونة",
-		"مشكور", "مشكورة", "جزاك", "جزاكي",
+		"مشكور", "مشكورة", "جزاك", "جزاكي", "يعطيك", "يعطيكي",
 		// English
-		"thanks", "thankyou", "appreciate", "grateful", "thankful",
+		"thanks", "thankyou", "appreciate", "grateful", "thankful", "ty", "thx",
 	},
 }
 
