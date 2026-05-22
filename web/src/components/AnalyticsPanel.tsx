@@ -306,7 +306,7 @@ function HourHistCard({ hourMe, hourThem, contactName }: { hourMe: number[]; hou
               <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+              <Bar dataKey="them" name={contactName} fill="var(--contact)" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -344,7 +344,7 @@ function DowCard({ dowMe, dowThem, contactName }: { dowMe: number[]; dowThem: nu
               <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+              <Bar dataKey="them" name={contactName} fill="var(--contact)" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -514,7 +514,7 @@ function LanguageCard({ language, contactName }: { language: AnalyticsReport["la
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{contactName}</p>
+                <p className="text-xs text-contact font-bold uppercase mb-2">{contactName}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {topEmojisThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
                 </div>
@@ -528,7 +528,7 @@ function LanguageCard({ language, contactName }: { language: AnalyticsReport["la
             <p className="text-xs font-semibold text-muted-foreground mb-2">{t("analytics.language.topWords")}</p>
             <div className="grid grid-cols-2 gap-4">
               <WordList label={t("analytics.you")} tokens={topWordsMe} accent="text-primary" />
-              <WordList label={contactName} tokens={topWordsThem} accent="text-muted-foreground" />
+              <WordList label={contactName} tokens={topWordsThem} accent="text-contact" />
             </div>
           </div>
         )}
@@ -544,7 +544,7 @@ function LanguageCard({ language, contactName }: { language: AnalyticsReport["la
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{contactName}</p>
+                <p className="text-xs text-contact font-bold uppercase mb-2">{contactName}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {topDomainsThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
                 </div>

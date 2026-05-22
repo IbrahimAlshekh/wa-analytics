@@ -84,7 +84,7 @@
     --ring:                 oklch(0.723 0.173 145);   /* green focus ring */
 
     /* Contact side color — amber/orange, contrasts with primary green */
-    --contact:              oklch(0.75 0.17 55);
+    --contact:              oklch(0.83 0.16 55);
 
     /* Charts — green-led palette */
     --chart-1:              oklch(0.723 0.173 145);   /* bright green */
