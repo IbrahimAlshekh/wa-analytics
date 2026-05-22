@@ -5,7 +5,7 @@ BIN := bin/tracker
 MIGRATE_BIN := bin/migrate-encryption
 BACKFILL_BIN := bin/analytics-backfill
 
-.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build clean setup deploy
+.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build demo-install demo-build demo run-demo clean setup deploy
 
 dev:
 	@( cd web && (test -d node_modules || pnpm install) && pnpm dev ) & \
@@ -21,6 +21,17 @@ web-build:
 	# Pass 1: download everything (build scripts may be blocked — that's ok).
 	# Pass 2: approve whatever is pending, then reinstall + build.
 	cd web && (pnpm install --no-frozen-lockfile || true) && (pnpm approve-builds --all || true) && pnpm install --no-frozen-lockfile && pnpm build
+
+demo-install:
+	cd demo && pnpm install
+
+demo-build:
+	cd demo && (pnpm install --no-frozen-lockfile || true) && (pnpm approve-builds --all || true) && pnpm install --no-frozen-lockfile && pnpm build
+
+demo: demo-build
+
+run-demo:
+	cd demo && (test -d node_modules || pnpm install) && pnpm dev
 
 build: web-build
 	mkdir -p bin
@@ -54,4 +65,4 @@ deploy:
 	ansible-playbook ansible/deploy.yml -i ansible/inventory.ini
 
 clean:
-	rm -rf bin web/dist web/node_modules
+	rm -rf bin web/dist web/node_modules demo/dist demo/node_modules
