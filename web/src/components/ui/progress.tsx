@@ -18,6 +18,7 @@ function Progress({
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
+      dir={dir}
       className={cn(
         "relative flex h-1 w-full overflow-hidden rounded-full",
         dual ? "bg-transparent" : "bg-muted",
