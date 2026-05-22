@@ -19,9 +19,12 @@ export default function Register() {
   const setToken = useStore((s) => s.setToken);
 
   useEffect(() => {
-    api.setupStatus().then(({ hasUsers }) => {
-      if (hasUsers) navigate("/login", { replace: true });
-    }).catch(() => {});
+    api
+      .setupStatus()
+      .then(({ hasUsers }) => {
+        if (hasUsers) navigate("/login", { replace: true });
+      })
+      .catch(() => {});
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,8 +53,12 @@ export default function Register() {
           <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xl font-bold text-primary">
             W
           </div>
-          <h1 className="text-xl font-bold tracking-tight">{t("auth.brand")}</h1>
-          <p className="text-sm text-muted-foreground">{t("auth.register.subtitle")}</p>
+          <h1 className="text-xl font-bold tracking-tight">
+            {t("auth.brand")}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t("auth.register.subtitle")}
+          </p>
         </div>
 
         <Card>
@@ -82,7 +89,9 @@ export default function Register() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="reg-confirm">{t("auth.register.confirmPassword")}</Label>
+                <Label htmlFor="reg-confirm">
+                  {t("auth.register.confirmPassword")}
+                </Label>
                 <Input
                   id="reg-confirm"
                   type="password"
@@ -93,15 +102,22 @@ export default function Register() {
                   autoComplete="new-password"
                 />
               </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full mt-1" disabled={loading}>
-                {loading ? t("auth.register.submitting") : t("auth.register.submit")}
+                {loading
+                  ? t("auth.register.submitting")
+                  : t("auth.register.submit")}
               </Button>
             </form>
           </CardContent>
         </Card>
+
+        <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[300px] mx-auto">
+          <p className="font-semibold uppercase tracking-wider text-[9px]">
+            {t("auth.disclaimer.title")}
+          </p>
+          <p>{t("auth.disclaimer.text")}</p>
+        </div>
       </div>
     </div>
   );

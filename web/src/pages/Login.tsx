@@ -18,9 +18,12 @@ export default function Login() {
   const setToken = useStore((s) => s.setToken);
 
   useEffect(() => {
-    api.setupStatus().then(({ hasUsers }) => {
-      if (!hasUsers) navigate("/register", { replace: true });
-    }).catch(() => {});
+    api
+      .setupStatus()
+      .then(({ hasUsers }) => {
+        if (!hasUsers) navigate("/register", { replace: true });
+      })
+      .catch(() => {});
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,8 +48,12 @@ export default function Login() {
           <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xl font-bold text-primary">
             W
           </div>
-          <h1 className="text-xl font-bold tracking-tight">{t("auth.brand")}</h1>
-          <p className="text-sm text-muted-foreground">{t("auth.login.subtitle")}</p>
+          <h1 className="text-xl font-bold tracking-tight">
+            {t("auth.brand")}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t("auth.login.subtitle")}
+          </p>
         </div>
 
         <Card>
@@ -76,15 +83,20 @@ export default function Login() {
                   autoComplete="current-password"
                 />
               </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full mt-1" disabled={loading}>
                 {loading ? t("auth.login.submitting") : t("auth.login.submit")}
               </Button>
             </form>
           </CardContent>
         </Card>
+
+        <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[300px] mx-auto">
+          <p className="font-semibold uppercase tracking-wider text-[9px]">
+            {t("auth.disclaimer.title")}
+          </p>
+          <p>{t("auth.disclaimer.text")}</p>
+        </div>
       </div>
     </div>
   );

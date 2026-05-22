@@ -16,6 +16,10 @@
   },
   "auth": {
     "brand": "WA Tracker",
+    "disclaimer": {
+      "title": "Legal Disclaimer",
+      "text": "This software is for personal use and educational purposes only. It is a third-party tool that interacts with WhatsApp through the whatsmeow library (a non-official API implementation). Use of this software is entirely at your own risk. The developer is not affiliated with WhatsApp or Meta Inc. and assumes no responsibility for account bans, data loss, or legal issues resulting from its use. You are solely responsible for compliance with WhatsApp's Terms of Service."
+    },
     "login": {
       "subtitle": "Sign in to your account",
       "username": "Username",

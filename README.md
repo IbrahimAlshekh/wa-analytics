@@ -1,5 +1,7 @@
 # WhatsApp Tracker
 
+**LEGAL DISCLAIMER:** This software is for personal use and educational purposes only. It is a third-party tool that interacts with WhatsApp through the `whatsmeow` library, which is a non-official implementation of the WhatsApp multi-device API. Use of this software is entirely at your own risk. The developer of this software is not affiliated with WhatsApp or Meta Inc. WhatsApp may ban accounts that use non-official clients or engage in automated behavior. The developer assumes no responsibility for any account bans, data loss, or legal issues resulting from the use of this software. By using this software, you agree that you are solely responsible for compliance with WhatsApp's Terms of Service and any applicable laws.
+
 A personal tool that logs into your own WhatsApp account, watches a list of contacts you add, and records:
 
 - online / offline transitions and last-seen timestamps
@@ -47,56 +49,60 @@ The `scripts/local/` directory contains a cross-platform local installer — sep
 
 ### Supported platforms
 
-| OS | Service | Icon | DNS |
-|---|---|---|---|
-| Linux | systemd user unit (`systemctl --user`) | `.desktop` entry + hicolor icon | dnsmasq |
-| macOS | launchd LaunchAgent | `.app` bundle with `.icns` | dnsmasq (brew) |
-| Windows | NSSM service (or Scheduled Task fallback) | Embedded `.exe` icon | `hosts` file |
+| OS      | Service                                   | Icon                            | DNS            |
+| ------- | ----------------------------------------- | ------------------------------- | -------------- |
+| Linux   | systemd user unit (`systemctl --user`)    | `.desktop` entry + hicolor icon | dnsmasq        |
+| macOS   | launchd LaunchAgent                       | `.app` bundle with `.icns`      | dnsmasq (brew) |
+| Windows | NSSM service (or Scheduled Task fallback) | Embedded `.exe` icon            | `hosts` file   |
 
 ### Quick start
 
 **Linux / macOS:**
+
 ```bash
 ./scripts/local/install.sh
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\local\install.ps1
 ```
 
 ### Options
 
-| Flag | Default | Description |
-|---|---|---|
-| `--yes` / `-AssumeYes` | off | Non-interactive; answer yes to all prompts |
-| `--skip-deps` | off | Skip build-dependency installation |
-| `--skip-build` | off | Skip build (use existing `bin/tracker`) |
-| `--skip-service` | off | Skip background service setup |
-| `--skip-dns` | off | Skip DNS / dnsmasq configuration |
-| `--no-icon` | off | Skip native OS icon embedding |
-| `--listen ADDR` | `:8080` | HTTP listen address |
-| `--domain DOMAIN` | `wa-analytics.local` | Local domain to map |
-| `--uninstall` | — | Remove the installation |
+| Flag                   | Default              | Description                                |
+| ---------------------- | -------------------- | ------------------------------------------ |
+| `--yes` / `-AssumeYes` | off                  | Non-interactive; answer yes to all prompts |
+| `--skip-deps`          | off                  | Skip build-dependency installation         |
+| `--skip-build`         | off                  | Skip build (use existing `bin/tracker`)    |
+| `--skip-service`       | off                  | Skip background service setup              |
+| `--skip-dns`           | off                  | Skip DNS / dnsmasq configuration           |
+| `--no-icon`            | off                  | Skip native OS icon embedding              |
+| `--listen ADDR`        | `:8080`              | HTTP listen address                        |
+| `--domain DOMAIN`      | `wa-analytics.local` | Local domain to map                        |
+| `--uninstall`          | —                    | Remove the installation                    |
 
 ### What gets installed where
 
-| | Linux | macOS | Windows |
-|---|---|---|---|
-| **Binary** | `~/.local/bin/tracker` | `~/Applications/WA Analytics.app` + symlink `~/.local/bin/tracker` | `%LOCALAPPDATA%\WhatsApp Tracker\tracker.exe` |
-| **Service** | `~/.config/systemd/user/whatsapp-tracker.service` | `~/Library/LaunchAgents/com.whatsapptracker.tracker.plist` | NSSM service `WhatsAppTracker` |
-| **Icon** | `~/.local/share/icons/hicolor/512x512/apps/whatsapp-tracker.png` + `.desktop` | `~/Applications/WA Analytics.app/Contents/Resources/tracker.icns` | Embedded in `tracker.exe` |
-| **Data** | `~/.local/share/whatsapp-tracker/` | `~/.local/share/whatsapp-tracker/` | `%LOCALAPPDATA%\whatsapp-tracker\` |
+|             | Linux                                                                         | macOS                                                              | Windows                                       |
+| ----------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
+| **Binary**  | `~/.local/bin/tracker`                                                        | `~/Applications/WA Analytics.app` + symlink `~/.local/bin/tracker` | `%LOCALAPPDATA%\WhatsApp Tracker\tracker.exe` |
+| **Service** | `~/.config/systemd/user/whatsapp-tracker.service`                             | `~/Library/LaunchAgents/com.whatsapptracker.tracker.plist`         | NSSM service `WhatsAppTracker`                |
+| **Icon**    | `~/.local/share/icons/hicolor/512x512/apps/whatsapp-tracker.png` + `.desktop` | `~/Applications/WA Analytics.app/Contents/Resources/tracker.icns`  | Embedded in `tracker.exe`                     |
+| **Data**    | `~/.local/share/whatsapp-tracker/`                                            | `~/.local/share/whatsapp-tracker/`                                 | `%LOCALAPPDATA%\whatsapp-tracker\`            |
 
 ### DNS — `wa-analytics.local` caveat
 
 > **Important:** The `.local` TLD is reserved for mDNS / Bonjour (RFC 6762). On macOS and Linux desktops running Avahi, `.local` lookups may be intercepted by mDNS before they reach dnsmasq, causing unreliable resolution.
 >
 > The installer warns you and requires confirmation before applying DNS changes. To avoid this, use a different TLD:
+>
 > ```bash
 > ./scripts/local/install.sh --domain wa-analytics.test   # safer
 > ./scripts/local/install.sh --domain wa-analytics.lan
 > ```
+>
 > On **Windows**, dnsmasq is not available — the installer adds a `hosts` file entry instead (requires admin).
 
 ### First-run checklist
@@ -115,6 +121,7 @@ Open `http://localhost:8080` (or your configured domain) and log in with `admin`
 ### Managing the service
 
 **Linux:**
+
 ```bash
 systemctl --user status whatsapp-tracker
 systemctl --user stop   whatsapp-tracker
@@ -123,6 +130,7 @@ journalctl --user -u whatsapp-tracker -f
 ```
 
 **macOS:**
+
 ```bash
 launchctl print  gui/$(id -u)/com.whatsapptracker.tracker
 launchctl stop   com.whatsapptracker.tracker
@@ -131,6 +139,7 @@ tail -f ~/.local/share/whatsapp-tracker/tracker.log
 ```
 
 **Windows:**
+
 ```powershell
 Get-Service WhatsAppTracker
 nssm stop  WhatsAppTracker
@@ -149,14 +158,14 @@ The data directory (`~/.local/share/whatsapp-tracker/`) is **never removed** —
 
 ### Troubleshooting
 
-| Problem | Fix |
-|---|---|
-| `cgo: C compiler "gcc" not found` | Run `--skip-build` and install gcc manually, then re-run |
-| `pnpm: command not found` | Run `corepack enable pnpm` after installing Node 20+ |
-| Port already in use | Change with `--listen :9090` |
-| `wa-analytics.local` doesn't resolve | Run with `--domain wa-analytics.test` (avoids mDNS conflict) |
-| Service not starting | Check logs: `journalctl --user -u whatsapp-tracker` or `tracker.log` in data dir |
-| macOS Xcode CLT installer dialog | Complete the dialog shown by the OS, then re-run `install.sh` |
+| Problem                              | Fix                                                                              |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| `cgo: C compiler "gcc" not found`    | Run `--skip-build` and install gcc manually, then re-run                         |
+| `pnpm: command not found`            | Run `corepack enable pnpm` after installing Node 20+                             |
+| Port already in use                  | Change with `--listen :9090`                                                     |
+| `wa-analytics.local` doesn't resolve | Run with `--domain wa-analytics.test` (avoids mDNS conflict)                     |
+| Service not starting                 | Check logs: `journalctl --user -u whatsapp-tracker` or `tracker.log` in data dir |
+| macOS Xcode CLT installer dialog     | Complete the dialog shown by the OS, then re-run `install.sh`                    |
 
 ---
 
@@ -170,12 +179,12 @@ The `ansible/` directory contains a fully idempotent playbook. It connects as **
 
 **Security model:**
 
-| Path | Owner | Mode | Notes |
-|---|---|---|---|
-| `/home/whatsapptracker/bin/whatsapp-tracker` | `root` | `0750` | Service can execute, not overwrite |
-| `/home/whatsapptracker/.local/share/whatsapp-tracker/` | `whatsapptracker` | `0700` | App data + `.env` key |
-| `/etc/systemd/system/whatsapp-tracker.service` | `root` | `0644` | System file |
-| `/etc/nginx/sites-available/whatsapp-tracker` | `root` | `0644` | System file |
+| Path                                                   | Owner             | Mode   | Notes                              |
+| ------------------------------------------------------ | ----------------- | ------ | ---------------------------------- |
+| `/home/whatsapptracker/bin/whatsapp-tracker`           | `root`            | `0750` | Service can execute, not overwrite |
+| `/home/whatsapptracker/.local/share/whatsapp-tracker/` | `whatsapptracker` | `0700` | App data + `.env` key              |
+| `/etc/systemd/system/whatsapp-tracker.service`         | `root`            | `0644` | System file                        |
+| `/etc/nginx/sites-available/whatsapp-tracker`          | `root`            | `0644` | System file                        |
 
 `whatsapptracker` has no login shell, no password, no sudo — it can only run the binary and write to its data directory. The systemd unit also enables `NoNewPrivileges`, `PrivateTmp`, and `ProtectSystem` hardening flags.
 
@@ -258,10 +267,10 @@ certbot renew --dry-run                  # test cert renewal
 
 `scripts/server/` contains two shell scripts for servers where Ansible is not available:
 
-| Script | Purpose |
-|---|---|
+| Script                                             | Purpose                                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `scripts/server/setup-service.sh <domain> [email]` | One-time server setup: installs deps, builds, installs systemd service, configures nginx + Let's Encrypt SSL |
-| `scripts/server/deploy.sh` | Deploys an update: stops service → `git pull` → build → install → restart |
+| `scripts/server/deploy.sh`                         | Deploys an update: stops service → `git pull` → build → install → restart                                    |
 
 These target **Ubuntu/Debian** servers and require `sudo`. They are **not** related to the local install scripts in `scripts/local/`.
 
@@ -269,14 +278,14 @@ These target **Ubuntu/Debian** servers and require `sudo`. They are **not** rela
 
 All settings can be passed by flag or env var:
 
-| Flag | Env | Default | Notes |
-| --- | --- | --- | --- |
-| `-data` | `WT_DATA_DIR` | `~/.local/share/whatsapp-tracker` | Where SQLite files live. |
-| `-listen` | `WT_LISTEN` | `:8080` | HTTP listen address. |
-| `-poll` | `WT_POLL_INTERVAL` | `15s` | Picture / About polling cadence. Min 5s. |
-| `-bearer` | `WT_BEARER` | (empty) | Optional bearer token. Required on every `/api` request and on the WebSocket (`?token=`) when set. |
-| `-dev` | `WT_DEV` | `false` | Enables permissive CORS so the Vite dev server can hit the API directly. |
-| `-walog` | `WT_WA_LOG` | `INFO` | whatsmeow log level: `DEBUG`/`INFO`/`WARN`/`ERROR`. |
+| Flag      | Env                | Default                           | Notes                                                                                              |
+| --------- | ------------------ | --------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `-data`   | `WT_DATA_DIR`      | `~/.local/share/whatsapp-tracker` | Where SQLite files live.                                                                           |
+| `-listen` | `WT_LISTEN`        | `:8080`                           | HTTP listen address.                                                                               |
+| `-poll`   | `WT_POLL_INTERVAL` | `15s`                             | Picture / About polling cadence. Min 5s.                                                           |
+| `-bearer` | `WT_BEARER`        | (empty)                           | Optional bearer token. Required on every `/api` request and on the WebSocket (`?token=`) when set. |
+| `-dev`    | `WT_DEV`           | `false`                           | Enables permissive CORS so the Vite dev server can hit the API directly.                           |
+| `-walog`  | `WT_WA_LOG`        | `INFO`                            | whatsmeow log level: `DEBUG`/`INFO`/`WARN`/`ERROR`.                                                |
 
 ## Auth flows
 
@@ -316,7 +325,7 @@ If `WT_BEARER` is set, send `Authorization: Bearer <token>` on REST and append `
 
 - **Presence**: event-driven via `events.Presence` + `cli.SubscribePresence(jid)`. Subscriptions are re-issued every 5 minutes so silent drops re-arm. Identical state re-emits collapse before hitting SQLite.
 - **Picture / About pollers**: every contact is polled once per `WT_POLL_INTERVAL`, with calls spread evenly across the interval. New rows are inserted only when the value differs from the latest stored one.
-- **Live updates**: every state change writes to SQLite *and* broadcasts over the WebSocket. The dashboard re-fetches the relevant queries via React Query.
+- **Live updates**: every state change writes to SQLite _and_ broadcasts over the WebSocket. The dashboard re-fetches the relevant queries via React Query.
 
 ## Limitations & risks
 

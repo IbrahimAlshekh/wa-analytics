@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Plus, X, Smartphone, RefreshCw, Calendar, Trash2, Pencil } from "lucide-react";
+import {
+  Plus,
+  X,
+  Smartphone,
+  RefreshCw,
+  Calendar,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { api } from "../lib/api";
 import type { Account, ScheduleSlot } from "../lib/types";
 import QRView from "../components/QRView";
@@ -22,8 +30,16 @@ import { cn } from "@/lib/utils";
 export default function Accounts() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { accounts: storeAccounts, setAccounts, upsertAccount, removeAccount } = useStore();
-  const accountsQ = useQuery({ queryKey: ["accounts"], queryFn: api.listAccounts });
+  const {
+    accounts: storeAccounts,
+    setAccounts,
+    upsertAccount,
+    removeAccount,
+  } = useStore();
+  const accountsQ = useQuery({
+    queryKey: ["accounts"],
+    queryFn: api.listAccounts,
+  });
   const [showPair, setShowPair] = useState(false);
 
   useEffect(() => {
@@ -31,8 +47,13 @@ export default function Accounts() {
   }, [accountsQ.data, setAccounts]);
 
   const toggle = useMutation({
-    mutationFn: ({ id, trackingActive }: { id: number; trackingActive: boolean }) =>
-      api.updateAccount(id, { trackingActive }),
+    mutationFn: ({
+      id,
+      trackingActive,
+    }: {
+      id: number;
+      trackingActive: boolean;
+    }) => api.updateAccount(id, { trackingActive }),
     onSuccess: (updated) => {
       upsertAccount(updated);
       qc.invalidateQueries({ queryKey: ["accounts"] });
@@ -47,18 +68,31 @@ export default function Accounts() {
     },
   });
 
-  const list: Account[] = storeAccounts.length > 0 ? storeAccounts : (accountsQ.data ?? []);
+  const list: Account[] =
+    storeAccounts.length > 0 ? storeAccounts : (accountsQ.data ?? []);
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-bold tracking-tight">{t("accounts.title")}</h2>
+        <h2 className="text-lg font-bold tracking-tight">
+          {t("accounts.title")}
+        </h2>
         <Button
           variant={showPair ? "ghost" : "default"}
           size="sm"
           onClick={() => setShowPair((v) => !v)}
         >
-          {showPair ? <><X className="size-3.5 me-1.5" />{t("accounts.cancel")}</> : <><Plus className="size-3.5 me-1.5" />{t("accounts.addAccount")}</>}
+          {showPair ? (
+            <>
+              <X className="size-3.5 me-1.5" />
+              {t("accounts.cancel")}
+            </>
+          ) : (
+            <>
+              <Plus className="size-3.5 me-1.5" />
+              {t("accounts.addAccount")}
+            </>
+          )}
         </Button>
       </div>
 
@@ -71,10 +105,16 @@ export default function Accounts() {
             <Tabs defaultValue="qr">
               <TabsList className="mb-4">
                 <TabsTrigger value="qr">{t("accounts.qrTab")}</TabsTrigger>
-                <TabsTrigger value="phone">{t("accounts.phoneTab")}</TabsTrigger>
+                <TabsTrigger value="phone">
+                  {t("accounts.phoneTab")}
+                </TabsTrigger>
               </TabsList>
-              <TabsContent value="qr"><QRView /></TabsContent>
-              <TabsContent value="phone"><PhoneCodeView /></TabsContent>
+              <TabsContent value="qr">
+                <QRView />
+              </TabsContent>
+              <TabsContent value="phone">
+                <PhoneCodeView />
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
@@ -86,7 +126,9 @@ export default function Accounts() {
             <Smartphone className="size-10 text-muted-foreground/50" />
             <div>
               <p className="font-medium text-sm">{t("accounts.emptyTitle")}</p>
-              <p className="text-sm text-muted-foreground mt-1">{t("accounts.emptyDesc")}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("accounts.emptyDesc")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -99,9 +141,17 @@ export default function Accounts() {
               <AccountRow
                 key={acc.id}
                 account={acc}
-                onToggle={(v) => toggle.mutate({ id: acc.id, trackingActive: v })}
+                onToggle={(v) =>
+                  toggle.mutate({ id: acc.id, trackingActive: v })
+                }
                 onDelete={() => {
-                  if (confirm(t("accounts.removeConfirm", { name: acc.label || acc.jid })))
+                  if (
+                    confirm(
+                      t("accounts.removeConfirm", {
+                        name: acc.label || acc.jid,
+                      }),
+                    )
+                  )
                     remove.mutate(acc.id);
                 }}
               />
@@ -109,6 +159,13 @@ export default function Accounts() {
           </div>
         </Card>
       )}
+
+      <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[400px] mx-auto mt-8 mb-4">
+        <p className="font-semibold uppercase tracking-wider text-[9px]">
+          {t("auth.disclaimer.title")}
+        </p>
+        <p>{t("auth.disclaimer.text")}</p>
+      </div>
     </div>
   );
 }
@@ -138,7 +195,9 @@ function AccountRow({
     },
   });
 
-  const initials = (account.label || account.jid || "?").slice(0, 2).toUpperCase();
+  const initials = (account.label || account.jid || "?")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div>
@@ -148,16 +207,20 @@ function AccountRow({
             <AvatarFallback
               className={cn(
                 "text-xs font-semibold",
-                account.connected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                account.connected
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground",
               )}
             >
               {initials}
             </AvatarFallback>
           </Avatar>
-          <span className={cn(
-            "absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-card",
-            account.connected ? "bg-primary" : "bg-muted-foreground/40",
-          )} />
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-card",
+              account.connected ? "bg-primary" : "bg-muted-foreground/40",
+            )}
+          />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -175,21 +238,30 @@ function AccountRow({
                 onChange={(e) => setLabel(e.target.value)}
                 autoFocus
               />
-              <Button size="sm" className="h-6 text-xs px-2" onClick={() => saveLabel.mutate()}>
+              <Button
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => saveLabel.mutate()}
+              >
                 {t("accounts.save")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-6 text-xs px-2"
-                onClick={() => { setLabel(account.label); setEditing(false); }}
+                onClick={() => {
+                  setLabel(account.label);
+                  setEditing(false);
+                }}
               >
                 {t("accounts.cancel")}
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-1 mt-0.5">
-              <span className="text-xs text-muted-foreground truncate">{account.jid}</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {account.jid}
+              </span>
               <button
                 onClick={() => setEditing(true)}
                 className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
@@ -204,7 +276,11 @@ function AccountRow({
           <Switch
             checked={account.trackingActive}
             onCheckedChange={onToggle}
-            title={account.trackingActive ? t("accounts.trackingOn") : t("accounts.trackingOff")}
+            title={
+              account.trackingActive
+                ? t("accounts.trackingOn")
+                : t("accounts.trackingOff")
+            }
           />
           <Button
             variant={showSchedule ? "secondary" : "ghost"}
@@ -237,7 +313,9 @@ function AccountRow({
 }
 
 function minutesToTime(min: number): string {
-  const h = Math.floor(min / 60).toString().padStart(2, "0");
+  const h = Math.floor(min / 60)
+    .toString()
+    .padStart(2, "0");
   const m = (min % 60).toString().padStart(2, "0");
   return `${h}:${m}`;
 }
@@ -287,7 +365,9 @@ function SchedulePanel({ accountId }: { accountId: number }) {
   }
 
   function updateSlot(i: number, field: "startMin" | "endMin", value: number) {
-    setSlots((prev) => prev.map((s, j) => (j === i ? { ...s, [field]: value } : s)));
+    setSlots((prev) =>
+      prev.map((s, j) => (j === i ? { ...s, [field]: value } : s)),
+    );
     setDirty(true);
   }
 
@@ -308,12 +388,19 @@ function SchedulePanel({ accountId }: { accountId: number }) {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Label className="text-sm font-medium">{t("accounts.forceOffline")}</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("accounts.forceOfflineDesc")}</p>
+          <Label className="text-sm font-medium">
+            {t("accounts.forceOffline")}
+          </Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("accounts.forceOfflineDesc")}
+          </p>
         </div>
         <Switch
           checked={forceOffline}
-          onCheckedChange={(v) => { setForceOffline(v); setDirty(true); }}
+          onCheckedChange={(v) => {
+            setForceOffline(v);
+            setDirty(true);
+          }}
         />
       </div>
 
@@ -321,7 +408,9 @@ function SchedulePanel({ accountId }: { accountId: number }) {
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted-foreground">
             {t("accounts.activeSlots")}
-            <span className="ms-1 opacity-70">{t("accounts.emptySlotsHint")}</span>
+            <span className="ms-1 opacity-70">
+              {t("accounts.emptySlotsHint")}
+            </span>
           </p>
           {slots.map((s, i) => (
             <div key={i} className="flex items-center gap-2 flex-wrap">
@@ -329,17 +418,23 @@ function SchedulePanel({ accountId }: { accountId: number }) {
                 type="time"
                 className="h-8 w-28 text-sm"
                 value={minutesToTime(s.startMin)}
-                onChange={(e) => updateSlot(i, "startMin", timeToMinutes(e.target.value))}
+                onChange={(e) =>
+                  updateSlot(i, "startMin", timeToMinutes(e.target.value))
+                }
               />
               <span className="text-muted-foreground">–</span>
               <Input
                 type="time"
                 className="h-8 w-28 text-sm"
                 value={minutesToTime(s.endMin)}
-                onChange={(e) => updateSlot(i, "endMin", timeToMinutes(e.target.value))}
+                onChange={(e) =>
+                  updateSlot(i, "endMin", timeToMinutes(e.target.value))
+                }
               />
               {s.startMin >= s.endMin && (
-                <Badge variant="secondary" className="text-xs">{t("accounts.overnight")}</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {t("accounts.overnight")}
+                </Badge>
               )}
               <Button
                 variant="ghost"
@@ -351,7 +446,12 @@ function SchedulePanel({ accountId }: { accountId: number }) {
               </Button>
             </div>
           ))}
-          <Button variant="ghost" size="sm" className="self-start h-7 text-xs" onClick={addSlot}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="self-start h-7 text-xs"
+            onClick={addSlot}
+          >
             <Plus className="size-3.5 me-1" />
             {t("accounts.addSlot")}
           </Button>
@@ -368,10 +468,14 @@ function SchedulePanel({ accountId }: { accountId: number }) {
           {save.isPending ? t("accounts.saving") : t("accounts.save")}
         </Button>
         {save.isError && (
-          <span className="text-xs text-destructive">{t("accounts.saveFailed")}</span>
+          <span className="text-xs text-destructive">
+            {t("accounts.saveFailed")}
+          </span>
         )}
         {save.isSuccess && !dirty && (
-          <span className="text-xs text-muted-foreground">{t("accounts.saved")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("accounts.saved")}
+          </span>
         )}
       </div>
     </div>
