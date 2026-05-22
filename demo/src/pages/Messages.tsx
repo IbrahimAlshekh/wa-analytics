@@ -40,6 +40,7 @@ export default function Messages() {
     mutationFn: ({ text, file }: { text: string; file?: File }) =>
       api.sendMessage(accountId, cid, text, file),
     onSuccess: () => {
+      scrollToBottomRef.current = true;
       qc.invalidateQueries({ queryKey: ["messages", accountId, cid] });
     },
   });
@@ -77,6 +78,7 @@ export default function Messages() {
   const waFetchingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const savedScrollHeightRef = useRef(0);
+  const scrollToBottomRef = useRef(false);
 
   useEffect(() => {
     return ws.on((msg) => {
@@ -103,7 +105,13 @@ export default function Messages() {
 
   useEffect(() => {
     const list = listRef.current;
-    if (!list || savedScrollHeightRef.current === 0) return;
+    if (!list) return;
+    if (scrollToBottomRef.current) {
+      list.scrollTop = list.scrollHeight;
+      scrollToBottomRef.current = false;
+      return;
+    }
+    if (savedScrollHeightRef.current === 0) return;
     const delta = list.scrollHeight - savedScrollHeightRef.current;
     if (delta > 0) list.scrollTop += delta;
     savedScrollHeightRef.current = 0;
@@ -131,7 +139,8 @@ export default function Messages() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card shrink-0">
+      <div className="border-b border-border bg-card shrink-0">
+      <div className="max-w-2xl mx-auto flex items-center justify-between px-5 py-3">
         <div className="flex items-center gap-1.5 text-sm">
           <Link
             to={`/accounts/${accountId}/contacts/${cid}`}
@@ -146,6 +155,7 @@ export default function Messages() {
           {t("messages.loaded", { count: msgs.length })}
         </span>
       </div>
+      </div>
 
       {isLoading && (
         <div className="text-sm text-muted-foreground text-center py-8">{t("messages.loading")}</div>
@@ -155,10 +165,8 @@ export default function Messages() {
       )}
 
       {/* Messages list */}
-      <div
-        ref={listRef}
-        className="flex-1 overflow-y-auto flex flex-col px-4 py-2"
-      >
+      <div ref={listRef} className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto flex flex-col px-4 py-2 min-h-full">
         {msgs.length === 0 && !isLoading && (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <MessageSquare className="size-10 text-muted-foreground/50" />
@@ -202,9 +210,11 @@ export default function Messages() {
           />
         ))}
       </div>
+      </div>
 
       {/* Input bar */}
-      <div className="shrink-0 px-4 py-3 border-t border-border bg-card">
+      <div className="shrink-0 border-t border-border bg-card">
+      <div className="max-w-2xl mx-auto px-4 py-3">
         <MessageInput
           onSend={(text, file) => sendMutation.mutate({ text, file })}
           disabled={sendMutation.isPending}
@@ -212,6 +222,7 @@ export default function Messages() {
         {sendMutation.error && (
           <p className="text-xs text-destructive mt-1.5">{sendMutation.error.message}</p>
         )}
+      </div>
       </div>
     </div>
   );
