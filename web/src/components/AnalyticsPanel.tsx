@@ -114,12 +114,12 @@ function StatItem({ label, value, description, info }: {
 function BalanceBar({ mePct, meLabel, themLabel }: { mePct: number; meLabel: string; themLabel: string }) {
   return (
     <div className="mb-4">
-      <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-        <span className="flex items-center gap-1.5">
+      <div className="flex justify-between text-xs mb-1.5">
+        <span className="flex items-center gap-1.5 text-primary">
           <span className="size-2 rounded-full bg-primary shrink-0" />
           {meLabel}
         </span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5 text-contact">
           {themLabel}
           <span className="size-2 rounded-full bg-contact shrink-0" />
         </span>
@@ -238,7 +238,7 @@ function VolumeCard({ me, them, contactName }: { me: AnalyticsVolumeSide; them: 
         />
         <div className="grid grid-cols-2 gap-4">
           <VolumeSideBox label={t("analytics.you")} side={me} accent="text-primary" />
-          <VolumeSideBox label={contactName} side={them} accent="text-muted-foreground" />
+          <VolumeSideBox label={contactName} side={them} accent="text-contact" />
         </div>
       </CardContent>
     </Card>
