@@ -308,13 +308,13 @@
       "description": "A session starts when either side breaks 3+ hours of silence. Shows who starts conversations and how quickly each side replies.",
       "tooltip": "When one person initiates 70%+ of sessions, the other may be less invested or waiting to be reached. Reply time gaps between 'you' and 'them' reveal asymmetry in attention — a large difference often indicates who values the conversation more.",
       "youStarted": "You started {{pct}}%",
-      "themPct": "Them {{pct}}%",
+      "themPct": "{{name}} {{pct}}%",
       "sessions": "Sessions",
       "avgMsgsPerSession": "Avg msgs/session",
       "avgReplyYou": "Avg reply (you)",
-      "avgReplyThem": "Avg reply (them)",
+      "avgReplyThem": "Avg reply ({{name}})",
       "medianReplyYou": "Median reply (you)",
-      "medianReplyThem": "Median reply (them)",
+      "medianReplyThem": "Median reply ({{name}})",
       "longestSilence": "Longest silence",
       "longestSilenceDesc": "Longest gap between any two messages.",
       "longestSilenceTooltip": "An unusually long single silence may mark a conflict, a trip, or a cooling point in the relationship. Compare it to average silence to see if it was a one-off or the norm.",
@@ -327,7 +327,7 @@
       "description": "Total messages, words, and media sent by each side. The bar shows your share of total messages.",
       "tooltip": "A persistent imbalance (one person above 65%) suggests who drives the conversation. Word balance often tells more than message count — short frequent replies look very different from long infrequent ones.",
       "youPct": "You {{pct}}%",
-      "themPct": "Them {{pct}}%",
+      "themPct": "{{name}} {{pct}}%",
       "messages": "Messages",
       "words": "Words",
       "avgWords": "Avg words",
@@ -354,16 +354,16 @@
       "description": "Percentage of messages sent between midnight and 5am by each side.",
       "tooltip": "High night-message rates (>15%) suggest conversations happen when the person is most relaxed and unguarded, or indicate very different time zones. It can also signal emotional intensity — late-night messaging is rarely casual.",
       "nightYou": "Night messages (you)",
-      "nightThem": "Night messages (them)"
+      "nightThem": "Night messages ({{name}})"
     },
     "emotion": {
       "title": "Emotion fingerprint",
       "description": "Messages classified by emotional tone using keyword patterns. Bars show your share vs theirs for each emotion.",
       "tooltip": "The balance of emotions reveals who brings positivity, who asks for support, and the overall register of the relationship. Gratitude or encouragement heavily skewed to one side can signal a support asymmetry — one person giving more than they receive.",
       "laughsYou": "Laughs (you)",
-      "laughsThem": "Laughs (them)",
+      "laughsThem": "Laughs ({{name}})",
       "questionsYou": "Questions (you)",
-      "questionsThem": "Questions (them)"
+      "questionsThem": "Questions ({{name}})"
     },
     "language": {
       "title": "Language fingerprint",

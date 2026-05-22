@@ -284,7 +284,7 @@ export default function ContactDetail() {
             </CardContent>
           </Card>
           {analyticsQ.data ? (
-            <AnalyticsPanel report={analyticsQ.data} />
+            <AnalyticsPanel report={analyticsQ.data} contactName={displayName} />
           ) : analyticsQ.isLoading ? (
             <div className="text-sm text-muted-foreground text-center py-8">
               {t("contactDetail.loadingAnalytics")}

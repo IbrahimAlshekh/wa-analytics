@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   report: AnalyticsReport;
+  contactName: string;
 }
 
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -23,7 +24,7 @@ const EMOTION_ICONS: Record<keyof AnalyticsEmotionCounts, string> = {
   care: "🤗", encourage: "💪", apology: "🙏", gratitude: "🌟",
 };
 
-export default function AnalyticsPanel({ report }: Props) {
+export default function AnalyticsPanel({ report, contactName }: Props) {
   const { t } = useTranslation();
   const { volume, temporal, emotion, timeline, initiation, language, indicators } = report;
 
@@ -41,14 +42,14 @@ export default function AnalyticsPanel({ report }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <TimelineCard timeline={timeline} />
-      <VolumeCard me={volume.me} them={volume.them} />
-      <InitiationCard initiation={initiation} />
-      <HourHistCard hourMe={temporal.hourHistMe} hourThem={temporal.hourHistThem} />
-      <DowCard dowMe={temporal.dowMe} dowThem={temporal.dowThem} />
-      <TemporalMetaCard temporal={temporal} />
-      <EmotionCard emotion={emotion} />
-      <LanguageCard language={language} />
-      <MonthlyEvolutionCard months={temporal.monthly} />
+      <VolumeCard me={volume.me} them={volume.them} contactName={contactName} />
+      <InitiationCard initiation={initiation} contactName={contactName} />
+      <HourHistCard hourMe={temporal.hourHistMe} hourThem={temporal.hourHistThem} contactName={contactName} />
+      <DowCard dowMe={temporal.dowMe} dowThem={temporal.dowThem} contactName={contactName} />
+      <TemporalMetaCard temporal={temporal} contactName={contactName} />
+      <EmotionCard emotion={emotion} contactName={contactName} />
+      <LanguageCard language={language} contactName={contactName} />
+      <MonthlyEvolutionCard months={temporal.monthly} contactName={contactName} />
       <IndicatorCard indicators={indicators} />
     </div>
   );
@@ -160,7 +161,7 @@ function TimelineCard({ timeline }: { timeline: AnalyticsReport["timeline"] }) {
   );
 }
 
-function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiation"] }) {
+function InitiationCard({ initiation, contactName }: { initiation: AnalyticsReport["initiation"]; contactName: string }) {
   const { t } = useTranslation();
   if (initiation.sessions === 0) return null;
   const mePct = initiation.initiationMeSharePct;
@@ -178,15 +179,15 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
         <BalanceBar
           mePct={mePct}
           meLabel={t("analytics.initiation.youStarted", { pct: mePct.toFixed(1) })}
-          themLabel={t("analytics.initiation.themPct", { pct: (100 - mePct).toFixed(1) })}
+          themLabel={t("analytics.initiation.themPct", { name: contactName, pct: (100 - mePct).toFixed(1) })}
         />
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatItem label={t("analytics.initiation.sessions")} value={String(initiation.sessions)} />
           <StatItem label={t("analytics.initiation.avgMsgsPerSession")} value={initiation.avgSessionMsgs.toFixed(1)} />
           {initiation.avgRespMeSec > 0 && <StatItem label={t("analytics.initiation.avgReplyYou")} value={formatDuration(initiation.avgRespMeSec)} />}
-          {initiation.avgRespThemSec > 0 && <StatItem label={t("analytics.initiation.avgReplyThem")} value={formatDuration(initiation.avgRespThemSec)} />}
+          {initiation.avgRespThemSec > 0 && <StatItem label={t("analytics.initiation.avgReplyThem", { name: contactName })} value={formatDuration(initiation.avgRespThemSec)} />}
           {initiation.medianRespMeSec > 0 && <StatItem label={t("analytics.initiation.medianReplyYou")} value={formatDuration(initiation.medianRespMeSec)} />}
-          {initiation.medianRespThemSec > 0 && <StatItem label={t("analytics.initiation.medianReplyThem")} value={formatDuration(initiation.medianRespThemSec)} />}
+          {initiation.medianRespThemSec > 0 && <StatItem label={t("analytics.initiation.medianReplyThem", { name: contactName })} value={formatDuration(initiation.medianRespThemSec)} />}
           {initiation.longestSilenceSec > 0 && (
             <StatItem
               label={t("analytics.initiation.longestSilence")}
@@ -209,7 +210,7 @@ function InitiationCard({ initiation }: { initiation: AnalyticsReport["initiatio
   );
 }
 
-function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolumeSide }) {
+function VolumeCard({ me, them, contactName }: { me: AnalyticsVolumeSide; them: AnalyticsVolumeSide; contactName: string }) {
   const { t } = useTranslation();
   const total = me.messages + them.messages;
   const meBar = total > 0 ? (me.messages / total) * 100 : 50;
@@ -227,11 +228,11 @@ function VolumeCard({ me, them }: { me: AnalyticsVolumeSide; them: AnalyticsVolu
         <BalanceBar
           mePct={meBar}
           meLabel={t("analytics.volume.youPct", { pct: me.sharePct.toFixed(1) })}
-          themLabel={t("analytics.volume.themPct", { pct: them.sharePct.toFixed(1) })}
+          themLabel={t("analytics.volume.themPct", { name: contactName, pct: them.sharePct.toFixed(1) })}
         />
         <div className="grid grid-cols-2 gap-4">
           <VolumeSideBox label={t("analytics.you")} side={me} accent="text-primary" />
-          <VolumeSideBox label={t("analytics.them")} side={them} accent="text-muted-foreground" />
+          <VolumeSideBox label={contactName} side={them} accent="text-muted-foreground" />
         </div>
       </CardContent>
     </Card>
@@ -269,7 +270,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number[] }) {
+function HourHistCard({ hourMe, hourThem, contactName }: { hourMe: number[]; hourThem: number[]; contactName: string }) {
   const { t } = useTranslation();
   const data = hourMe.map((me, h) => ({
     hour: h,
@@ -298,7 +299,7 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
               <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="them" name={t("analytics.them")} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+              <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -307,7 +308,7 @@ function HourHistCard({ hourMe, hourThem }: { hourMe: number[]; hourThem: number
   );
 }
 
-function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
+function DowCard({ dowMe, dowThem, contactName }: { dowMe: number[]; dowThem: number[]; contactName: string }) {
   const { t } = useTranslation();
   const data = DOW_LABELS.map((label, i) => ({
     label,
@@ -335,7 +336,7 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
               <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="them" name={t("analytics.them")} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
+              <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -344,7 +345,7 @@ function DowCard({ dowMe, dowThem }: { dowMe: number[]; dowThem: number[] }) {
   );
 }
 
-function TemporalMetaCard({ temporal }: { temporal: AnalyticsReport["temporal"] }) {
+function TemporalMetaCard({ temporal, contactName }: { temporal: AnalyticsReport["temporal"]; contactName: string }) {
   const { t } = useTranslation();
   return (
     <Card>
@@ -359,14 +360,14 @@ function TemporalMetaCard({ temporal }: { temporal: AnalyticsReport["temporal"] 
       <CardContent className="pt-0">
         <div className="grid grid-cols-2 gap-3">
           <StatItem label={t("analytics.temporal.nightYou")} value={`${temporal.nightPctMe.toFixed(1)}%`} />
-          <StatItem label={t("analytics.temporal.nightThem")} value={`${temporal.nightPctThem.toFixed(1)}%`} />
+          <StatItem label={t("analytics.temporal.nightThem", { name: contactName })} value={`${temporal.nightPctThem.toFixed(1)}%`} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
+function EmotionCard({ emotion, contactName }: { emotion: AnalyticsReport["emotion"]; contactName: string }) {
   const { t } = useTranslation();
   const hasEmotion = EMOTION_KEYS.some(
     (k) => (emotion.countsMe[k] ?? 0) > 0 || (emotion.countsThem[k] ?? 0) > 0,
@@ -386,13 +387,13 @@ function EmotionCard({ emotion }: { emotion: AnalyticsReport["emotion"] }) {
           {emotion.laughterMsgsMe + emotion.laughterMsgsThem > 0 && (
             <>
               <StatItem label={t("analytics.emotion.laughsYou")} value={formatCount(emotion.laughterMsgsMe)} />
-              <StatItem label={t("analytics.emotion.laughsThem")} value={formatCount(emotion.laughterMsgsThem)} />
+              <StatItem label={t("analytics.emotion.laughsThem", { name: contactName })} value={formatCount(emotion.laughterMsgsThem)} />
             </>
           )}
           {emotion.questionsMe + emotion.questionsThem > 0 && (
             <>
               <StatItem label={t("analytics.emotion.questionsYou")} value={formatCount(emotion.questionsMe)} />
-              <StatItem label={t("analytics.emotion.questionsThem")} value={formatCount(emotion.questionsThem)} />
+              <StatItem label={t("analytics.emotion.questionsThem", { name: contactName })} value={formatCount(emotion.questionsThem)} />
             </>
           )}
         </div>
@@ -426,7 +427,7 @@ function EmotionRow({ icon, label, me, them }: { icon: string; label: string; me
   );
 }
 
-function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
+function LanguageCard({ language, contactName }: { language: AnalyticsReport["language"]; contactName: string }) {
   const { t } = useTranslation();
   const topEmojisMe = language.topEmojisMe ?? [];
   const topEmojisThem = language.topEmojisThem ?? [];
@@ -463,7 +464,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{t("analytics.them")}</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{contactName}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {topEmojisThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
                 </div>
@@ -477,7 +478,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
             <p className="text-xs font-semibold text-muted-foreground mb-2">{t("analytics.language.topWords")}</p>
             <div className="grid grid-cols-2 gap-4">
               <WordList label={t("analytics.you")} tokens={topWordsMe} accent="text-primary" />
-              <WordList label={t("analytics.them")} tokens={topWordsThem} accent="text-muted-foreground" />
+              <WordList label={contactName} tokens={topWordsThem} accent="text-muted-foreground" />
             </div>
           </div>
         )}
@@ -493,7 +494,7 @@ function LanguageCard({ language }: { language: AnalyticsReport["language"] }) {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{t("analytics.them")}</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase mb-2">{contactName}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {topDomainsThem.map((tc) => <TokenPill key={tc.token} {...tc} />)}
                 </div>
@@ -531,7 +532,7 @@ function WordList({ label, tokens, accent }: { label: string; tokens: TokenCount
   );
 }
 
-function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
+function MonthlyEvolutionCard({ months, contactName }: { months: MonthRow[]; contactName: string }) {
   const { t } = useTranslation();
   if (!months || months.length < 2) return null;
   const recent3 = new Set(months.slice(-3).map((m) => m.month));
@@ -552,7 +553,7 @@ function MonthlyEvolutionCard({ months }: { months: MonthRow[] }) {
               {[
                 { key: "month", label: t("analytics.monthly.month"), align: "left" },
                 { key: "you", label: t("analytics.monthly.you"), align: "right" },
-                { key: "them", label: t("analytics.monthly.them"), align: "right" },
+                { key: "them", label: contactName, align: "right" },
                 { key: "total", label: t("analytics.monthly.total"), align: "right" },
                 { key: "yourPct", label: t("analytics.monthly.yourPct"), align: "right" },
               ].map((h) => (
