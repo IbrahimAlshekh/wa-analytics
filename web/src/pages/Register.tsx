@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import logo from "../assets/wa_analytics_logo_512.png";
 
 export default function Register() {
   const { t } = useTranslation();
@@ -50,9 +51,7 @@ export default function Register() {
     <div className="flex flex-col items-center justify-center min-h-full px-4 py-16">
       <div className="w-full max-w-sm flex flex-col gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <div className="size-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xl font-bold text-primary">
-            W
-          </div>
+          <img src={logo} alt="Logo" className="size-16 mb-2" />
           <h1 className="text-xl font-bold tracking-tight">
             {t("auth.brand")}
           </h1>
