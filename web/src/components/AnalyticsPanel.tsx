@@ -271,7 +271,8 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 function HourHistCard({ hourMe, hourThem, contactName }: { hourMe: number[]; hourThem: number[]; contactName: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.dir() === "rtl";
   const data = hourMe.map((me, h) => ({
     hour: h,
     label: `${String(h).padStart(2, "0")}:00`,
@@ -295,8 +296,8 @@ function HourHistCard({ hourMe, hourThem, contactName }: { hourMe: number[]; hou
           <ResponsiveContainer>
             <BarChart data={data} barCategoryGap="20%" barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval={2} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
+              <XAxis dataKey="label" tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} interval={2} reversed={isRTL} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
               <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />
@@ -309,7 +310,8 @@ function HourHistCard({ hourMe, hourThem, contactName }: { hourMe: number[]; hou
 }
 
 function DowCard({ dowMe, dowThem, contactName }: { dowMe: number[]; dowThem: number[]; contactName: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.dir() === "rtl";
   const data = DOW_LABELS.map((label, i) => ({
     label,
     me: dowMe[i] ?? 0,
@@ -332,8 +334,8 @@ function DowCard({ dowMe, dowThem, contactName }: { dowMe: number[]; dowThem: nu
           <ResponsiveContainer>
             <BarChart data={data} barCategoryGap="25%" barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} reversed={isRTL} />
+              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
               <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
               <Bar dataKey="me" name={t("analytics.you")} fill="var(--primary)" radius={[3, 3, 0, 0]} />
               <Bar dataKey="them" name={contactName} fill="var(--muted-foreground)" radius={[3, 3, 0, 0]} opacity={0.5} />

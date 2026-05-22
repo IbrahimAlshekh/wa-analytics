@@ -15,7 +15,8 @@ interface Props {
 }
 
 export default function StatsStrip({ accountId, contactId }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.dir() === "rtl";
   const [range, setRange] = useState<"today" | "week" | "month">("week");
   const stats = useQuery({
     queryKey: ["stats", accountId, contactId, range],
@@ -92,8 +93,8 @@ export default function StatsStrip({ accountId, contactId }: Props) {
           <ResponsiveContainer>
             <BarChart data={data} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={32} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} reversed={isRTL} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={32} orientation={isRTL ? "right" : "left"} />
               <Tooltip
                 contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                 cursor={{ fill: "oklch(0.723 0.173 145 / 0.1)" }}

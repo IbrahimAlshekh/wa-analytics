@@ -21,7 +21,8 @@ interface Props {
 }
 
 export default function PresencePanel({ entries, contact }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.dir() === "rtl";
   const safeEntries = entries ?? [];
   const hourlyData    = computePeakHours(safeEntries);
   const weekdayData   = computeWeekdayActivity(safeEntries);
@@ -198,8 +199,8 @@ export default function PresencePanel({ entries, contact }: Props) {
                 <ResponsiveContainer>
                   <BarChart data={hourlyData} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                    <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} />
-                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={3} reversed={isRTL} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
                     <Bar dataKey="minutes" fill="var(--primary)" radius={[3, 3, 0, 0]} />
                   </BarChart>
@@ -221,8 +222,8 @@ export default function PresencePanel({ entries, contact }: Props) {
                 <ResponsiveContainer>
                   <BarChart data={weekdayData} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} reversed={isRTL} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} cursor={{ fill: "oklch(0.723 0.173 145 / 0.08)" }} />
                     <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
                       {weekdayData.map((d, i) => (
@@ -267,8 +268,8 @@ export default function PresencePanel({ entries, contact }: Props) {
                 <ResponsiveContainer>
                   <LineChart data={trend30}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={4} />
-                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} interval={4} reversed={isRTL} />
+                    <YAxis tick={{ fontSize: 9, fill: "var(--fg-muted)" }} axisLine={false} tickLine={false} width={28} orientation={isRTL ? "right" : "left"} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
                     <Line type="monotone" dataKey="minutes" stroke="var(--primary)" dot={false} strokeWidth={2} />
                   </LineChart>

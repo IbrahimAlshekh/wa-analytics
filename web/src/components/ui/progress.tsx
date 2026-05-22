@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Progress as ProgressPrimitive } from "radix-ui"
+import { Progress as ProgressPrimitive, Direction as DirectionPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -8,6 +8,10 @@ function Progress({
   value,
   ...props
 }: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+  const dir = DirectionPrimitive.useDirection();
+  const offset = 100 - (value || 0);
+  const translateX = dir === "rtl" ? `${offset}%` : `-${offset}%`;
+
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
@@ -20,7 +24,7 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className="size-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        style={{ transform: `translateX(${translateX})` }}
       />
     </ProgressPrimitive.Root>
   )
