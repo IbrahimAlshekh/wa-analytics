@@ -928,6 +928,40 @@ func (db *DB) TimelineRange(ctx context.Context, contactID, start, end int64) ([
 	return out, nil
 }
 
+// PresenceDaysList returns up to limit distinct UTC calendar days (YYYY-MM-DD)
+// that have at least one presence, picture, or about event before the given
+// unix timestamp, ordered newest first.
+func (db *DB) PresenceDaysList(ctx context.Context, contactID, before int64, limit int) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT DISTINCT date(ts, 'unixepoch') AS day
+		FROM (
+			SELECT observed_at AS ts FROM presence_events     WHERE contact_id=? AND observed_at<?
+			UNION ALL
+			SELECT captured_at            FROM profile_picture_history WHERE contact_id=? AND captured_at<?
+			UNION ALL
+			SELECT captured_at            FROM about_history            WHERE contact_id=? AND captured_at<?
+		)
+		ORDER BY day DESC
+		LIMIT ?`,
+		contactID, before,
+		contactID, before,
+		contactID, before,
+		limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var days []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+	return days, rows.Err()
+}
+
 // --- Stats ------------------------------------------------------------------
 
 func (db *DB) PresenceRange(ctx context.Context, contactID, start, end int64) ([]PresenceEvent, error) {

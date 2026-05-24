@@ -61,6 +61,45 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handlePresenceDays(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cid, err := parseCID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.db.GetContact(r.Context(), accountID, cid); err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	before := time.Now().Unix()
+	if v := r.URL.Query().Get("before"); v != "" {
+		if n, err2 := strconv.ParseInt(v, 10, 64); err2 == nil {
+			before = n
+		}
+	}
+	limit := 7
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err2 := strconv.Atoi(v); err2 == nil && n > 0 && n <= 50 {
+			limit = n
+		}
+	}
+	days, err := s.db.PresenceDaysList(r.Context(), cid, before, limit)
+	if err != nil {
+		slog.Error("presence-days: query failed", "accountID", accountID, "id", cid, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if days == nil {
+		days = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"days": days})
+}
+
 func (s *Server) handlePresenceDay(w http.ResponseWriter, r *http.Request) {
 	accountID, err := parseID(r)
 	if err != nil {

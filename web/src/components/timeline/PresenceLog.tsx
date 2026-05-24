@@ -1,37 +1,28 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 import PresenceDaySection from "./PresenceDaySection";
 
-const WINDOW_DAYS = 7;
-
-function getISODate(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
-}
+const PAGE_SIZE = 7;
 
 function getDayLabel(isoDate: string, t: (k: string) => string): string {
   const now = new Date();
-  const todayISO = getISODate(0);
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const yesterdayISO = getISODate(1);
+  const todayUTC = now.toISOString().slice(0, 10);
+  const yesterdayUTC = new Date(now.getTime() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 
-  if (isoDate === todayISO) return t("timeline.today");
-  if (isoDate === yesterdayISO) return t("timeline.yesterday");
+  if (isoDate === todayUTC) return t("timeline.today");
+  if (isoDate === yesterdayUTC) return t("timeline.yesterday");
 
-  const d = new Date(`${isoDate}T12:00:00`);
+  const d = new Date(`${isoDate}T12:00:00Z`);
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
-    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+    ...(d.getUTCFullYear() !== now.getUTCFullYear() ? { year: "numeric" } : {}),
   });
 }
 
@@ -42,13 +33,41 @@ export interface PresenceLogProps {
 
 export default function PresenceLog({ accountId, contactId }: PresenceLogProps) {
   const { t } = useTranslation();
-  const [totalDays, setTotalDays] = useState(WINDOW_DAYS);
 
-  const dayList = Array.from({ length: totalDays }, (_, i) => getISODate(i));
+  const daysQ = useInfiniteQuery({
+    queryKey: ["presence-days", accountId, contactId],
+    queryFn: ({ pageParam }) =>
+      api.presenceDays(accountId, contactId, pageParam, PAGE_SIZE),
+    initialPageParam: Math.floor(Date.now() / 1000),
+    getNextPageParam: (lastPage) => {
+      if (lastPage.days.length < PAGE_SIZE) return undefined;
+      const oldest = lastPage.days[lastPage.days.length - 1];
+      return Math.floor(new Date(`${oldest}T00:00:00Z`).getTime() / 1000);
+    },
+    staleTime: 60_000,
+  });
+
+  const allDays = daysQ.data?.pages.flatMap((p) => p.days) ?? [];
+
+  if (daysQ.isLoading) {
+    return (
+      <p className="text-sm text-muted-foreground animate-pulse">
+        {t("timeline.loading")}
+      </p>
+    );
+  }
+
+  if (allDays.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("timeline.noSessions")}
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      {dayList.map((isoDate, i) => (
+      {allDays.map((isoDate, i) => (
         <PresenceDaySection
           key={isoDate}
           accountId={accountId}
@@ -59,15 +78,20 @@ export default function PresenceLog({ accountId, contactId }: PresenceLogProps) 
         />
       ))}
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="self-center gap-1.5 text-xs text-muted-foreground"
-        onClick={() => setTotalDays((n) => n + WINDOW_DAYS)}
-      >
-        <ChevronDown className="size-3.5" />
-        {t("timeline.loadMoreDays", { count: WINDOW_DAYS })}
-      </Button>
+      {daysQ.hasNextPage && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-center gap-1.5 text-xs text-muted-foreground"
+          onClick={() => daysQ.fetchNextPage()}
+          disabled={daysQ.isFetchingNextPage}
+        >
+          <ChevronDown className="size-3.5" />
+          {daysQ.isFetchingNextPage
+            ? t("timeline.loading")
+            : t("timeline.loadMoreDays", { count: PAGE_SIZE })}
+        </Button>
+      )}
     </div>
   );
 }

@@ -128,6 +128,16 @@ export const api = {
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/timeline?since=${since}`,
     ),
+  presenceDays: (
+    accountId: number,
+    contactId: number,
+    before: number,
+    limit = 7,
+  ) =>
+    request<{ days: string[] }>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/presence/days?before=${before}&limit=${limit}`,
+    ),
   presenceDay: (accountId: number, contactId: number, start: number, end: number) =>
     request<TimelineEntry[]>(
       "GET",

@@ -23,8 +23,7 @@ export interface PresenceDaySectionProps {
 }
 
 function dayBounds(isoDate: string): { start: number; end: number } {
-  const d = new Date(`${isoDate}T00:00:00`);
-  const start = Math.floor(d.getTime() / 1000);
+  const start = Math.floor(new Date(`${isoDate}T00:00:00Z`).getTime() / 1000);
   return { start, end: start + 86400 };
 }
 
