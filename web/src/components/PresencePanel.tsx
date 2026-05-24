@@ -34,7 +34,6 @@ import {
   formatDuration,
   formatDate,
   formatDatetime,
-  WEEKDAYS,
 } from "../lib/presence-stats";
 
 interface Props {

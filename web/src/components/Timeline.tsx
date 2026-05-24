@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TimelineEntry } from "../lib/types";
 import { getMediaUrl } from "../lib/media";
 import { buildBlocks, formatTime, formatDuration } from "../lib/sessions";
-import type { Session, NonPresence, Block } from "../lib/sessions";
+import type { Session, NonPresence } from "../lib/sessions";
 
 interface Props {
   entries: TimelineEntry[];

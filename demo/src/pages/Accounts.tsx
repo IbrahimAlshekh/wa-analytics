@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { Account, ScheduleSlot } from "../lib/types";
+import { minutesToTime, timeToMinutes } from "../lib/schedule";
 import QRView from "../components/QRView";
 import PhoneCodeView from "../components/PhoneCodeView";
 import { useStore } from "../lib/store";
@@ -28,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export default function Accounts() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const {
     accounts: storeAccounts,
@@ -94,22 +95,6 @@ export default function Accounts() {
             </>
           )}
         </Button>
-      </div>
-
-      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-3 items-start">
-        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
-          ✨
-        </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-semibold text-primary">
-            {i18n.language === "ar"
-              ? "معلومات العرض التجريبي"
-              : "Demo Information"}
-          </p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {t("accounts.demoInfo")}
-          </p>
-        </div>
       </div>
 
       {showPair && (
@@ -326,19 +311,6 @@ function AccountRow({
       )}
     </div>
   );
-}
-
-function minutesToTime(min: number): string {
-  const h = Math.floor(min / 60)
-    .toString()
-    .padStart(2, "0");
-  const m = (min % 60).toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
 }
 
 function SchedulePanel({ accountId }: { accountId: number }) {

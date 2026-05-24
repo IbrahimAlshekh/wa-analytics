@@ -15,14 +15,26 @@ make dev
 # Production build: React → internal/api/dist → embedded in Go binary at bin/tracker
 make build
 
-# Run all tests
-make test
+# Run all tests (Go + web + demo)
+make test-all
 
-# Run tests for a specific package
+# Go only — race detector + coverage
+make test-go
+
+# Frontend only
+make test-web    # web/
+make test-demo   # demo/
+
+# Run tests for a specific Go package
 go test ./internal/analytics/...
+
+# Run a specific frontend test file
+cd web && pnpm test:run src/lib/api.test.ts
 ```
 
 Build requires CGO_ENABLED=1 (for go-sqlite3). Requires Go 1.22+, Node 20+, pnpm 10+, and a C toolchain.
+
+See [docs/testing.md](docs/testing.md) for a full guide to the test suite.
 
 ## Architecture
 

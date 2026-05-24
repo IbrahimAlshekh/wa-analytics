@@ -291,6 +291,7 @@ Pull requests for bug fixes, improvements, and new features are appreciated.
 | [Development Guide](docs/development.md) | Dev setup, build system, how to extend the app                   |
 | [Deployment Guide](docs/deployment.md)   | Server deployment with Ansible and manual scripts                |
 | [Configuration](docs/configuration.md)   | All flags and environment variables                              |
+| [Testing Guide](docs/testing.md)         | How to run tests, mocking strategy, helper overview              |
 
 ---
 

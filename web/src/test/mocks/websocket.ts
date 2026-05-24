@@ -67,13 +67,20 @@ const _OriginalWebSocket = globalThis.WebSocket;
 
 export function installMockWebSocket() {
   MockWebSocketInstance.reset();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).WebSocket = MockWebSocketInstance;
+  Object.defineProperty(globalThis, "WebSocket", {
+    configurable: true,
+    writable: true,
+    value: MockWebSocketInstance,
+  });
   return {
     latest: () => MockWebSocketInstance.latest(),
     instances: () => MockWebSocketInstance._instances,
     restore: () => {
-      (globalThis as any).WebSocket = _OriginalWebSocket; // eslint-disable-line @typescript-eslint/no-explicit-any
+      Object.defineProperty(globalThis, "WebSocket", {
+        configurable: true,
+        writable: true,
+        value: _OriginalWebSocket,
+      });
       MockWebSocketInstance.reset();
     },
   };

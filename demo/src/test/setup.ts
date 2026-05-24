@@ -1,6 +1,9 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { cleanup } from "@testing-library/react";
 import { server } from "./mocks/server";
+
+afterEach(() => cleanup());
 
 beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
 afterEach(() => server.resetHandlers());
@@ -20,7 +23,7 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
-global.ResizeObserver = class {
+globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}
   disconnect() {}

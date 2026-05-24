@@ -4,6 +4,7 @@ import i18n from "i18next";
 import React from "react";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 if (!i18n.isInitialized) {
   i18n.use(initReactI18next).init({
@@ -35,7 +36,9 @@ export function renderWithProviders(
     return (
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          </TooltipProvider>
         </I18nextProvider>
       </QueryClientProvider>
     );

@@ -1,6 +1,10 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { cleanup } from "@testing-library/react";
 import { server } from "./mocks/server";
+
+// RTL cleanup — required because globals:false disables auto-cleanup detection
+afterEach(() => cleanup());
 
 // MSW lifecycle
 beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
@@ -23,7 +27,7 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 // ResizeObserver stub — used by recharts / radix
-global.ResizeObserver = class {
+globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}
   disconnect() {}
