@@ -127,6 +127,40 @@ export function formatTime(unix: number): string {
   });
 }
 
+// --- Day grouping for PresenceLog -------------------------------------------
+
+export interface DayGroup {
+  isoDate: string; // "YYYY-MM-DD"
+  blocks: Block[];
+}
+
+function blockTimestamp(b: Block): number {
+  if (b.type === "session") return b.session.startAt;
+  if (b.type === "offline-gap") return b.fromAt;
+  return b.ev.at;
+}
+
+function toISODate(unix: number): string {
+  const d = new Date(unix * 1000);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Group blocks by calendar day, most-recent day first. */
+export function groupBlocksByDay(blocks: Block[]): DayGroup[] {
+  const map = new Map<string, Block[]>();
+  for (const b of blocks) {
+    const key = toISODate(blockTimestamp(b));
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(b);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => b.localeCompare(a)) // newest first
+    .map(([isoDate, blocks]) => ({ isoDate, blocks }));
+}
+
 export function formatDuration(sec: number): string {
   if (sec < 60) return `${sec}s`;
   const m = Math.floor(sec / 60);

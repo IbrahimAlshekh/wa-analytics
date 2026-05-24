@@ -196,7 +196,10 @@
     "aboutUpdated": "تم تحديث النبذة:",
     "aboutEmpty": "(فارغ)",
     "statusSection": "الحالة",
-    "viewMedia": "عرض {{type}}"
+    "viewMedia": "عرض {{type}}",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "showMore": "عرض {{count}} أيام أخرى"
   },
   "stats": {
     "activitySummary": "ملخص النشاط",

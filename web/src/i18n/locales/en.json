@@ -196,7 +196,10 @@
     "aboutUpdated": "About updated:",
     "aboutEmpty": "(empty)",
     "statusSection": "Status",
-    "viewMedia": "View {{type}}"
+    "viewMedia": "View {{type}}",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "showMore": "Show {{count}} more days"
   },
   "stats": {
     "activitySummary": "Activity summary",

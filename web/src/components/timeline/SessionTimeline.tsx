@@ -2,9 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { TimelineEntry } from "@/types/timeline";
 import { buildBlocks, formatTime } from "@/lib/sessions";
 import MediaPreview from "./MediaPreview";
-import SessionBlock from "./SessionBlock";
-import GapBlock from "./GapBlock";
-import EventBlock from "./EventBlock";
+import PresenceLog from "./PresenceLog";
 
 export interface SessionTimelineProps {
   entries: TimelineEntry[];
@@ -78,21 +76,7 @@ export default function SessionTimeline({
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           {t("timeline.statusSection")}
         </p>
-        {blocks.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            {t("timeline.noSessions")}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {blocks.map((b, i) => {
-              if (b.type === "session")
-                return <SessionBlock key={i} session={b.session} />;
-              if (b.type === "offline-gap")
-                return <GapBlock key={i} fromAt={b.fromAt} toAt={b.toAt} />;
-              return <EventBlock key={i} ev={b.ev} />;
-            })}
-          </div>
-        )}
+        <PresenceLog blocks={blocks} />
       </div>
     </div>
   );
