@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -668,7 +669,7 @@ func (t *Tracker) onMessage(msg *events.Message) {
 	// Determine text and media type.
 	text := extractText(msg.Message)
 	mediaType := extractMediaType(msg.Message)
-	var mediaPath string
+	var mediaPath, stickerHash string
 
 	// Download media if available.
 	if mediaType != "" && t.mediaDir != "" {
@@ -676,6 +677,11 @@ func (t *Tracker) onMessage(msg *events.Message) {
 			data, err := t.wa.DownloadMedia(t.ctx, downloadable)
 			if err != nil {
 				slog.Warn("tracker: download media failed", "accountID", t.accountID, "messageID", info.ID, "err", err)
+			} else if mediaType == "sticker" {
+				mediaPath, stickerHash = t.saveSticker(data)
+				if mediaPath != "" {
+					slog.Debug("tracker: sticker saved", "accountID", t.accountID, "messageID", info.ID, "hash", stickerHash)
+				}
 			} else {
 				ext := getExtension(mediaType, msg.Message)
 				filename := fmt.Sprintf("%d_%s%s", t.accountID, info.ID, ext)
@@ -737,6 +743,7 @@ func (t *Tracker) onMessage(msg *events.Message) {
 		Text:            text,
 		MediaType:       mediaType,
 		MediaPath:       mediaPath,
+		StickerHash:     stickerHash,
 		ReceivedAt:      now,
 		QuotedMessageID: extractQuotedMessageID(msg.Message),
 	}
@@ -835,6 +842,8 @@ func (t *Tracker) onStory(msg *events.Message) {
 			data, err := t.wa.DownloadMedia(t.ctx, downloadable)
 			if err != nil {
 				slog.Warn("tracker: story download media failed", "accountID", t.accountID, "storyID", info.ID, "err", err)
+			} else if mediaType == "sticker" {
+				mediaPath, _ = t.saveSticker(data)
 			} else {
 				ext := getExtension(mediaType, msg.Message)
 				filename := fmt.Sprintf("story_%d_%s%s", t.accountID, info.ID, ext)
@@ -1163,6 +1172,34 @@ func getDownloadable(msg *waE2E.Message) any {
 		return msg.StickerMessage
 	}
 	return nil
+}
+
+// saveSticker stores a sticker image using content-based (SHA-256) addressing so the
+// same image is written only once regardless of which account or message sent it.
+// Returns the relative media path and hex hash; both are empty on failure.
+func (t *Tracker) saveSticker(data []byte) (path, hash string) {
+	sum := sha256.Sum256(data)
+	hash = hex.EncodeToString(sum[:])
+	path = filepath.Join("stickers", hash+".webp")
+
+	// If the DB already knows this hash the file exists on disk; skip write.
+	if _, err := t.db.GetStickerByHash(t.ctx, hash); err == nil {
+		return path, hash
+	}
+
+	fullPath := filepath.Join(t.mediaDir, path)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		slog.Error("tracker: create stickers dir failed", "err", err)
+		return "", ""
+	}
+	if err := os.WriteFile(fullPath, data, 0o644); err != nil {
+		slog.Error("tracker: save sticker failed", "hash", hash, "err", err)
+		return "", ""
+	}
+	if _, err := t.db.UpsertSticker(t.ctx, hash, path); err != nil {
+		slog.Warn("tracker: upsert sticker record failed", "hash", hash, "err", err)
+	}
+	return path, hash
 }
 
 func getExtension(mediaType string, msg *waE2E.Message) string {

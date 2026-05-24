@@ -52,6 +52,9 @@ func (f *fakeQuerier) GetTopWords(_ context.Context, _ int64, _, _ string, _ int
 func (f *fakeQuerier) GetTopDomains(_ context.Context, _ int64, _, _ string) ([]analytics.TokenCount, []analytics.TokenCount, error) {
 	return nil, nil, nil
 }
+func (f *fakeQuerier) GetTopStickers(_ context.Context, _ int64, _, _ string, _ int) ([]analytics.StickerUsage, []analytics.StickerUsage, error) {
+	return nil, nil, nil
+}
 func (f *fakeQuerier) GetMonthlyTotals(_ context.Context, _ int64, _, _ string) ([]analytics.MonthRow, error) {
 	return f.monthly, nil
 }

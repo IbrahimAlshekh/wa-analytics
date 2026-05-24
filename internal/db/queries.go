@@ -434,6 +434,37 @@ func (db *DB) InsertAbout(ctx context.Context, contactID int64, text string, set
 	return AboutRecord{ID: id, ContactID: contactID, Text: text, SetAt: setAt, CapturedAt: capturedAt}, nil
 }
 
+// --- Stickers ---------------------------------------------------------------
+
+// Sticker represents a deduplicated sticker image stored once across all accounts.
+type Sticker struct {
+	Hash      string `json:"hash"`
+	Path      string `json:"path"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// UpsertSticker inserts a sticker record if the hash is not already known and
+// returns the canonical record (either new or existing).
+func (db *DB) UpsertSticker(ctx context.Context, hash, path string) (Sticker, error) {
+	now := time.Now().Unix()
+	_, err := db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO stickers (hash, path, created_at) VALUES (?, ?, ?)`,
+		hash, path, now)
+	if err != nil {
+		return Sticker{}, err
+	}
+	return db.GetStickerByHash(ctx, hash)
+}
+
+// GetStickerByHash fetches a sticker by its SHA-256 hash.
+func (db *DB) GetStickerByHash(ctx context.Context, hash string) (Sticker, error) {
+	var s Sticker
+	err := db.QueryRowContext(ctx,
+		`SELECT hash, path, created_at FROM stickers WHERE hash=?`, hash).
+		Scan(&s.Hash, &s.Path, &s.CreatedAt)
+	return s, err
+}
+
 // --- Messages ---------------------------------------------------------------
 
 type Message struct {
@@ -448,6 +479,7 @@ type Message struct {
 	Text            string `json:"text,omitempty"`
 	MediaType       string `json:"mediaType,omitempty"`
 	MediaPath       string `json:"mediaPath,omitempty"`
+	StickerHash     string `json:"stickerHash,omitempty"`
 	ReceivedAt      int64  `json:"receivedAt"`
 	QuotedMessageID string `json:"quotedMessageId,omitempty"`
 }
@@ -468,11 +500,11 @@ type MessageEvent struct {
 func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
 	res, err := db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO messages
-		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, media_path, received_at, quoted_message_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, text, media_type, media_path, sticker_hash, received_at, quoted_message_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
 		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
-		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt, nullStr(m.QuotedMessageID))
+		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), nullStr(m.StickerHash), m.ReceivedAt, nullStr(m.QuotedMessageID))
 	if err != nil {
 		return Message{}, err
 	}
@@ -488,7 +520,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), received_at, COALESCE(quoted_message_id,'')
+	q := `SELECT id, account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp, COALESCE(text,''), COALESCE(media_type,''), COALESCE(media_path,''), COALESCE(sticker_hash,''), received_at, COALESCE(quoted_message_id,'')
 		   FROM messages WHERE contact_id=?`
 	args := []any{contactID}
 	if before > 0 {
@@ -509,7 +541,7 @@ func (db *DB) ListMessages(ctx context.Context, contactID, before int64, limit i
 		var cid sql.NullInt64
 		var fromMe int
 		if err := rows.Scan(&m.ID, &m.AccountID, &cid, &m.ChatJID, &m.MessageID,
-			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.ReceivedAt, &m.QuotedMessageID); err != nil {
+			&m.SenderJID, &fromMe, &m.Timestamp, &m.Text, &m.MediaType, &m.MediaPath, &m.StickerHash, &m.ReceivedAt, &m.QuotedMessageID); err != nil {
 			return nil, err
 		}
 		if cid.Valid {

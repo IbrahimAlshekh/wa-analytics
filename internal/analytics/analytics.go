@@ -18,6 +18,7 @@ type AnalyticsQuerier interface {
 	GetTopEmojis(ctx context.Context, contactID int64, startDay, endDay string, limit int) (me, them []TokenCount, err error)
 	GetTopWords(ctx context.Context, contactID int64, startDay, endDay string, limit int) (me, them []TokenCount, err error)
 	GetTopDomains(ctx context.Context, contactID int64, startDay, endDay string) (me, them []TokenCount, err error)
+	GetTopStickers(ctx context.Context, contactID int64, startDay, endDay string, limit int) (me, them []StickerUsage, err error)
 	GetMonthlyTotals(ctx context.Context, contactID int64, startDay, endDay string) ([]MonthRow, error)
 	GetSyncLaughDays(ctx context.Context, contactID int64, startDay, endDay string) (int64, error)
 }
@@ -64,6 +65,13 @@ type TokenCount struct {
 	Count int64  `json:"count"`
 }
 
+// StickerUsage records how often a specific sticker was used.
+type StickerUsage struct {
+	Hash  string `json:"hash"`
+	Path  string `json:"path"`
+	Count int64  `json:"count"`
+}
+
 // MonthRow holds message counts for a calendar month.
 type MonthRow struct {
 	Month      string  `json:"month"`      // "YYYY-MM"
@@ -74,12 +82,14 @@ type MonthRow struct {
 }
 
 type LanguageSection struct {
-	TopEmojisMe    []TokenCount `json:"topEmojisMe"`
-	TopEmojisThem  []TokenCount `json:"topEmojisThem"`
-	TopWordsMe     []TokenCount `json:"topWordsMe"`
-	TopWordsThem   []TokenCount `json:"topWordsThem"`
-	TopDomainsMe   []TokenCount `json:"topDomainsMe"`
-	TopDomainsThem []TokenCount `json:"topDomainsThem"`
+	TopEmojisMe    []TokenCount   `json:"topEmojisMe"`
+	TopEmojisThem  []TokenCount   `json:"topEmojisThem"`
+	TopWordsMe     []TokenCount   `json:"topWordsMe"`
+	TopWordsThem   []TokenCount   `json:"topWordsThem"`
+	TopDomainsMe   []TokenCount   `json:"topDomainsMe"`
+	TopDomainsThem []TokenCount   `json:"topDomainsThem"`
+	TopStickersMe  []StickerUsage `json:"topStickersMe"`
+	TopStickersThem []StickerUsage `json:"topStickersThem"`
 }
 
 type IndicatorSection struct {
@@ -229,6 +239,10 @@ func Compute(ctx context.Context, q AnalyticsQuerier, contactID int64, rangeName
 	if err != nil {
 		return Report{}, err
 	}
+	topStickersMe, topStickersThem, err := q.GetTopStickers(ctx, contactID, startDay, endDay, 10)
+	if err != nil {
+		return Report{}, err
+	}
 	monthly, err := q.GetMonthlyTotals(ctx, contactID, startDay, endDay)
 	if err != nil {
 		return Report{}, err
@@ -341,12 +355,14 @@ func Compute(ctx context.Context, q AnalyticsQuerier, contactID int64, rangeName
 		},
 		Initiation: initiation,
 		Language: LanguageSection{
-			TopEmojisMe:    topEmojisMe,
-			TopEmojisThem:  topEmojisThem,
-			TopWordsMe:     topWordsMe,
-			TopWordsThem:   topWordsThem,
-			TopDomainsMe:   topDomainsMe,
-			TopDomainsThem: topDomainsThem,
+			TopEmojisMe:     topEmojisMe,
+			TopEmojisThem:   topEmojisThem,
+			TopWordsMe:      topWordsMe,
+			TopWordsThem:    topWordsThem,
+			TopDomainsMe:    topDomainsMe,
+			TopDomainsThem:  topDomainsThem,
+			TopStickersMe:   topStickersMe,
+			TopStickersThem: topStickersThem,
 		},
 		Indicators: indicators,
 	}, nil

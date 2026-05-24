@@ -34,7 +34,7 @@ func (db *DB) InsertMessageWithAnalytics(ctx context.Context, m Message, f analy
 		slog.Warn("db: analytics tx begin failed", "messageID", m.MessageID, "err", err)
 		return saved, nil
 	}
-	if err := db.ApplyMessageAnalyticsTx(ctx, tx, *m.ContactID, side, day, m.MediaType, f); err != nil {
+	if err := db.ApplyMessageAnalyticsTx(ctx, tx, *m.ContactID, side, day, m.MediaType, m.StickerHash, f); err != nil {
 		_ = tx.Rollback()
 		slog.Warn("db: analytics apply failed", "messageID", m.MessageID, "err", err)
 		return saved, nil
@@ -50,15 +50,15 @@ func (db *DB) insertMessageWithDerived(ctx context.Context, m Message, f analyti
 	res, err := db.ExecContext(ctx,
 		`INSERT OR IGNORE INTO messages
 		 (account_id, contact_id, chat_jid, message_id, sender_jid, is_from_me, timestamp,
-		  text, media_type, media_path, received_at,
+		  text, media_type, media_path, sticker_hash, received_at,
 		  word_count, char_count, has_question, has_laughter,
 		  emoji_json, word_json, url_domain_json,
 		  emotion_mask, emotion_counts_json, hour_local, dow_local,
 		  quoted_message_id)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?,?, ?)`,
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?,?, ?)`,
 		m.AccountID, nullInt64Ptr(m.ContactID), db.enc(m.ChatJID), m.MessageID,
 		db.enc(m.SenderJID), boolToInt(m.IsFromMe), m.Timestamp,
-		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), m.ReceivedAt,
+		nullStr(m.Text), nullStr(m.MediaType), nullStr(m.MediaPath), nullStr(m.StickerHash), m.ReceivedAt,
 		f.WordCount, f.CharCount, boolToInt(f.HasQuestion), boolToInt(f.HasLaughter),
 		jsonOrNullStr(uniqueStrings(f.Emojis, 100)),
 		jsonOrNullStr(uniqueStrings(f.Words, 50)),
@@ -101,8 +101,9 @@ func (db *DB) UpdateMessageDerivedTx(ctx context.Context, tx *sql.Tx, msgID int6
 
 // ApplyMessageAnalyticsTx UPSERTs analytics aggregate rows for one message within tx.
 // mediaType is the value from the messages.media_type column.
+// stickerHash is the SHA-256 hash for sticker messages; empty string for non-stickers.
 // Called by InsertMessageWithAnalytics (in its own tx) and by the backfill CLI.
-func (db *DB) ApplyMessageAnalyticsTx(ctx context.Context, tx *sql.Tx, contactID int64, senderSide, day, mediaType string, f analytics.MessageFeatures) error {
+func (db *DB) ApplyMessageAnalyticsTx(ctx context.Context, tx *sql.Tx, contactID int64, senderSide, day, mediaType, stickerHash string, f analytics.MessageFeatures) error {
 	voiceNotes, photos, videos, stickers, documents, links := mediaFlags(mediaType, f.URLDomains)
 
 	_, err := tx.ExecContext(ctx,
@@ -190,6 +191,18 @@ func (db *DB) ApplyMessageAnalyticsTx(ctx context.Context, tx *sql.Tx, contactID
 			 VALUES (?,?,?,?,1)
 			 ON CONFLICT(contact_id,day,sender_side,domain) DO UPDATE SET count=count+1`,
 			contactID, day, senderSide, domain,
+		); err != nil {
+			return err
+		}
+	}
+
+	// Sticker usage (only when a recognised sticker hash is present)
+	if mediaType == "sticker" && stickerHash != "" {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO analytics_sticker_daily (contact_id, day, sender_side, sticker_hash, count)
+			 VALUES (?,?,?,?,1)
+			 ON CONFLICT(contact_id,day,sender_side,sticker_hash) DO UPDATE SET count=count+1`,
+			contactID, day, senderSide, stickerHash,
 		); err != nil {
 			return err
 		}

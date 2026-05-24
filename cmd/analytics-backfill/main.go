@@ -97,18 +97,19 @@ func run(ctx context.Context, dbPath string, key []byte) error {
 
 // msgRow holds the minimal data needed to compute analytics features for a message.
 type msgRow struct {
-	id        int64
-	contactID sql.NullInt64
-	isFromMe  bool
-	timestamp int64
-	text      string
-	mediaType string
+	id          int64
+	contactID   sql.NullInt64
+	isFromMe    bool
+	timestamp   int64
+	text        string
+	mediaType   string
+	stickerHash string
 }
 
 func fetchChunk(ctx context.Context, store *db.DB, afterID int64) ([]msgRow, error) {
 	rows, err := store.QueryContext(ctx,
 		`SELECT id, contact_id, is_from_me, timestamp,
-		        COALESCE(text,''), COALESCE(media_type,'')
+		        COALESCE(text,''), COALESCE(media_type,''), COALESCE(sticker_hash,'')
 		 FROM messages WHERE word_count IS NULL AND id > ?
 		 ORDER BY id LIMIT ?`, afterID, chunkSize)
 	if err != nil {
@@ -120,7 +121,7 @@ func fetchChunk(ctx context.Context, store *db.DB, afterID int64) ([]msgRow, err
 	for rows.Next() {
 		var r msgRow
 		var fromMe int
-		if err := rows.Scan(&r.id, &r.contactID, &fromMe, &r.timestamp, &r.text, &r.mediaType); err != nil {
+		if err := rows.Scan(&r.id, &r.contactID, &fromMe, &r.timestamp, &r.text, &r.mediaType, &r.stickerHash); err != nil {
 			return nil, err
 		}
 		r.isFromMe = fromMe == 1
@@ -150,7 +151,7 @@ func processChunk(ctx context.Context, store *db.DB, chunk []msgRow) error {
 				side = "me"
 			}
 			day := ts.Local().Format("2006-01-02")
-			if err := store.ApplyMessageAnalyticsTx(ctx, tx, r.contactID.Int64, side, day, r.mediaType, f); err != nil {
+			if err := store.ApplyMessageAnalyticsTx(ctx, tx, r.contactID.Int64, side, day, r.mediaType, r.stickerHash, f); err != nil {
 				return fmt.Errorf("analytics for message %d: %w", r.id, err)
 			}
 		}

@@ -269,6 +269,38 @@ func (d *DB) GetTopDomains(ctx context.Context, contactID int64, startDay, endDa
 	return
 }
 
+// GetTopStickers returns the most-used stickers per sender side, capped at limit per side.
+func (d *DB) GetTopStickers(ctx context.Context, contactID int64, startDay, endDay string, limit int) (me, them []analytics.StickerUsage, err error) {
+	rows, err := d.QueryContext(ctx, `
+		SELECT asd.sender_side, asd.sticker_hash, COALESCE(s.path,''), SUM(asd.count) as total
+		FROM analytics_sticker_daily asd
+		LEFT JOIN stickers s ON s.hash = asd.sticker_hash
+		WHERE asd.contact_id=? AND asd.day BETWEEN ? AND ?
+		GROUP BY asd.sender_side, asd.sticker_hash
+		ORDER BY asd.sender_side, total DESC`,
+		contactID, startDay, endDay,
+	)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var side, hash, path string
+		var count int64
+		if err = rows.Scan(&side, &hash, &path, &count); err != nil {
+			return
+		}
+		u := analytics.StickerUsage{Hash: hash, Path: path, Count: count}
+		if side == "me" && len(me) < limit {
+			me = append(me, u)
+		} else if side == "them" && len(them) < limit {
+			them = append(them, u)
+		}
+	}
+	err = rows.Err()
+	return
+}
+
 // GetMonthlyTotals returns per-month message counts for both sender sides.
 func (d *DB) GetMonthlyTotals(ctx context.Context, contactID int64, startDay, endDay string) ([]analytics.MonthRow, error) {
 	rows, err := d.QueryContext(ctx, `

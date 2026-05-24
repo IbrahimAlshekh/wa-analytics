@@ -18,7 +18,7 @@ func TestMigrationsRunOnOpen(t *testing.T) {
 	var count int
 	err := store.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count)
 	require.NoError(t, err)
-	assert.Equal(t, 11, count, "all 11 migration files should be recorded")
+	assert.Equal(t, 12, count, "all 12 migration files should be recorded")
 }
 
 func TestMigrationsIdempotent(t *testing.T) {
@@ -34,7 +34,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	// (We can't call migrate directly since it's unexported, so just check that
 	// the DB is usable after a second open of the same path — tested indirectly
 	// via the WriteConcern in production; here we just verify count is stable.)
-	assert.Equal(t, 11, count1)
+	assert.Equal(t, 12, count1)
 }
 
 // ---- splitStatements --------------------------------------------------------
