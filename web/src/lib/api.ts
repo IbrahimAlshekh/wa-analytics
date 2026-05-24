@@ -144,11 +144,22 @@ export const api = {
       `/accounts/${accountId}/contacts/${contactId}/messages?${q}`,
     );
   },
-  analytics: (accountId: number, contactId: number, range: AnalyticsRange) =>
-    request<AnalyticsReport>(
-      "GET",
-      `/accounts/${accountId}/contacts/${contactId}/analytics?range=${range}`,
-    ),
+  analytics: (
+    accountId: number,
+    contactId: number,
+    range: AnalyticsRange,
+    customStart?: string,
+    customEnd?: string,
+  ) => {
+    const base = `/accounts/${accountId}/contacts/${contactId}/analytics`;
+    if (range === "custom" && customStart && customEnd) {
+      return request<AnalyticsReport>(
+        "GET",
+        `${base}?start=${customStart}&end=${customEnd}`,
+      );
+    }
+    return request<AnalyticsReport>("GET", `${base}?range=${range}`);
+  },
 
   // Schedule (per-account)
   getSchedule: (accountId: number) =>

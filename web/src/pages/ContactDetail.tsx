@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { MessageSquare, Pause, Play, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
-import type { AnalyticsRange } from "@/types/analytics";
+import type { AnalyticsRange, CustomDateRange } from "@/types/analytics";
+import AnalyticsRangeFilter from "@/components/analytics/AnalyticsRangeFilter";
 import type { TimelineEntry } from "@/types/timeline";
 import SessionTimeline from "@/components/timeline/SessionTimeline";
 import StatsStrip from "../components/StatsStrip";
@@ -33,13 +34,10 @@ export default function ContactDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const RANGE_LABELS: { value: AnalyticsRange; label: string }[] = [
-    { value: "day", label: t("contactDetail.rangeDaily") },
-    { value: "week", label: t("contactDetail.rangeWeekly") },
-    { value: "all", label: t("contactDetail.rangeGeneral") },
-  ];
-
   const [range, setRange] = useState<AnalyticsRange>("week");
+  const [customDates, setCustomDates] = useState<CustomDateRange>({ start: "", end: "" });
+
+  const isCustomReady = range === "custom" && customDates.start !== "" && customDates.end !== "";
 
   const {
     upsertContact,
@@ -107,9 +105,11 @@ export default function ContactDetail() {
   }, [accountId, cid, addWsEntry]);
 
   const analyticsQ = useQuery({
-    queryKey: ["analytics", accountId, cid, range],
-    queryFn: () => api.analytics(accountId, cid, range),
+    queryKey: ["analytics", accountId, cid, range, customDates.start, customDates.end],
+    queryFn: () =>
+      api.analytics(accountId, cid, range, customDates.start, customDates.end),
     staleTime: 60_000,
+    enabled: range !== "custom" || isCustomReady,
   });
 
   const allEntries = useMemo<TimelineEntry[]>(() => {
@@ -306,24 +306,12 @@ export default function ContactDetail() {
         <TabsContent value="analytics" className="mt-4 flex flex-col gap-4">
           <Card>
             <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("contactDetail.rangeLabel")}
-                </span>
-                <div className="flex gap-1">
-                  {RANGE_LABELS.map(({ value, label }) => (
-                    <Button
-                      key={value}
-                      variant={range === value ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setRange(value)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <AnalyticsRangeFilter
+                range={range}
+                customDates={customDates}
+                onRangeChange={setRange}
+                onCustomDatesChange={setCustomDates}
+              />
             </CardContent>
           </Card>
           {analyticsQ.data ? (

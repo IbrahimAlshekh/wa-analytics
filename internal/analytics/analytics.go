@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -196,7 +197,27 @@ type InitiationSection struct {
 // Recognized range names: "day" (today), "week" (last 7 days), "month" (last 30 days), "all".
 func Compute(ctx context.Context, q AnalyticsQuerier, contactID int64, rangeName string, now time.Time) (Report, error) {
 	startDay, endDay, startUnix, endUnix := rangeBounds(rangeName, now)
+	return computeWithBounds(ctx, q, contactID, rangeName, startDay, endDay, startUnix, endUnix)
+}
 
+// ComputeCustom returns a Report for contactID over an explicit date range.
+// startDay and endDay must be in "YYYY-MM-DD" format. endDay is inclusive.
+func ComputeCustom(ctx context.Context, q AnalyticsQuerier, contactID int64, startDay, endDay string) (Report, error) {
+	loc := time.Local
+	start, err := time.ParseInLocation("2006-01-02", startDay, loc)
+	if err != nil {
+		return Report{}, fmt.Errorf("invalid start date: %w", err)
+	}
+	end, err := time.ParseInLocation("2006-01-02", endDay, loc)
+	if err != nil {
+		return Report{}, fmt.Errorf("invalid end date: %w", err)
+	}
+	startUnix := start.Unix()
+	endUnix := end.AddDate(0, 0, 1).Unix() - 1 // inclusive end-of-day
+	return computeWithBounds(ctx, q, contactID, "custom", startDay, endDay, startUnix, endUnix)
+}
+
+func computeWithBounds(ctx context.Context, q AnalyticsQuerier, contactID int64, label, startDay, endDay string, startUnix, endUnix int64) (Report, error) {
 	me, them, err := q.GetAnalyticsTotals(ctx, contactID, startDay, endDay)
 	if err != nil {
 		return Report{}, err
@@ -278,7 +299,7 @@ func Compute(ctx context.Context, q AnalyticsQuerier, contactID int64, rangeName
 	}
 
 	return Report{
-		Range:     rangeName,
+		Range:     label,
 		StartUnix: startUnix,
 		EndUnix:   endUnix,
 		Timeline: TimelineSection{

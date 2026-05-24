@@ -11,7 +11,12 @@ export interface MonthRow {
   meSharePct: number;
 }
 
-export type AnalyticsRange = "day" | "week" | "month" | "all";
+export type AnalyticsRange = "day" | "week" | "month" | "all" | "custom";
+
+export interface CustomDateRange {
+  start: string; // YYYY-MM-DD
+  end: string;   // YYYY-MM-DD
+}
 
 export interface AnalyticsEmotionCounts {
   love: number;
