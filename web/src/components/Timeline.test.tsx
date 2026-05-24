@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "../test/utils";
 import type { TimelineEntry } from "@/types/timeline";
-import SessionTimeline from "./timeline/SessionTimeline";
+import RecentMessages from "./timeline/RecentMessages";
 
 const NOW = 1700000000;
 
@@ -12,51 +12,29 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-const p = (
-  offset: number,
-  state: "available" | "unavailable",
-): TimelineEntry => ({ kind: "presence", at: NOW + offset, state });
-
-const defaultProps = { accountId: 1, contactId: 1 };
-
-describe("SessionTimeline", () => {
+describe("RecentMessages", () => {
   it("shows no-messages for empty entries", () => {
-    renderWithProviders(
-      <SessionTimeline entries={[]} contactName="Alice" {...defaultProps} />,
-    );
+    renderWithProviders(<RecentMessages entries={[]} contactName="Alice" />);
     expect(screen.getByText("timeline.noMessages")).toBeInTheDocument();
   });
 
   it("shows no-messages when entries contain only presence events", () => {
-    const entries = [p(-600, "available"), p(-60, "unavailable")];
+    const entries: TimelineEntry[] = [
+      { kind: "presence", at: NOW - 600, state: "available" },
+      { kind: "presence", at: NOW - 60, state: "unavailable" },
+    ];
     renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Alice" {...defaultProps} />,
+      <RecentMessages entries={entries} contactName="Alice" />,
     );
     expect(screen.getByText("timeline.noMessages")).toBeInTheDocument();
   });
 
-  it("renders session blocks section for presence entries", () => {
-    const entries = [p(-600, "available"), p(-60, "unavailable")];
-    renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Alice" {...defaultProps} />,
-    );
-    expect(screen.getByText("timeline.statusSection")).toBeInTheDocument();
-  });
-
-  it("shows no-messages when only presence entries are present", () => {
-    const entries = [p(-600, "available"), p(-60, "unavailable")];
-    renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Alice" {...defaultProps} />,
-    );
-    expect(screen.getByText("timeline.noMessages")).toBeInTheDocument();
-  });
-
-  it("renders message text in recent messages section", () => {
+  it("renders message text", () => {
     const entries: TimelineEntry[] = [
       { kind: "message", at: NOW - 100, text: "hello there", isFromMe: false },
     ];
     renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Alice" {...defaultProps} />,
+      <RecentMessages entries={entries} contactName="Alice" />,
     );
     expect(screen.getByText(/hello there/)).toBeInTheDocument();
   });
@@ -66,7 +44,7 @@ describe("SessionTimeline", () => {
       { kind: "message", at: NOW - 100, text: "hey", isFromMe: false },
     ];
     renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Bob" {...defaultProps} />,
+      <RecentMessages entries={entries} contactName="Bob" />,
     );
     expect(screen.getByText(/Bob/)).toBeInTheDocument();
   });
@@ -76,9 +54,8 @@ describe("SessionTimeline", () => {
       { kind: "message", at: NOW - 100, text: "sent by me", isFromMe: true },
     ];
     renderWithProviders(
-      <SessionTimeline entries={entries} contactName="Bob" {...defaultProps} />,
+      <RecentMessages entries={entries} contactName="Bob" />,
     );
-    // In cimode, t("analytics.you") returns "analytics.you"
     expect(screen.getByText(/analytics\.you/)).toBeInTheDocument();
   });
 });

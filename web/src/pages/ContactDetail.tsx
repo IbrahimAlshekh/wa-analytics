@@ -7,7 +7,8 @@ import { api } from "../lib/api";
 import type { AnalyticsRange, CustomDateRange } from "@/types/analytics";
 import AnalyticsRangeFilter from "@/components/analytics/AnalyticsRangeFilter";
 import type { TimelineEntry } from "@/types/timeline";
-import SessionTimeline from "@/components/timeline/SessionTimeline";
+import RecentMessages from "@/components/timeline/RecentMessages";
+import ActivityTimeline from "@/components/timeline/ActivityTimeline";
 import StatsStrip from "../components/StatsStrip";
 import PresencePanel from "@/components/presence/PresencePanel";
 import AnalyticsPanel from "@/components/analytics/AnalyticsPanel";
@@ -18,7 +19,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getMediaUrl } from "@/lib/media";
 import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -282,16 +283,8 @@ export default function ContactDetail() {
             sessionStart={sessionStart}
             lastPresence={lastPresence}
           />
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("contactDetail.activityTimeline")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SessionTimeline entries={allEntries} contactName={displayName} accountId={accountId} contactId={cid} />
-            </CardContent>
-          </Card>
+          <RecentMessages entries={allEntries} contactName={displayName} />
+          <ActivityTimeline accountId={accountId} contactId={cid} />
         </TabsContent>
 
         <TabsContent value="presence" className="mt-4 flex flex-col gap-4">
