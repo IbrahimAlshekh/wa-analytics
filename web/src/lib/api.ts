@@ -1,16 +1,10 @@
-import type {
-  Account,
-  AccountSchedule,
-  AnalyticsRange,
-  AnalyticsReport,
-  Contact,
-  ContactsPage,
-  MessagesPage,
-  ScheduleSlot,
-  StatsSummary,
-  Story,
-  TimelineResponse,
-} from "./types";
+import type { Account } from "@/types/account";
+import type { Contact, ContactsPage } from "@/types/contact";
+import type { StatsSummary, TimelineResponse } from "@/types/timeline";
+import type { MessagesPage } from "@/types/message";
+import type { Story } from "@/types/story";
+import type { AnalyticsRange, AnalyticsReport } from "@/types/analytics";
+import type { ScheduleSlot, AccountSchedule } from "@/types/schedule";
 
 const BASE = "/api";
 
@@ -51,7 +45,11 @@ async function maybeRefresh(): Promise<void> {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   await maybeRefresh();
 
   const headers: Record<string, string> = {};
@@ -81,7 +79,10 @@ export const api = {
   // Setup
   setupStatus: () => request<{ hasUsers: boolean }>("GET", "/setup/status"),
   setupRegister: (username: string, password: string) =>
-    request<{ token: string }>("POST", "/setup/register", { username, password }),
+    request<{ token: string }>("POST", "/setup/register", {
+      username,
+      password,
+    }),
 
   // Auth
   login: (username: string, password: string) =>
@@ -92,19 +93,27 @@ export const api = {
   startQR: () => request<{ started: boolean }>("POST", "/accounts/pair/qr"),
   pairPhone: (phone: string) =>
     request<{ code: string }>("POST", "/accounts/pair/phone", { phone }),
-  updateAccount: (id: number, body: { label?: string; trackingActive?: boolean }) =>
-    request<Account>("PATCH", `/accounts/${id}`, body),
+  updateAccount: (
+    id: number,
+    body: { label?: string; trackingActive?: boolean },
+  ) => request<Account>("PATCH", `/accounts/${id}`, body),
   deleteAccount: (id: number) => request<void>("DELETE", `/accounts/${id}`),
 
   // Contacts (per-account)
   listContacts: (accountId: number, page = 1, limit = 20, search = "") => {
     const q = search ? `&q=${encodeURIComponent(search)}` : "";
-    return request<ContactsPage>("GET", `/accounts/${accountId}/contacts?page=${page}&limit=${limit}${q}`);
+    return request<ContactsPage>(
+      "GET",
+      `/accounts/${accountId}/contacts?page=${page}&limit=${limit}${q}`,
+    );
   },
   syncContacts: (accountId: number) =>
     request<{ synced: number }>("POST", `/accounts/${accountId}/contacts/sync`),
   createContact: (accountId: number, phone: string, displayName: string) =>
-    request<Contact>("POST", `/accounts/${accountId}/contacts`, { phone, displayName }),
+    request<Contact>("POST", `/accounts/${accountId}/contacts`, {
+      phone,
+      displayName,
+    }),
   updateContact: (
     accountId: number,
     id: number,
@@ -119,7 +128,11 @@ export const api = {
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/timeline?since=${since}`,
     ),
-  stats: (accountId: number, contactId: number, range: "today" | "week" | "month") =>
+  stats: (
+    accountId: number,
+    contactId: number,
+    range: "today" | "week" | "month",
+  ) =>
     request<StatsSummary>(
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/stats?range=${range}`,
@@ -140,19 +153,40 @@ export const api = {
   // Schedule (per-account)
   getSchedule: (accountId: number) =>
     request<AccountSchedule>("GET", `/accounts/${accountId}/schedule`),
-  putSchedule: (accountId: number, forceOffline: boolean, slots: ScheduleSlot[]) =>
-    request<AccountSchedule>("PUT", `/accounts/${accountId}/schedule`, { forceOffline, slots }),
+  putSchedule: (
+    accountId: number,
+    forceOffline: boolean,
+    slots: ScheduleSlot[],
+  ) =>
+    request<AccountSchedule>("PUT", `/accounts/${accountId}/schedule`, {
+      forceOffline,
+      slots,
+    }),
 
   stories: (accountId: number, contactId: number) =>
-    request<Story[]>("GET", `/accounts/${accountId}/contacts/${contactId}/stories`),
+    request<Story[]>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/stories`,
+    ),
 
   refreshPicture: (accountId: number, contactId: number) =>
-    request<{ started: boolean }>("POST", `/accounts/${accountId}/contacts/${contactId}/refresh-picture`),
+    request<{ started: boolean }>(
+      "POST",
+      `/accounts/${accountId}/contacts/${contactId}/refresh-picture`,
+    ),
 
   fetchMessageHistory: (accountId: number, contactId: number) =>
-    request<{ started: boolean }>("POST", `/accounts/${accountId}/contacts/${contactId}/messages/fetch-history`),
+    request<{ started: boolean }>(
+      "POST",
+      `/accounts/${accountId}/contacts/${contactId}/messages/fetch-history`,
+    ),
 
-  sendMessage: (accountId: number, contactId: number, text: string, file?: File) => {
+  sendMessage: (
+    accountId: number,
+    contactId: number,
+    text: string,
+    file?: File,
+  ) => {
     if (!file) {
       return request<{ id: string; timestamp: number }>(
         "POST",
@@ -171,7 +205,11 @@ export const api = {
   },
 };
 
-async function requestRaw<T>(method: string, path: string, body: FormData): Promise<T> {
+async function requestRaw<T>(
+  method: string,
+  path: string,
+  body: FormData,
+): Promise<T> {
   await maybeRefresh();
   const headers: Record<string, string> = {};
   const t = token();

@@ -90,8 +90,8 @@ export default function AppHeader() {
               {backupState === "loading"
                 ? t("app.backingUp")
                 : backupState === "error"
-                ? t("app.backupFailed")
-                : t("app.backup")}
+                  ? t("app.backupFailed")
+                  : t("app.backup")}
             </span>
           </Button>
 

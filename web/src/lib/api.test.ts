@@ -52,7 +52,10 @@ describe("Authorization header", () => {
 describe("204 response", () => {
   it("returns undefined for 204 No Content", async () => {
     server.use(
-      http.delete(`${BASE}/accounts/1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(
+        `${BASE}/accounts/1`,
+        () => new HttpResponse(null, { status: 204 }),
+      ),
     );
     const api = await importApi();
     const result = await api.deleteAccount(1);
@@ -64,7 +67,10 @@ describe("401 response", () => {
   it("clears token and throws 'unauthorized' on 401", async () => {
     localStorage.setItem("wt_bearer", "bad-token");
     server.use(
-      http.get(`${BASE}/accounts`, () => new HttpResponse(null, { status: 401 })),
+      http.get(
+        `${BASE}/accounts`,
+        () => new HttpResponse(null, { status: 401 }),
+      ),
     );
     const api = await importApi();
     await expect(api.listAccounts()).rejects.toThrow("unauthorized");

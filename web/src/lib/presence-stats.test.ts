@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TimelineEntry } from "./types";
+import type { TimelineEntry } from "@/types/timeline";
 import {
   parseSessions,
   computeAvgSessionDuration,
@@ -84,12 +84,22 @@ describe("computeLongestSession", () => {
 
 describe("computeFirstLastSeen", () => {
   it("returns nulls for empty entries", () => {
-    expect(computeFirstLastSeen([])).toEqual({ firstSeen: null, lastSeen: null });
+    expect(computeFirstLastSeen([])).toEqual({
+      firstSeen: null,
+      lastSeen: null,
+    });
   });
 
   it("returns correct first and last presence timestamps", () => {
-    const entries = [p(1000, "available"), p(2000, "unavailable"), p(3000, "available")];
-    expect(computeFirstLastSeen(entries)).toEqual({ firstSeen: 1000, lastSeen: 3000 });
+    const entries = [
+      p(1000, "available"),
+      p(2000, "unavailable"),
+      p(3000, "available"),
+    ];
+    expect(computeFirstLastSeen(entries)).toEqual({
+      firstSeen: 1000,
+      lastSeen: 3000,
+    });
   });
 });
 

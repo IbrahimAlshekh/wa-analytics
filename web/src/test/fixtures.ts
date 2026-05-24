@@ -1,14 +1,14 @@
-import type {
-  Account,
-  AnalyticsReport,
-  Contact,
-  TimelineEntry,
-} from "@/lib/types";
+import type { Account } from "@/types/account";
+import type { Contact } from "@/types/contact";
+import type { TimelineEntry } from "@/types/timeline";
+import type { AnalyticsReport } from "@/types/analytics";
 
 let _seq = 1;
 const seq = () => _seq++;
 
-export function makeAccount(overrides: Partial<Account> & { id?: number } = {}): Account {
+export function makeAccount(
+  overrides: Partial<Account> & { id?: number } = {},
+): Account {
   const id = overrides.id ?? seq();
   return {
     id,
@@ -37,7 +37,9 @@ export function makeContact(
   };
 }
 
-export function makeTimelineEntry(overrides: Partial<TimelineEntry> = {}): TimelineEntry {
+export function makeTimelineEntry(
+  overrides: Partial<TimelineEntry> = {},
+): TimelineEntry {
   return {
     kind: "presence",
     at: 1700000000,

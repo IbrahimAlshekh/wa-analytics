@@ -42,7 +42,9 @@ export default function PhoneCodeView() {
       </Button>
       {code && (
         <div className="flex flex-col items-center gap-2 mt-2">
-          <span className="text-sm text-muted-foreground">{t("phone.enterCode")}</span>
+          <span className="text-sm text-muted-foreground">
+            {t("phone.enterCode")}
+          </span>
           <span className="font-mono text-2xl font-bold tracking-[0.3em] text-primary">
             {code.match(/.{1,4}/g)?.join(" ") ?? code}
           </span>

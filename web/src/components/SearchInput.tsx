@@ -9,10 +9,15 @@ interface SearchInputProps {
   className?: string;
 }
 
-export default function SearchInput({ value, onChange, placeholder, className }: SearchInputProps) {
+export default function SearchInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: SearchInputProps) {
   return (
     <div className={cn("relative", className)}>
-      <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+      <Search className="absolute inset-s-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -23,7 +28,7 @@ export default function SearchInput({ value, onChange, placeholder, className }:
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute inset-e-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="size-4" />
         </button>

@@ -1,23 +1,7 @@
-import type { TimelineEntry } from "./types";
+import type { TimelineEntry } from "@/types/timeline";
+import type { Session, NonPresence, Block } from "@/types/session";
 
-export interface Session {
-  startAt: number;
-  endAt: number | null;
-  lastSeen: number | null;
-  durationSec: number | null;
-}
-
-export interface NonPresence {
-  kind: "picture" | "about";
-  at: number;
-  text?: string;
-  mediaPath?: string;
-}
-
-export type Block =
-  | { type: "session"; session: Session }
-  | { type: "offline-gap"; fromAt: number; toAt: number }
-  | { type: "event"; ev: NonPresence };
+export type { Session, NonPresence, Block };
 
 export const MERGE_GAP_SEC = 120;
 
@@ -90,7 +74,11 @@ export function buildBlocks(entries: TimelineEntry[]): Block[] {
     if (prev && prev.endAt != null) {
       const gapSec = cur.startAt - prev.endAt;
       if (gapSec > 30) {
-        blocks.push({ type: "offline-gap", fromAt: prev.endAt, toAt: cur.startAt });
+        blocks.push({
+          type: "offline-gap",
+          fromAt: prev.endAt,
+          toAt: cur.startAt,
+        });
       }
     }
     blocks.push({ type: "session", session: cur });

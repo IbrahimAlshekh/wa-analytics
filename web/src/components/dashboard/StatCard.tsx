@@ -1,6 +1,16 @@
 import type { LucideIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +24,15 @@ interface StatCardProps {
   className?: string;
 }
 
-export default function StatCard({ title, value, description, info, icon: Icon, trend, className }: StatCardProps) {
+export default function StatCard({
+  title,
+  value,
+  description,
+  info,
+  icon: Icon,
+  trend,
+  className,
+}: StatCardProps) {
   return (
     <Card className={cn("gap-2", className)}>
       <CardHeader className="pb-1">
@@ -40,18 +58,30 @@ export default function StatCard({ title, value, description, info, icon: Icon, 
             )}
           </div>
           {Icon && (
-            <Icon className={cn(
-              "size-4 shrink-0 mt-0.5",
-              trend === "up" ? "text-primary" : trend === "down" ? "text-destructive" : "text-muted-foreground",
-            )} />
+            <Icon
+              className={cn(
+                "size-4 shrink-0 mt-0.5",
+                trend === "up"
+                  ? "text-primary"
+                  : trend === "down"
+                    ? "text-destructive"
+                    : "text-muted-foreground",
+              )}
+            />
           )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <span className={cn(
-          "text-2xl font-bold tracking-tight",
-          trend === "up" ? "text-primary" : trend === "down" ? "text-destructive" : "text-foreground",
-        )}>
+        <span
+          className={cn(
+            "text-2xl font-bold tracking-tight",
+            trend === "up"
+              ? "text-primary"
+              : trend === "down"
+                ? "text-destructive"
+                : "text-foreground",
+          )}
+        >
           {value}
         </span>
       </CardContent>

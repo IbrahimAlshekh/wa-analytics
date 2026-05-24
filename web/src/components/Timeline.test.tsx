@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "../test/utils";
-import type { TimelineEntry } from "../lib/types";
-import SessionTimeline from "./Timeline";
+import type { TimelineEntry } from "@/types/timeline";
+import SessionTimeline from "./timeline/SessionTimeline";
 
 const NOW = 1700000000;
 
@@ -27,19 +27,25 @@ describe("SessionTimeline", () => {
     const entries: TimelineEntry[] = [
       { kind: "message", at: NOW - 60, text: "hi", isFromMe: false },
     ];
-    renderWithProviders(<SessionTimeline entries={entries} contactName="Alice" />);
+    renderWithProviders(
+      <SessionTimeline entries={entries} contactName="Alice" />,
+    );
     expect(screen.getByText("timeline.noSessions")).toBeInTheDocument();
   });
 
   it("renders session block for a completed presence pair", () => {
     const entries = [p(-600, "available"), p(-60, "unavailable")];
-    renderWithProviders(<SessionTimeline entries={entries} contactName="Alice" />);
+    renderWithProviders(
+      <SessionTimeline entries={entries} contactName="Alice" />,
+    );
     expect(screen.queryByText("timeline.noSessions")).not.toBeInTheDocument();
   });
 
   it("shows no-messages when only presence entries are present", () => {
     const entries = [p(-600, "available"), p(-60, "unavailable")];
-    renderWithProviders(<SessionTimeline entries={entries} contactName="Alice" />);
+    renderWithProviders(
+      <SessionTimeline entries={entries} contactName="Alice" />,
+    );
     expect(screen.getByText("timeline.noMessages")).toBeInTheDocument();
   });
 
@@ -47,7 +53,9 @@ describe("SessionTimeline", () => {
     const entries: TimelineEntry[] = [
       { kind: "message", at: NOW - 100, text: "hello there", isFromMe: false },
     ];
-    renderWithProviders(<SessionTimeline entries={entries} contactName="Alice" />);
+    renderWithProviders(
+      <SessionTimeline entries={entries} contactName="Alice" />,
+    );
     expect(screen.getByText(/hello there/)).toBeInTheDocument();
   });
 

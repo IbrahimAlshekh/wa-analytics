@@ -33,7 +33,9 @@ export default function QRView() {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className="text-sm text-muted-foreground text-center">{t("qr.instruction")}</p>
+      <p className="text-sm text-muted-foreground text-center">
+        {t("qr.instruction")}
+      </p>
       <div className="size-64 flex items-center justify-center rounded-xl border border-border bg-white p-3">
         {code ? (
           <QRCodeSVG value={code} size={232} level="M" />
@@ -43,9 +45,15 @@ export default function QRView() {
       </div>
       <Button onClick={start} disabled={starting}>
         {starting ? (
-          <><RefreshCw className="size-3.5 me-1.5 animate-spin" />{t("qr.generate")}</>
+          <>
+            <RefreshCw className="size-3.5 me-1.5 animate-spin" />
+            {t("qr.generate")}
+          </>
         ) : code ? (
-          <><RefreshCw className="size-3.5 me-1.5" />{t("qr.refresh")}</>
+          <>
+            <RefreshCw className="size-3.5 me-1.5" />
+            {t("qr.refresh")}
+          </>
         ) : (
           t("qr.generate")
         )}

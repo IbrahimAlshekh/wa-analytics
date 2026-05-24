@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildBlocks, formatDuration, MERGE_GAP_SEC } from "./sessions";
-import type { TimelineEntry } from "./types";
+import type { TimelineEntry } from "@/types/timeline";
 
 // Fixed "now" so buildBlocks's offline-indicator logic is deterministic.
 const NOW = 1700000000;
@@ -12,7 +12,10 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 // Presence entry relative to NOW (negative = in the past)
-const p = (offset: number, state: "available" | "unavailable"): TimelineEntry => ({
+const p = (
+  offset: number,
+  state: "available" | "unavailable",
+): TimelineEntry => ({
   kind: "presence",
   at: NOW + offset,
   state,
@@ -56,7 +59,11 @@ describe("buildBlocks — basic session pairing", () => {
   });
 
   it("ignores standalone unavailable before any available", () => {
-    const blocks = buildBlocks([p(-900, "unavailable"), p(-600, "available"), p(-5, "unavailable")]);
+    const blocks = buildBlocks([
+      p(-900, "unavailable"),
+      p(-600, "available"),
+      p(-5, "unavailable"),
+    ]);
     const sessions = blocks.filter((b) => b.type === "session");
     expect(sessions.length).toBe(1);
   });
@@ -68,7 +75,7 @@ describe("buildBlocks — merge gap", () => {
     const blocks = buildBlocks([
       p(-600, "available"),
       p(-540, "unavailable"), // 60s session
-      p(-440, "available"),   // gap = 100s
+      p(-440, "available"), // gap = 100s
       p(-300, "unavailable"),
     ]);
     const sessions = blocks.filter((b) => b.type === "session");
@@ -84,7 +91,7 @@ describe("buildBlocks — merge gap", () => {
     const blocks = buildBlocks([
       p(-1000, "available"),
       p(-940, "unavailable"),
-      p(-600, "available"),   // gap = 340s > MERGE_GAP_SEC
+      p(-600, "available"), // gap = 340s > MERGE_GAP_SEC
       p(-5, "unavailable"),
     ]);
     const sessions = blocks.filter((b) => b.type === "session");

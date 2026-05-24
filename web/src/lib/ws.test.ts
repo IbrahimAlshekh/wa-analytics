@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WSEnvelope } from "./types";
+import type { WSEnvelope } from "@/types/ws";
 import { installMockWebSocket } from "../test/mocks/websocket";
 
 // Import ws lazily so we can control module reset

@@ -3,7 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "./test/utils";
 import { installMockWebSocket } from "./test/mocks/websocket";
 import { useStore } from "./lib/store";
-import type { WSEnvelope } from "./lib/types";
+import type { WSEnvelope } from "@/types/ws";
 import App from "./App";
 
 // ws.ts maintains module-level singleton state (socket, reconnectTimer).

@@ -5,17 +5,13 @@ const BASE = "/api";
 
 export const handlers = [
   // Setup
-  http.get(`${BASE}/setup/status`, () =>
-    HttpResponse.json({ hasUsers: true }),
-  ),
+  http.get(`${BASE}/setup/status`, () => HttpResponse.json({ hasUsers: true })),
   http.post(`${BASE}/setup/register`, () =>
     HttpResponse.json({ token: "test-jwt" }),
   ),
 
   // Auth
-  http.post(`${BASE}/login`, () =>
-    HttpResponse.json({ token: "test-jwt" }),
-  ),
+  http.post(`${BASE}/login`, () => HttpResponse.json({ token: "test-jwt" })),
   http.post(`${BASE}/refresh`, () =>
     HttpResponse.json({ token: "test-jwt-refreshed" }),
   ),
@@ -33,7 +29,10 @@ export const handlers = [
   http.patch(`${BASE}/accounts/:id`, ({ params, request: _r }) =>
     HttpResponse.json(makeAccount({ id: Number(params.id) })),
   ),
-  http.delete(`${BASE}/accounts/:id`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(
+    `${BASE}/accounts/:id`,
+    () => new HttpResponse(null, { status: 204 }),
+  ),
 
   // Contacts
   http.get(`${BASE}/accounts/:id/contacts`, ({ params }) =>
@@ -48,19 +47,27 @@ export const handlers = [
     HttpResponse.json({ synced: 5 }),
   ),
   http.post(`${BASE}/accounts/:id/contacts`, ({ params }) =>
-    HttpResponse.json(makeContact({ accountId: Number(params.id) }), { status: 201 }),
+    HttpResponse.json(makeContact({ accountId: Number(params.id) }), {
+      status: 201,
+    }),
   ),
   http.patch(`${BASE}/accounts/:id/contacts/:cid`, ({ params }) =>
-    HttpResponse.json(makeContact({ id: Number(params.cid), accountId: Number(params.id) })),
+    HttpResponse.json(
+      makeContact({ id: Number(params.cid), accountId: Number(params.id) }),
+    ),
   ),
-  http.delete(`${BASE}/accounts/:id/contacts/:cid`, () =>
-    new HttpResponse(null, { status: 204 }),
+  http.delete(
+    `${BASE}/accounts/:id/contacts/:cid`,
+    () => new HttpResponse(null, { status: 204 }),
   ),
 
   // Timeline / Stats / Messages / Analytics
   http.get(`${BASE}/accounts/:id/contacts/:cid/timeline`, ({ params }) =>
     HttpResponse.json({
-      contact: makeContact({ id: Number(params.cid), accountId: Number(params.id) }),
+      contact: makeContact({
+        id: Number(params.cid),
+        accountId: Number(params.id),
+      }),
       entries: [],
     }),
   ),

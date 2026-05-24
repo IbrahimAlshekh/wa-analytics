@@ -1,4 +1,4 @@
-import type { WSEnvelope } from "./types";
+import type { WSEnvelope } from "@/types/ws";
 
 type Listener = (msg: WSEnvelope) => void;
 

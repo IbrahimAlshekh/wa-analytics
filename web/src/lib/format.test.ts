@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatRelative, formatDuration, formatCount, getInitials } from "./format";
+import {
+  formatRelative,
+  formatDuration,
+  formatCount,
+  getInitials,
+} from "./format";
 
 const NOW_UNIX = 1700000000; // fixed reference point
 

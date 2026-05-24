@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "../test/utils";
-import type { TimelineEntry } from "../lib/types";
-import PresencePanel from "./PresencePanel";
+import type { TimelineEntry } from "@/types/timeline";
+import PresencePanel from "./presence/PresencePanel";
 
 const NOW = 1700000000;
 
@@ -20,9 +20,7 @@ const presenceEntries: TimelineEntry[] = [
 
 describe("PresencePanel", () => {
   it("renders null when no presence data", () => {
-    const { container } = renderWithProviders(
-      <PresencePanel entries={[]} />,
-    );
+    const { container } = renderWithProviders(<PresencePanel entries={[]} />);
     expect(container.firstChild).toBeNull();
   });
 

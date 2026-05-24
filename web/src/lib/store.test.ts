@@ -71,15 +71,27 @@ describe("addWsEntry / pruneWsEntries", () => {
   });
 
   it("addWsEntry deduplicates by entryKey", () => {
-    const entry = makeTimelineEntry({ kind: "presence", at: 1000, state: "available" });
+    const entry = makeTimelineEntry({
+      kind: "presence",
+      at: 1000,
+      state: "available",
+    });
     useStore.getState().addWsEntry(1, 1, entry);
     useStore.getState().addWsEntry(1, 1, entry); // same entry
     expect(useStore.getState().wsEntries[wsKey(1, 1)]).toHaveLength(1);
   });
 
   it("pruneWsEntries filters entries matching serverKeys", () => {
-    const e1 = makeTimelineEntry({ kind: "presence", at: 1000, state: "available" });
-    const e2 = makeTimelineEntry({ kind: "presence", at: 2000, state: "unavailable" });
+    const e1 = makeTimelineEntry({
+      kind: "presence",
+      at: 1000,
+      state: "available",
+    });
+    const e2 = makeTimelineEntry({
+      kind: "presence",
+      at: 2000,
+      state: "unavailable",
+    });
     useStore.getState().addWsEntry(1, 1, e1);
     useStore.getState().addWsEntry(1, 1, e2);
 
@@ -126,8 +138,12 @@ describe("upsertContacts / upsertContact / removeContact", () => {
   });
 
   it("upsertContact replaces by id", () => {
-    useStore.getState().upsertContact(makeContact({ id: 1, displayName: "Old" }));
-    useStore.getState().upsertContact(makeContact({ id: 1, displayName: "New" }));
+    useStore
+      .getState()
+      .upsertContact(makeContact({ id: 1, displayName: "Old" }));
+    useStore
+      .getState()
+      .upsertContact(makeContact({ id: 1, displayName: "New" }));
     expect(useStore.getState().contacts[1].displayName).toBe("New");
   });
 

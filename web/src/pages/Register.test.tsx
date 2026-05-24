@@ -10,9 +10,7 @@ beforeEach(() => {
   localStorage.clear();
   // Override to indicate no users yet so Register doesn't redirect to /login
   server.use(
-    http.get("/api/setup/status", () =>
-      HttpResponse.json({ hasUsers: false }),
-    ),
+    http.get("/api/setup/status", () => HttpResponse.json({ hasUsers: false })),
   );
 });
 afterEach(() => localStorage.clear());
@@ -21,10 +19,14 @@ describe("Register page", () => {
   it("renders all form fields", async () => {
     renderWithProviders(<Register />, { route: "/register" });
     await waitFor(() =>
-      expect(screen.getByLabelText("auth.register.username")).toBeInTheDocument(),
+      expect(
+        screen.getByLabelText("auth.register.username"),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByLabelText("auth.register.password")).toBeInTheDocument();
-    expect(screen.getByLabelText("auth.register.confirmPassword")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("auth.register.confirmPassword"),
+    ).toBeInTheDocument();
   });
 
   it("registers and stores token on success", async () => {

@@ -1,27 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, Plus, X, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { api } from "@/lib/api";
-import { getMediaUrl } from "@/lib/media";
 import { useStore } from "@/lib/store";
-import type { Contact } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import ContactSidebarItem from "./ContactSidebarItem";
 
 function useDebounce(value: string, delay: number): string {
   const [d, setD] = useState(value);
@@ -32,91 +29,7 @@ function useDebounce(value: string, delay: number): string {
   return d;
 }
 
-function getInitials(name: string): string {
-  if (name.startsWith("+")) return name.slice(1, 3);
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-function formatRelative(unix: number): string {
-  const diff = Math.max(0, Date.now() / 1000 - unix);
-  if (diff < 60) return `${Math.floor(diff)}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 const PAGE_SIZE = 50;
-
-interface ContactItemProps {
-  accountId: number;
-  contact: Contact;
-  active: boolean;
-}
-
-function ContactSidebarItem({ accountId, contact: contactProp, active }: ContactItemProps) {
-  const { t } = useTranslation();
-  const { setOpenMobile } = useSidebar();
-
-  const storeContact = useStore((s) => s.contacts[contactProp.id]);
-  const contact = storeContact ?? contactProp;
-  const presence = useStore((s) => s.lastPresence[`${accountId}:${contact.id}`]);
-
-  const displayName = contact.displayName || contact.phone;
-  const online = presence?.state === "available";
-
-  const lastSeenText = online
-    ? t("sidebar.online")
-    : presence
-    ? presence.lastSeen
-      ? t("sidebar.lastSeen", { time: formatRelative(presence.lastSeen) })
-      : t("sidebar.offlineSince", { time: formatRelative(presence.at) })
-    : contact.trackingEnabled
-    ? t("sidebar.noActivity")
-    : null;
-
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={active}
-        className="h-auto py-2 px-3"
-        onClick={() => setOpenMobile(false)}
-      >
-        <Link to={`/accounts/${accountId}/contacts/${contact.id}`} className="flex items-center gap-2.5">
-          <div className="relative shrink-0">
-            <Avatar size="sm">
-              {contact.latestPicturePath && (
-                <AvatarImage src={getMediaUrl(contact.latestPicturePath)} alt={displayName} />
-              )}
-              <AvatarFallback className="text-xs">{getInitials(displayName)}</AvatarFallback>
-            </Avatar>
-            <span
-              className={cn(
-                "absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-sidebar",
-                online ? "bg-primary" : "bg-muted-foreground/40",
-              )}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold truncate text-foreground">{displayName}</div>
-            {lastSeenText && (
-              <div className={cn("text-xs truncate mt-0.5", online ? "text-primary" : "text-muted-foreground")}>
-                {lastSeenText}
-              </div>
-            )}
-          </div>
-          {!contact.trackingEnabled && (
-            <Badge variant="secondary" className="shrink-0 text-xs h-5 px-1.5">
-              {t("sidebar.paused")}
-            </Badge>
-          )}
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}
 
 interface AppSidebarProps {
   accountId: number;
@@ -145,7 +58,10 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
       api.listContacts(accountId, pageParam as number, PAGE_SIZE, search),
     initialPageParam: 1,
     getNextPageParam: (_lastPage, allPages) => {
-      const loaded = allPages.reduce((n, p) => n + (p.contacts?.length ?? 0), 0);
+      const loaded = allPages.reduce(
+        (n, p) => n + (p.contacts?.length ?? 0),
+        0,
+      );
       const total = allPages[0]?.total ?? 0;
       return loaded < total ? allPages.length + 1 : undefined;
     },
@@ -171,7 +87,11 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
       qc.invalidateQueries({ queryKey: ["contacts", accountId] });
     },
     onError: (e) =>
-      setSyncMsg(t("sidebar.syncFailed", { error: e instanceof Error ? e.message : String(e) })),
+      setSyncMsg(
+        t("sidebar.syncFailed", {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      ),
   });
 
   const addMutation = useMutation({
@@ -189,11 +109,17 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
   });
 
   return (
-    <Sidebar side={isRTL ? "right" : "left"} collapsible="offcanvas" className="border-e border-border">
+    <Sidebar
+      side={isRTL ? "right" : "left"}
+      collapsible="offcanvas"
+      className="border-e border-border"
+    >
       {/* Header */}
       <SidebarHeader className="border-b border-border px-3 py-2.5 gap-2">
         <div className="flex items-center justify-between gap-1">
-          <span className="text-sm font-semibold text-foreground">{t("sidebar.title")}</span>
+          <span className="text-sm font-semibold text-foreground">
+            {t("sidebar.title")}
+          </span>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -203,7 +129,12 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
             >
-              <RefreshCw className={cn("size-3.5", syncMutation.isPending && "animate-spin")} />
+              <RefreshCw
+                className={cn(
+                  "size-3.5",
+                  syncMutation.isPending && "animate-spin",
+                )}
+              />
             </Button>
             <Button
               variant={showAdd ? "secondary" : "ghost"}
@@ -214,7 +145,11 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
                 setAddError(null);
               }}
             >
-              {showAdd ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
+              {showAdd ? (
+                <X className="size-3.5" />
+              ) : (
+                <Plus className="size-3.5" />
+              )}
             </Button>
           </div>
         </div>
@@ -250,17 +185,17 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
               className="h-7 text-xs w-full"
               disabled={!phone || addMutation.isPending}
             >
-              {addMutation.isPending ? t("sidebar.adding") : t("sidebar.addContact")}
+              {addMutation.isPending
+                ? t("sidebar.adding")
+                : t("sidebar.addContact")}
             </Button>
-            {addError && (
-              <p className="text-xs text-destructive">{addError}</p>
-            )}
+            {addError && <p className="text-xs text-destructive">{addError}</p>}
           </form>
         )}
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          <Search className="absolute inset-s-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           <Input
             placeholder={t("sidebar.searchPlaceholder")}
             value={searchInput}
@@ -269,7 +204,7 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
           />
           {searchInput && (
             <button
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute inset-e-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               onClick={() => setSearchInput("")}
               type="button"
             >
@@ -315,7 +250,9 @@ export default function AppSidebar({ accountId, activeCid }: AppSidebarProps) {
           >
             {contactsQ.isFetchingNextPage
               ? t("sidebar.loadingMore")
-              : t("sidebar.moreContacts", { count: total - allContacts.length })}
+              : t("sidebar.moreContacts", {
+                  count: total - allContacts.length,
+                })}
           </Button>
         </SidebarFooter>
       )}

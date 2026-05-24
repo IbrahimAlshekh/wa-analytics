@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useTranslation } from "react-i18next";
 import { Clock, Image, FileText, BarChart2 } from "lucide-react";
 import { api } from "../lib/api";
@@ -92,14 +100,39 @@ export default function StatsStrip({ accountId, contactId }: Props) {
         <div className="w-full h-48">
           <ResponsiveContainer>
             <BarChart data={data} barCategoryGap="30%">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.1)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} reversed={isRTL} />
-              <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={32} orientation={isRTL ? "right" : "left"} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(127,127,127,0.1)"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                axisLine={false}
+                tickLine={false}
+                reversed={isRTL}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                axisLine={false}
+                tickLine={false}
+                width={32}
+                orientation={isRTL ? "right" : "left"}
+              />
               <Tooltip
-                contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                contentStyle={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
                 cursor={{ fill: "oklch(0.723 0.173 145 / 0.1)" }}
               />
-              <Bar dataKey="minutes" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="minutes"
+                fill="var(--primary)"
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

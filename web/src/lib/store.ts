@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { Account, Contact, TimelineEntry } from "./types";
+import type { Account } from "@/types/account";
+import type { Contact } from "@/types/contact";
+import type { TimelineEntry } from "@/types/timeline";
 
 export function wsKey(accountId: number, contactId: number): string {
   return `${accountId}:${contactId}`;
@@ -27,12 +29,29 @@ interface AppStore {
 
   // Live WS timeline entries per account+contact
   wsEntries: Record<string, TimelineEntry[]>;
-  addWsEntry: (accountId: number, contactId: number, entry: TimelineEntry) => void;
-  pruneWsEntries: (accountId: number, contactId: number, serverKeys: Set<string>) => void;
+  addWsEntry: (
+    accountId: number,
+    contactId: number,
+    entry: TimelineEntry,
+  ) => void;
+  pruneWsEntries: (
+    accountId: number,
+    contactId: number,
+    serverKeys: Set<string>,
+  ) => void;
 
   // Last-known presence per contact — never pruned, only updated
-  lastPresence: Record<string, { state: "available" | "unavailable"; at: number; lastSeen?: number }>;
-  setLastPresence: (accountId: number, contactId: number, state: "available" | "unavailable", at: number, lastSeen?: number) => void;
+  lastPresence: Record<
+    string,
+    { state: "available" | "unavailable"; at: number; lastSeen?: number }
+  >;
+  setLastPresence: (
+    accountId: number,
+    contactId: number,
+    state: "available" | "unavailable",
+    at: number,
+    lastSeen?: number,
+  ) => void;
 
   // App-level UI state
   backupState: "idle" | "loading" | "error";
@@ -96,7 +115,9 @@ export const useStore = create<AppStore>((set) => ({
     set((s) => ({
       wsEntries: {
         ...s.wsEntries,
-        [key]: (s.wsEntries[key] ?? []).filter((e) => !serverKeys.has(entryKey(e))),
+        [key]: (s.wsEntries[key] ?? []).filter(
+          (e) => !serverKeys.has(entryKey(e)),
+        ),
       },
     }));
   },
@@ -108,7 +129,9 @@ export const useStore = create<AppStore>((set) => ({
     set((s) => {
       const existing = s.lastPresence[key];
       if (existing && existing.at >= at) return s;
-      return { lastPresence: { ...s.lastPresence, [key]: { state, at, lastSeen } } };
+      return {
+        lastPresence: { ...s.lastPresence, [key]: { state, at, lastSeen } },
+      };
     });
   },
 

@@ -31,7 +31,10 @@ describe("Login page", () => {
     await waitFor(() => screen.getByLabelText("auth.login.username"));
 
     await userEvent.type(screen.getByLabelText("auth.login.username"), "admin");
-    await userEvent.type(screen.getByLabelText("auth.login.password"), "secret");
+    await userEvent.type(
+      screen.getByLabelText("auth.login.password"),
+      "secret",
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "auth.login.submit" }),
     );
@@ -39,7 +42,10 @@ describe("Login page", () => {
     await waitFor(() =>
       expect(localStorage.getItem("wt_bearer")).toBe("jwt-for-test"),
     );
-    expect(capturedBody).toMatchObject({ username: "admin", password: "secret" });
+    expect(capturedBody).toMatchObject({
+      username: "admin",
+      password: "secret",
+    });
   });
 
   it("shows error message on failed login", async () => {

@@ -1,7 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 
 interface ChartCardProps {
@@ -13,7 +23,14 @@ interface ChartCardProps {
   className?: string;
 }
 
-export default function ChartCard({ title, description, info, icon: Icon, children, className }: ChartCardProps) {
+export default function ChartCard({
+  title,
+  description,
+  info,
+  icon: Icon,
+  children,
+  className,
+}: ChartCardProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -38,12 +55,12 @@ export default function ChartCard({ title, description, info, icon: Icon, childr
               </CardDescription>
             )}
           </div>
-          {Icon && <Icon className="size-4 shrink-0 mt-0.5 text-muted-foreground" />}
+          {Icon && (
+            <Icon className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+          )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        {children}
-      </CardContent>
+      <CardContent className="pt-0">{children}</CardContent>
     </Card>
   );
 }

@@ -130,7 +130,7 @@ export default function Register() {
             </span>
           </Button>
 
-          <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-[300px] mx-auto">
+          <div className="flex flex-col gap-2 text-center text-[10px] leading-relaxed text-muted-foreground/60 max-w-75 mx-auto">
             <p className="font-semibold uppercase tracking-wider text-[9px]">
               {t("auth.disclaimer.title")}
             </p>

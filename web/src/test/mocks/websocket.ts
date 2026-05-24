@@ -1,4 +1,4 @@
-import type { WSEnvelope } from "@/lib/types";
+import type { WSEnvelope } from "@/types/ws";
 
 type ReadyState = 0 | 1 | 2 | 3;
 
