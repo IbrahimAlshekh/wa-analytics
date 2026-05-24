@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -35,6 +36,18 @@ export default function ContactSidebarItem({
 
   const displayName = contact.displayName || contact.phone;
   const online = presence?.state === "available";
+
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (online || !presence) return;
+    const at = presence.lastSeen ?? presence.at;
+    const age = Math.max(0, Date.now() / 1000 - at);
+    // < 1 min: refresh every 5 s; < 1 h: every minute; older: no timer needed
+    const ms = age < 60 ? 5_000 : age < 3_600 ? 60_000 : 0;
+    if (!ms) return;
+    const id = setInterval(() => tick((n) => n + 1), ms);
+    return () => clearInterval(id);
+  }, [presence, online]);
 
   const lastSeenText = online
     ? t("sidebar.online")
