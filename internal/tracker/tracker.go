@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
@@ -248,11 +249,12 @@ func (t *Tracker) onConnected() {
 
 	if firstConnect {
 		slog.Info("tracker: starting workers", "accountID", t.accountID, "poll_interval", t.interval)
-		t.wg.Add(5)
+		t.wg.Add(6)
 		go t.runPictureLoop()
 		go t.runAboutLoop()
 		go t.runResubLoop()
 		go t.runScheduleLoop()
+		go t.runPresenceRefreshLoop()
 		go func() {
 			defer t.wg.Done()
 			t.startSubscriptions()
@@ -969,6 +971,55 @@ func (t *Tracker) runResubLoop() {
 			t.startSubscriptions()
 		}
 	}
+}
+
+// runPresenceRefreshLoop periodically cycles the WhatsApp connection to force
+// a fresh presence snapshot from the server. SubscribePresence only registers
+// for future changes; after several hours subscriptions go stale and contacts
+// appear frozen. A full disconnect+reconnect causes WhatsApp to re-send the
+// current state for every subscribed contact when onConnected fires.
+//
+// The interval is randomised between 4–6 hours so multiple accounts don't all
+// cycle at the same moment, and to avoid predictable timing.
+func (t *Tracker) runPresenceRefreshLoop() {
+	defer t.wg.Done()
+
+	timer := time.NewTimer(randInterval(4*time.Hour, 6*time.Hour))
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-timer.C:
+			if !t.isRunning() || !t.wa.IsConnected() {
+				timer.Reset(randInterval(4*time.Hour, 6*time.Hour))
+				continue
+			}
+			slog.Info("tracker: cycling connection to unfreeze presence", "accountID", t.accountID)
+			t.wa.SoftDisconnect()
+
+			// Brief pause so the TCP session fully closes before we reconnect.
+			// Randomised to avoid a predictable reconnect fingerprint.
+			select {
+			case <-t.ctx.Done():
+				return
+			case <-time.After(randInterval(5*time.Second, 30*time.Second)):
+			}
+
+			if err := t.wa.Connect(t.ctx); err != nil {
+				slog.Warn("tracker: reconnect after presence refresh failed", "accountID", t.accountID, "err", err)
+			}
+			// onConnected fires automatically after Connect and handles
+			// SendAvailable + startSubscriptions — no extra work needed here.
+			timer.Reset(randInterval(4*time.Hour, 6*time.Hour))
+		}
+	}
+}
+
+func randInterval(min, max time.Duration) time.Duration {
+	spread := int64(max - min)
+	return min + time.Duration(rand.Int63n(spread))
 }
 
 func (t *Tracker) isRunning() bool {
