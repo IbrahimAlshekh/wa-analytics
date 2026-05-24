@@ -199,7 +199,10 @@
     "viewMedia": "View {{type}}",
     "today": "Today",
     "yesterday": "Yesterday",
-    "showMore": "Show {{count}} more days"
+    "showMore": "Show {{count}} more days",
+    "loadMoreDays": "Load {{count}} more days",
+    "loading": "Loading…",
+    "noActivity": "No activity on this day."
   },
   "stats": {
     "activitySummary": "Activity summary",

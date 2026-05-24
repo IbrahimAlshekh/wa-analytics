@@ -166,6 +166,7 @@ func (s *Server) routes() {
 
 	// Timeline / Stats / Messages / Analytics (per-contact)
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/timeline", apiAuth(s.handleTimeline))
+	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/presence", apiAuth(s.handlePresenceDay))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/stats", apiAuth(s.handleStats))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/analytics", apiAuth(s.handleAnalytics))
 	s.mux.Handle("GET /api/accounts/{id}/contacts/{cid}/messages", apiAuth(s.handleMessages))

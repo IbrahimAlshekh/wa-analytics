@@ -1,35 +1,28 @@
 import { useTranslation } from "react-i18next";
 import type { TimelineEntry } from "@/types/timeline";
-import { buildBlocks, formatTime } from "@/lib/sessions";
+import { formatTime } from "@/lib/sessions";
 import MediaPreview from "./MediaPreview";
 import PresenceLog from "./PresenceLog";
 
 export interface SessionTimelineProps {
   entries: TimelineEntry[];
   contactName: string;
+  accountId: number;
+  contactId: number;
 }
 
 export default function SessionTimeline({
   entries,
   contactName,
+  accountId,
+  contactId,
 }: SessionTimelineProps) {
   const { t } = useTranslation();
 
-  if (!entries?.length) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        {t("timeline.noEvents")}
-      </div>
-    );
-  }
-
-  const messages = entries
+  const messages = (entries ?? [])
     .filter((e) => e.kind === "message")
     .sort((a, b) => b.at - a.at)
     .slice(0, 10);
-
-  const statusEntries = entries.filter((e) => e.kind !== "message");
-  const blocks = buildBlocks(statusEntries);
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,7 +69,7 @@ export default function SessionTimeline({
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           {t("timeline.statusSection")}
         </p>
-        <PresenceLog blocks={blocks} />
+        <PresenceLog accountId={accountId} contactId={contactId} />
       </div>
     </div>
   );

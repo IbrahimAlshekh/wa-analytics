@@ -855,6 +855,79 @@ func (db *DB) Timeline(ctx context.Context, contactID, since int64) ([]TimelineE
 	return out, nil
 }
 
+// TimelineRange returns all timeline entries for a contact within [start, end).
+func (db *DB) TimelineRange(ctx context.Context, contactID, start, end int64) ([]TimelineEntry, error) {
+	out := make([]TimelineEntry, 0, 32)
+
+	pres, err := db.QueryContext(ctx,
+		`SELECT state, last_seen, observed_at FROM presence_events
+		   WHERE contact_id=? AND observed_at>=? AND observed_at<?
+		   ORDER BY observed_at`, contactID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	for pres.Next() {
+		var e TimelineEntry
+		e.Kind = KindPresence
+		var ls sql.NullInt64
+		if err := pres.Scan(&e.State, &ls, &e.At); err != nil {
+			pres.Close()
+			return nil, err
+		}
+		if ls.Valid {
+			v := ls.Int64
+			e.LastSeen = &v
+		}
+		out = append(out, e)
+	}
+	pres.Close()
+
+	pics, err := db.QueryContext(ctx,
+		`SELECT picture_id, url, COALESCE(media_path,''), captured_at FROM profile_picture_history
+		   WHERE contact_id=? AND captured_at>=? AND captured_at<?
+		   ORDER BY captured_at`, contactID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	for pics.Next() {
+		var e TimelineEntry
+		e.Kind = KindPicture
+		var pid, url, mp sql.NullString
+		if err := pics.Scan(&pid, &url, &mp, &e.At); err != nil {
+			pics.Close()
+			return nil, err
+		}
+		e.PictureID = pid.String
+		e.URL = url.String
+		e.MediaPath = mp.String
+		out = append(out, e)
+	}
+	pics.Close()
+
+	abouts, err := db.QueryContext(ctx,
+		`SELECT text, captured_at FROM about_history
+		   WHERE contact_id=? AND captured_at>=? AND captured_at<?
+		   ORDER BY captured_at`, contactID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	for abouts.Next() {
+		var e TimelineEntry
+		e.Kind = KindAbout
+		var txt sql.NullString
+		if err := abouts.Scan(&txt, &e.At); err != nil {
+			abouts.Close()
+			return nil, err
+		}
+		e.Text = txt.String
+		out = append(out, e)
+	}
+	abouts.Close()
+
+	sortByAt(out)
+	return out, nil
+}
+
 // --- Stats ------------------------------------------------------------------
 
 func (db *DB) PresenceRange(ctx context.Context, contactID, start, end int64) ([]PresenceEvent, error) {

@@ -61,6 +61,45 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handlePresenceDay(w http.ResponseWriter, r *http.Request) {
+	accountID, err := parseID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	cid, err := parseCID(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if _, err := s.db.GetContact(r.Context(), accountID, cid); err != nil {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+	if startStr == "" || endStr == "" {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("start and end params required"))
+		return
+	}
+	start, err1 := strconv.ParseInt(startStr, 10, 64)
+	end, err2 := strconv.ParseInt(endStr, 10, 64)
+	if err1 != nil || err2 != nil || start >= end {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("invalid start/end params"))
+		return
+	}
+	entries, err := s.db.TimelineRange(r.Context(), cid, start, end)
+	if err != nil {
+		slog.Error("presence-day: query failed", "accountID", accountID, "id", cid, "err", err)
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if entries == nil {
+		entries = []db.TimelineEntry{}
+	}
+	writeJSON(w, http.StatusOK, entries)
+}
+
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	accountID, err := parseID(r)
 	if err != nil {

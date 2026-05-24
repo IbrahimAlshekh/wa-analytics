@@ -289,7 +289,7 @@ export default function ContactDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <SessionTimeline entries={allEntries} contactName={displayName} />
+              <SessionTimeline entries={allEntries} contactName={displayName} accountId={accountId} contactId={cid} />
             </CardContent>
           </Card>
         </TabsContent>

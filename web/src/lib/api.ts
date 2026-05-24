@@ -1,6 +1,6 @@
 import type { Account } from "@/types/account";
 import type { Contact, ContactsPage } from "@/types/contact";
-import type { StatsSummary, TimelineResponse } from "@/types/timeline";
+import type { StatsSummary, TimelineEntry, TimelineResponse } from "@/types/timeline";
 import type { MessagesPage } from "@/types/message";
 import type { Story } from "@/types/story";
 import type { AnalyticsRange, AnalyticsReport } from "@/types/analytics";
@@ -127,6 +127,11 @@ export const api = {
     request<TimelineResponse>(
       "GET",
       `/accounts/${accountId}/contacts/${contactId}/timeline?since=${since}`,
+    ),
+  presenceDay: (accountId: number, contactId: number, start: number, end: number) =>
+    request<TimelineEntry[]>(
+      "GET",
+      `/accounts/${accountId}/contacts/${contactId}/presence?start=${start}&end=${end}`,
     ),
   stats: (
     accountId: number,

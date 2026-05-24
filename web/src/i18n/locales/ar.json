@@ -199,7 +199,10 @@
     "viewMedia": "عرض {{type}}",
     "today": "اليوم",
     "yesterday": "أمس",
-    "showMore": "عرض {{count}} أيام أخرى"
+    "showMore": "عرض {{count}} أيام أخرى",
+    "loadMoreDays": "تحميل {{count}} أيام أخرى",
+    "loading": "جارٍ التحميل…",
+    "noActivity": "لا يوجد نشاط في هذا اليوم."
   },
   "stats": {
     "activitySummary": "ملخص النشاط",
