@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import type { Account, ScheduleSlot } from "../lib/types";
+import { minutesToTime, timeToMinutes } from "../lib/schedule";
 import QRView from "../components/QRView";
 import PhoneCodeView from "../components/PhoneCodeView";
 import { useStore } from "../lib/store";
@@ -310,19 +311,6 @@ function AccountRow({
       )}
     </div>
   );
-}
-
-function minutesToTime(min: number): string {
-  const h = Math.floor(min / 60)
-    .toString()
-    .padStart(2, "0");
-  const m = (min % 60).toString().padStart(2, "0");
-  return `${h}:${m}`;
-}
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
 }
 
 function SchedulePanel({ accountId }: { accountId: number }) {
