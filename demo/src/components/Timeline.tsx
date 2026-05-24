@@ -1,38 +1,15 @@
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TimelineEntry } from "../lib/types";
-import { getMediaUrl } from "../lib/media";
-import { buildBlocks, formatTime, formatDuration } from "../lib/sessions";
-import type { Session, NonPresence } from "../lib/sessions";
+import { buildBlocks, formatTime } from "../lib/sessions";
+import MediaPreview from "./timeline/MediaPreview";
+import SessionBlock from "./timeline/SessionBlock";
+import GapBlock from "./timeline/GapBlock";
+import EventBlock from "./timeline/EventBlock";
 
 interface Props {
   entries: TimelineEntry[];
   contactName: string;
 }
-
-function MediaPreview({ type, path }: { type?: string; path: string }) {
-  const { t } = useTranslation();
-  const url = useMemo(() => getMediaUrl(path), [path]);
-
-  if (type === "image") {
-    return (
-      <a href={url} target="_blank" rel="noreferrer" className="block mt-1">
-        <img
-          src={url}
-          alt="WhatsApp Media"
-          className="max-w-48 max-h-36 rounded object-cover block mt-1"
-        />
-      </a>
-    );
-  }
-
-  return (
-    <a href={url} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">
-      {t("timeline.viewMedia", { type: type || "media" })}
-    </a>
-  );
-}
-
 
 export default function SessionTimeline({ entries, contactName }: Props) {
   const { t } = useTranslation();
@@ -92,62 +69,3 @@ export default function SessionTimeline({ entries, contactName }: Props) {
     </div>
   );
 }
-
-function SessionBlock({ session }: { session: Session }) {
-  const { t } = useTranslation();
-  const start = formatTime(session.startAt);
-  const end = session.endAt ? formatTime(session.endAt) : t("contactDetail.nowLabel");
-  const dur = session.durationSec != null ? formatDuration(session.durationSec) : null;
-  const lastSeenDiff =
-    session.lastSeen != null && session.endAt != null
-      ? session.endAt - session.lastSeen
-      : null;
-
-  return (
-    <div className="flex items-start gap-2 py-1.5 px-3 rounded-md bg-primary/5 border border-primary/10">
-      <span className="size-2 rounded-full bg-primary mt-1.5 shrink-0" />
-      <div className="flex flex-col">
-        <span className="text-sm">
-          {t("timeline.onlineSession", { start, end })}
-          {dur ? <span className="text-xs text-muted-foreground ms-1">({dur})</span> : null}
-        </span>
-        {lastSeenDiff != null && lastSeenDiff > 0 && (
-          <p className="text-xs text-muted-foreground mt-0.5 ms-4">
-            {t("timeline.lastActivity", { duration: formatDuration(lastSeenDiff) })}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GapBlock({ fromAt, toAt }: { fromAt: number; toAt: number }) {
-  const { t } = useTranslation();
-  const dur = formatDuration(toAt - fromAt);
-  return (
-    <div className="flex items-center gap-2 py-1 px-3 text-muted-foreground">
-      <span className="size-2 rounded-full bg-muted-foreground/40 shrink-0" />
-      <span className="text-sm text-muted-foreground">{t("timeline.offlineGap", { duration: dur })}</span>
-    </div>
-  );
-}
-
-function EventBlock({ ev }: { ev: NonPresence }) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-start gap-2 py-1 text-sm">
-      <time className="text-xs text-muted-foreground shrink-0 min-w-12">{formatTime(ev.at)}</time>
-      {ev.kind === "picture" ? (
-        <span>
-          {t("timeline.picChanged")}
-          {ev.mediaPath ? (
-            <> <a href={getMediaUrl(ev.mediaPath)} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">{t("timeline.view")}</a></>
-          ) : null}
-        </span>
-      ) : (
-        <span>{t("timeline.aboutUpdated")} <em>{ev.text || t("timeline.aboutEmpty")}</em></span>
-      )}
-    </div>
-  );
-}
-

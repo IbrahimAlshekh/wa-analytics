@@ -19,15 +19,7 @@ import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import ContactSidebarItem from "./ContactSidebarItem";
-
-function useDebounce(value: string, delay: number): string {
-  const [d, setD] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setD(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return d;
-}
+import { useDebounce } from "@/hooks/useDebounce";
 
 const PAGE_SIZE = 50;
 
