@@ -62,6 +62,29 @@
 
 ---
 
+## Features
+
+| | |
+|---|---|
+| 🟢 **Online activity** | See exactly when a contact comes online and goes offline, with a full timeline going back as far as you want |
+| 🖼️ **Profile history** | Every profile picture and bio change is saved with a timestamp — browse the complete history |
+| 💬 **Live message feed** | Watch new messages, reactions, edits, and deletions appear in real time |
+| 📸 **Media previews** | Photos, videos, voice notes, documents, and stickers are all viewable right in the app |
+| 🎭 **Sticker usage** | See which stickers you and a contact send most often, ranked by frequency |
+| 📊 **Conversation balance** | Find out who sends more messages and how that share has shifted over time |
+| 🕐 **Time patterns** | Discover which hours and days of the week you both tend to chat |
+| 🚀 **Who starts conversations** | Know who usually reaches out first |
+| ⏱️ **Response times** | See how fast each person typically replies |
+| ❤️ **Emotional tone** | Spot recurring emotional themes — affection, humour, worry, gratitude, and more |
+| 🔤 **Top words & emojis** | Your most-used words, emojis, stickers, and shared links at a glance |
+| 🔥 **Streaks & highlights** | Your longest conversation streak, longest silence, and all-time busiest day |
+| 📅 **Monthly trends** | A month-by-month breakdown of how the relationship has evolved |
+| 👥 **Multiple accounts** | Track contacts across several WhatsApp numbers from one place |
+| 🔒 **Fully private** | Everything stays on your own device. Nothing is shared with any third party |
+| ⏰ **Scheduling** | Set quiet hours per account so the app only runs when you want it to |
+
+---
+
 ## What It Does
 
 WA Analytics connects to WhatsApp as a linked device on your account — just like WhatsApp Web. You pick which contacts to observe, and it quietly runs in the background collecting data and surfacing it through a real-time dashboard.
@@ -83,12 +106,16 @@ WA Analytics goes deep on your message history. It tells you:
 - Who usually starts conversations
 - How fast each person typically responds
 - What emotions come through most often
-- Your most-used words, emojis, and shared links
+- Your most-used words, emojis, stickers, and shared links
 - Streaks, silent periods, and your all-time busiest day
 
 ### Watch messages come in live
 
-A real-time feed shows messages as they arrive, with reactions, edits, and deletions. Browse full chat history with media previews — photos, videos, voice notes, documents.
+A real-time feed shows messages as they arrive, with reactions, edits, and deletions. Browse full chat history with media previews — photos, videos, voice notes, documents, stickers.
+
+### Sticker deduplication and usage analytics
+
+Sticker images are stored once on disk (content-addressed by SHA-256 hash) and shared across all accounts — receiving the same sticker from different contacts or accounts never duplicates the file. The analytics dashboard shows which stickers you and each contact send most often, ranked by frequency.
 
 ### Run multiple accounts
 
