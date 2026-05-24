@@ -143,19 +143,26 @@ type Tracker struct {
 	scheduleSlots []db.ScheduleSlot
 
 	pictureFetchAt sync.Map // int64 contactID → int64 unix seconds
+
+	// inferredOnline tracks auto-offline timers for contacts whose WhatsApp
+	// status is hidden — we infer "available" from messages/typing but must
+	// reset to "unavailable" after 2 minutes of silence.
+	inferredMu     sync.Mutex
+	inferredOnline map[int64]*time.Timer // contactID → pending offline timer
 }
 
 func newTracker(accountID int64, d Deps) *Tracker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Tracker{
-		accountID: accountID,
-		wa:        d.WA,
-		db:        d.DB,
-		hub:       d.Hub,
-		interval:  d.Interval,
-		mediaDir:  d.MediaDir,
-		ctx:       ctx,
-		cancel:    cancel,
+		accountID:      accountID,
+		wa:             d.WA,
+		db:             d.DB,
+		hub:            d.Hub,
+		interval:       d.Interval,
+		mediaDir:       d.MediaDir,
+		ctx:            ctx,
+		cancel:         cancel,
+		inferredOnline: make(map[int64]*time.Timer),
 	}
 }
 
@@ -168,6 +175,12 @@ func (t *Tracker) Stop() {
 	slog.Info("tracker: stopping", "accountID", t.accountID)
 	t.cancel()
 	t.wg.Wait()
+	t.inferredMu.Lock()
+	for id, timer := range t.inferredOnline {
+		timer.Stop()
+		delete(t.inferredOnline, id)
+	}
+	t.inferredMu.Unlock()
 	slog.Info("tracker: stopped", "accountID", t.accountID)
 }
 
@@ -195,6 +208,9 @@ func (t *Tracker) HandleEvent(evt any) {
 
 	case *events.Presence:
 		t.onPresence(v)
+
+	case *events.ChatPresence:
+		t.onChatPresence(v)
 
 	case *events.Message:
 		t.onMessage(v)
@@ -395,6 +411,9 @@ func (t *Tracker) onPresence(p *events.Presence) {
 		return
 	}
 
+	// Real presence event from WhatsApp takes priority — cancel any inferred timer.
+	t.cancelInferredOffline(c.ID)
+
 	state := "available"
 	if p.Unavailable {
 		state = "unavailable"
@@ -432,6 +451,95 @@ func (t *Tracker) onPresence(p *events.Presence) {
 		"lastSeen":   lastSeen,
 		"observedAt": ev.ObservedAt,
 	})
+}
+
+// onChatPresence handles typing indicators. For contacts with hidden presence
+// status, a "composing" event is treated as evidence of activity: mark online
+// and reset the 2-minute auto-offline timer.
+func (t *Tracker) onChatPresence(cp *events.ChatPresence) {
+	if cp.IsFromMe || cp.State != types.ChatPresenceComposing {
+		return
+	}
+	fromJID := cp.Sender.ToNonAD()
+	jidStr := fromJID.String()
+
+	var c db.Contact
+	var err error
+	if fromJID.Server == types.HiddenUserServer {
+		c, err = t.db.GetContactByLID(t.ctx, t.accountID, jidStr)
+	} else {
+		c, err = t.db.GetContactByJID(t.ctx, t.accountID, jidStr)
+	}
+	if err != nil {
+		return
+	}
+
+	now := time.Now().Unix()
+	prev, _ := t.db.LatestPresence(t.ctx, c.ID)
+	if prev.State != "available" {
+		if _, err := t.db.InsertPresence(t.ctx, c.ID, "available", nil, now); err == nil {
+			slog.Info("tracker: inferred online from typing", "accountID", t.accountID, "contact_id", c.ID)
+			t.hub.Broadcast("presence", map[string]any{
+				"accountId":  t.accountID,
+				"contactId":  c.ID,
+				"jid":        c.JID,
+				"state":      "available",
+				"observedAt": now,
+			})
+		}
+	}
+	t.scheduleInferredOffline(c.ID, c.JID)
+}
+
+// scheduleInferredOffline starts (or resets) a 2-minute timer that will mark a
+// contact unavailable if no further messages, typing events, or real presence
+// events arrive. Only applies when the contact's WhatsApp status is hidden and
+// we are inferring their online state from activity.
+func (t *Tracker) scheduleInferredOffline(contactID int64, jidStr string) {
+	const timeout = 2 * time.Minute
+
+	t.inferredMu.Lock()
+	defer t.inferredMu.Unlock()
+
+	if timer, ok := t.inferredOnline[contactID]; ok {
+		timer.Reset(timeout)
+		return
+	}
+
+	t.inferredOnline[contactID] = time.AfterFunc(timeout, func() {
+		t.inferredMu.Lock()
+		delete(t.inferredOnline, contactID)
+		t.inferredMu.Unlock()
+
+		now := time.Now().Unix()
+		prev, _ := t.db.LatestPresence(t.ctx, contactID)
+		if prev.State != "available" {
+			return
+		}
+		if _, err := t.db.InsertPresence(t.ctx, contactID, "unavailable", nil, now); err != nil {
+			slog.Error("tracker: inferred offline insert failed", "accountID", t.accountID, "contact_id", contactID, "err", err)
+			return
+		}
+		slog.Info("tracker: inferred offline — no activity for 2m", "accountID", t.accountID, "contact_id", contactID)
+		t.hub.Broadcast("presence", map[string]any{
+			"accountId":  t.accountID,
+			"contactId":  contactID,
+			"jid":        jidStr,
+			"state":      "unavailable",
+			"observedAt": now,
+		})
+	})
+}
+
+// cancelInferredOffline cancels a pending auto-offline timer for a contact.
+// Called when a real WhatsApp presence event arrives, so the real status wins.
+func (t *Tracker) cancelInferredOffline(contactID int64) {
+	t.inferredMu.Lock()
+	defer t.inferredMu.Unlock()
+	if timer, ok := t.inferredOnline[contactID]; ok {
+		timer.Stop()
+		delete(t.inferredOnline, contactID)
+	}
 }
 
 // resolveContactForEvent finds the contact ID for a sender JID, falling back to the
@@ -626,6 +734,8 @@ func (t *Tracker) onMessage(msg *events.Message) {
 	// If we found a contact, record an "available" presence event — but only
 	// if the contact isn't already marked online, so incoming messages don't
 	// push the session start forward with every new message.
+	// Also schedule an auto-offline after 2 minutes; this is cancelled if a
+	// real WhatsApp presence event (available/unavailable) arrives first.
 	if contactID != nil && !info.IsFromMe {
 		prev, _ := t.db.LatestPresence(t.ctx, *contactID)
 		if prev.State != "available" {
@@ -638,6 +748,7 @@ func (t *Tracker) onMessage(msg *events.Message) {
 				"observedAt": now,
 			})
 		}
+		t.scheduleInferredOffline(*contactID, senderStr)
 	}
 
 	t.hub.Broadcast("message", map[string]any{
