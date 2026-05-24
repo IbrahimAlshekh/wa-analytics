@@ -5,7 +5,7 @@ BIN := bin/tracker
 MIGRATE_BIN := bin/migrate-encryption
 BACKFILL_BIN := bin/analytics-backfill
 
-.PHONY: dev build build-migrate build-backfill run test tidy web-install web-build demo-install demo-build demo run-demo clean setup deploy
+.PHONY: dev build build-migrate build-backfill run test test-go test-web test-demo test-all tidy web-install web-build demo-install demo-build demo run-demo clean setup deploy
 
 dev:
 	@( cd web && (test -d node_modules || pnpm install) && pnpm dev ) & \
@@ -52,8 +52,18 @@ build-backfill:
 run: build
 	./$(BIN)
 
-test:
-	go test $(GO_PKG)
+test-go:
+	CGO_ENABLED=1 go test -race -count=1 -coverprofile=coverage.out $(GO_PKG)
+
+test-web:
+	cd web && pnpm test --run
+
+test-demo:
+	cd demo && pnpm test --run
+
+test-all: test-go test-web test-demo
+
+test: test-all
 
 tidy:
 	go mod tidy

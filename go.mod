@@ -4,8 +4,10 @@ go 1.25.6
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.44
+	github.com/stretchr/testify v1.11.1
 	go.mau.fi/whatsmeow v0.0.0-20260506122147-6a7198d94d26
 	golang.org/x/crypto v0.50.0
 	golang.org/x/term v0.43.0

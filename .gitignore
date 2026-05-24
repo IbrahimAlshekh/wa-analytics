@@ -22,7 +22,8 @@ web/dist/
 # logs
 *.log
 
-/internal/api/dist
+/internal/api/dist/*
+!/internal/api/dist/.gitkeep
 
 # Windows .exe icon resource (generated per-build by install.ps1 via goversioninfo)
 cmd/tracker/*.syso

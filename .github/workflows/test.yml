@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go-test:
+    name: Go tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install system deps (CGO)
+        run: sudo apt-get install -y gcc
+      - run: CGO_ENABLED=1 go test -race -count=1 -coverprofile=coverage.out ./...
+        name: Run Go tests
+
+  web-test:
+    name: Web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install deps
+        run: pnpm --filter ./web install --frozen-lockfile
+      - name: Run tests
+        run: pnpm --filter ./web test --run
+
+  demo-test:
+    name: Demo tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: demo/pnpm-lock.yaml
+      - name: Install deps
+        run: pnpm --filter ./demo install --frozen-lockfile
+      - name: Run tests
+        run: pnpm --filter ./demo test --run
