@@ -11,7 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
+// These are vars (not consts) so tests can lower them without race conditions.
+var (
 	wsWriteTimeout = 10 * time.Second
 	wsPingPeriod   = 30 * time.Second
 	wsClientBuffer = 64

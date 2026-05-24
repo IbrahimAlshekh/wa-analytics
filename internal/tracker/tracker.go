@@ -18,13 +18,32 @@ import (
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/analytics"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/config"
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
-	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 )
 
 // Hub is the minimum interface the tracker uses to broadcast updates.
 type Hub interface {
 	Broadcast(kind string, payload any)
 }
+
+// WAClient is the subset of wa.Client that the tracker needs.
+// *wa.Client satisfies this interface; tests use a hand-rolled fake.
+type WAClient interface {
+	IsConnected() bool
+	OwnJID() string
+	Connect(ctx context.Context) error
+	SoftDisconnect()
+	SendAvailable(ctx context.Context) error
+	SubscribePresence(ctx context.Context, jid types.JID) error
+	GetLIDForJID(ctx context.Context, jid types.JID) (types.JID, error)
+	DownloadMedia(ctx context.Context, msg any) ([]byte, error)
+	GetProfilePicture(ctx context.Context, jid types.JID) (*types.ProfilePictureInfo, error)
+	GetUserInfo(ctx context.Context, jids []types.JID) (map[types.JID]types.UserInfo, error)
+}
+
+// inferredOfflineTimeout is how long we wait after the last typing/message
+// event before marking a contact with hidden status as unavailable.
+// Lowered to ~50 ms in tests via this package-level var.
+var inferredOfflineTimeout = 2 * time.Minute
 
 // TrackerManager owns one Tracker per account.
 type TrackerManager struct {
@@ -114,7 +133,7 @@ func (m *TrackerManager) SubscribeContact(ctx context.Context, c db.Contact) {
 // ---------------------------------------------------------------------------
 
 type Deps struct {
-	WA       *wa.Client
+	WA       WAClient
 	DB       *db.DB
 	Hub      Hub
 	Interval time.Duration
@@ -123,7 +142,7 @@ type Deps struct {
 
 type Tracker struct {
 	accountID int64
-	wa        *wa.Client
+	wa        WAClient
 	db        *db.DB
 	hub       Hub
 	interval  time.Duration
@@ -498,17 +517,15 @@ func (t *Tracker) onChatPresence(cp *events.ChatPresence) {
 // events arrive. Only applies when the contact's WhatsApp status is hidden and
 // we are inferring their online state from activity.
 func (t *Tracker) scheduleInferredOffline(contactID int64, jidStr string) {
-	const timeout = 2 * time.Minute
-
 	t.inferredMu.Lock()
 	defer t.inferredMu.Unlock()
 
 	if timer, ok := t.inferredOnline[contactID]; ok {
-		timer.Reset(timeout)
+		timer.Reset(inferredOfflineTimeout)
 		return
 	}
 
-	t.inferredOnline[contactID] = time.AfterFunc(timeout, func() {
+	t.inferredOnline[contactID] = time.AfterFunc(inferredOfflineTimeout, func() {
 		t.inferredMu.Lock()
 		delete(t.inferredOnline, contactID)
 		t.inferredMu.Unlock()

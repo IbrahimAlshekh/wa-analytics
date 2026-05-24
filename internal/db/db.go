@@ -151,6 +151,9 @@ func splitStatements(sql string) []string {
 // isIgnorableAlterError returns true for SQLite errors that occur when trying
 // to add a column that already exists.
 func isIgnorableAlterError(err error) bool {
+	if err == nil {
+		return false
+	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "duplicate column name") ||
 		strings.Contains(msg, "already has a column named")

@@ -14,8 +14,11 @@ import (
 	"sync"
 	"time"
 
+	whatsmeow "go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/types"
+
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
-	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 )
 
 // Tracker is the interface the API uses to subscribe contacts to presence and manage scheduling.
@@ -23,6 +26,27 @@ type Tracker interface {
 	SubscribeContact(ctx context.Context, c db.Contact)
 	ApplySchedule(accountID int64, forceOffline bool, slots []db.ScheduleSlot)
 	RefreshContactPicture(accountID, contactID int64)
+}
+
+// WAClientForAPI is the subset of wa.Client methods used by API handlers.
+// *wa.Client satisfies this interface; tests use a hand-rolled fake.
+type WAClientForAPI interface {
+	IsConnected() bool
+	OwnJID() string
+	SendMessage(ctx context.Context, to types.JID, msg *waE2E.Message) (whatsmeow.SendResponse, error)
+	UploadMedia(ctx context.Context, data []byte, appMessageType whatsmeow.MediaType) (whatsmeow.UploadResponse, error)
+	FetchMessageHistory(ctx context.Context, info *types.MessageInfo) error
+	GetAllContacts(ctx context.Context) (map[types.JID]types.ContactInfo, error)
+}
+
+// WAManager manages per-account WhatsApp clients.
+// *wa.ClientManager satisfies this via the adapter in cmd/tracker/main.go.
+type WAManager interface {
+	GetByAccountID(id int64) WAClientForAPI
+	IsConnected(accountID int64) bool
+	StartQRPairing(ctx context.Context) (<-chan string, error)
+	PairPhone(ctx context.Context, phone string) (string, error)
+	Remove(ctx context.Context, accountID int64) error
 }
 
 // Config holds runtime configuration for the API server.
@@ -38,14 +62,14 @@ type Config struct {
 type Server struct {
 	cfg     Config
 	db      *db.DB
-	manager *wa.ClientManager
+	manager WAManager
 	tracker Tracker
 	hub     *Hub
 	mux     *http.ServeMux
 	limiter *rateLimiter
 }
 
-func NewServer(cfg Config, store *db.DB, manager *wa.ClientManager, trk Tracker, hub *Hub) *Server {
+func NewServer(cfg Config, store *db.DB, manager WAManager, trk Tracker, hub *Hub) *Server {
 	s := &Server{
 		cfg:     cfg,
 		db:      store,

@@ -476,11 +476,11 @@ func (db *DB) InsertMessage(ctx context.Context, m Message) (Message, error) {
 	if err != nil {
 		return Message{}, err
 	}
-	id, _ := res.LastInsertId()
-	if id == 0 {
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
 		return Message{}, nil // duplicate, already inserted
 	}
-	m.ID = id
+	m.ID, _ = res.LastInsertId()
 	return m, nil
 }
 

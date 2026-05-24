@@ -84,6 +84,36 @@ func (h *RecordingHub) Wait(kind string, timeout time.Duration) bool {
 	}
 }
 
+// WaitN blocks until at least n events of kind exist, or timeout expires.
+func (h *RecordingHub) WaitN(kind string, n int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		h.mu.Lock()
+		count := 0
+		for _, e := range h.events {
+			if e.Kind == kind {
+				count++
+			}
+		}
+		h.mu.Unlock()
+		if count >= n {
+			return true
+		}
+
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return false
+		}
+		timer := time.NewTimer(remaining)
+		select {
+		case <-h.notify:
+			timer.Stop()
+		case <-timer.C:
+			return false
+		}
+	}
+}
+
 // Reset clears all recorded events.
 func (h *RecordingHub) Reset() {
 	h.mu.Lock()

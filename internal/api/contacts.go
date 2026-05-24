@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/ibrahimalshekh/whatsapp-tracker/internal/db"
-	"github.com/ibrahimalshekh/whatsapp-tracker/internal/wa"
 	"go.mau.fi/whatsmeow/types"
 )
 
@@ -211,7 +210,7 @@ func (s *Server) handleSyncContacts(w http.ResponseWriter, r *http.Request) {
 // SyncWAContacts reads all contacts from the whatsmeow local store and inserts
 // any individual contacts not yet in tracker.db as untracked.
 // Returns the total number of contacts found in the WA store.
-func SyncWAContacts(ctx context.Context, client *wa.Client, store *db.DB, accountID int64) (int, error) {
+func SyncWAContacts(ctx context.Context, client WAClientForAPI, store *db.DB, accountID int64) (int, error) {
 	contacts, err := client.GetAllContacts(ctx)
 	if err != nil {
 		return 0, err

@@ -53,6 +53,7 @@ func SeedMessage(tb testing.TB, store *db.DB, accountID, contactID int64, text s
 		ContactID: &cid,
 		ChatJID:   "contact@s.whatsapp.net",
 		SenderJID: "contact@s.whatsapp.net",
+		MessageID: fmt.Sprintf("msg_%d_%s", at.UnixNano(), text),
 		IsFromMe:  false,
 		Text:      text,
 		Timestamp: at.Unix(),

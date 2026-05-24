@@ -204,7 +204,7 @@ func main() {
 		JWTKey:   cfg.JWTKey,
 		DataDir:  cfg.DataDir,
 		MediaDir: mediaDir,
-	}, store, manager, trackerMgr, hub)
+	}, store, &waManagerAdapter{manager}, trackerMgr, hub)
 
 	httpSrv := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -228,6 +228,25 @@ func main() {
 	_ = httpSrv.Shutdown(shutdownCtx)
 	trackerMgr.StopAll()
 }
+
+// waManagerAdapter adapts *wa.ClientManager to the api.WAManager interface.
+type waManagerAdapter struct{ m *wa.ClientManager }
+
+func (a *waManagerAdapter) GetByAccountID(id int64) api.WAClientForAPI {
+	c := a.m.GetByAccountID(id)
+	if c == nil {
+		return nil
+	}
+	return c
+}
+func (a *waManagerAdapter) IsConnected(id int64) bool              { return a.m.IsConnected(id) }
+func (a *waManagerAdapter) StartQRPairing(ctx context.Context) (<-chan string, error) {
+	return a.m.StartQRPairing(ctx)
+}
+func (a *waManagerAdapter) PairPhone(ctx context.Context, phone string) (string, error) {
+	return a.m.PairPhone(ctx, phone)
+}
+func (a *waManagerAdapter) Remove(ctx context.Context, id int64) error { return a.m.Remove(ctx, id) }
 
 func startTracker(ctx context.Context, mgr *tracker.TrackerManager, client *wa.Client, store *db.DB, hub *api.Hub, accountID int64, interval time.Duration, mediaDir string) {
 	trk := mgr.Add(accountID, tracker.Deps{
